@@ -105,6 +105,7 @@
     <ClCompile Include="hmd_driver_factory.cpp" />
     <ClCompile Include="hmd_driver_loader.cpp" />
     <ClCompile Include="ipc_server.cpp" />
+    <ClCompile Include="libpad_hooks.cpp" />
     <ClCompile Include="usb_thread_gaze.cpp" />
     <ClCompile Include="usb_thread_hooks.cpp" />
     <ClCompile Include="trigger_effect_manager.cpp" />
@@ -120,7 +121,9 @@
     <ClInclude Include="hmd_driver_loader.h" />
     <ClInclude Include="ipc_server.h" />
     <ClInclude Include="hmd_math.h" />
+    <ClInclude Include="libpad_hooks.h" />
     <ClInclude Include="pad_trigger_effect.h" />
+    <ClInclude Include="rolling_percentile.h" />
     <ClInclude Include="vr_settings.h" />
     <ClInclude Include="usb_thread_gaze.h" />
     <ClInclude Include="usb_thread_hooks.h" />

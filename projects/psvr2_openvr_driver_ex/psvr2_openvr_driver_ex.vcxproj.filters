@@ -62,6 +62,9 @@
     <ClCompile Include="trigger_effect_manager.cpp">
       <Filter>Trigger Effect</Filter>
     </ClCompile>
+    <ClCompile Include="libpad_hooks.cpp">
+      <Filter>Hooks</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="hmd_driver_loader.h">
@@ -111,6 +114,12 @@
     </ClInclude>
     <ClInclude Include="hmd2_gaze.h">
       <Filter>Gaze</Filter>
+    </ClInclude>
+    <ClInclude Include="rolling_percentile.h">
+      <Filter>Utilities</Filter>
+    </ClInclude>
+    <ClInclude Include="libpad_hooks.h">
+      <Filter>Hooks</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

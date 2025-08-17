@@ -6,6 +6,7 @@
 #include "hmd_driver_loader.h"
 #include "hook_lib.h"
 #include "ipc_server.h"
+#include "libpad_hooks.h"
 #include "trigger_effect_manager.h"
 #include "usb_thread_hooks.h"
 #include "util.h"
@@ -106,6 +107,7 @@ namespace psvr2_toolkit {
 
     CaesarManagerHooks::InstallHooks();
     HmdDeviceHooks::InstallHooks();
+    LibpadHooks::InstallHooks();
     UsbThreadHooks::InstallHooks();
   }
 
