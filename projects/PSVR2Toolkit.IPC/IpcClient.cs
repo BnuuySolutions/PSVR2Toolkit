@@ -13,6 +13,7 @@ namespace PSVR2Toolkit.CAPI {
         private static IpcClient m_pInstance;
 
         private bool m_running = false;
+        public bool IsRunning => m_running;
         private TcpClient? m_client;
         private NetworkStream? m_stream;
         private Thread? m_receiveThread;
