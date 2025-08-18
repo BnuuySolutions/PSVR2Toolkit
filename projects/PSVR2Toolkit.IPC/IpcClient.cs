@@ -82,6 +82,11 @@ namespace PSVR2Toolkit.CAPI {
             m_forceShutdownToken.Dispose();
         }
 
+        public bool IsRunning()
+        {
+            return m_running;
+        }
+
         private void ReceiveLoop(CancellationToken token) {
             byte[] buffer = new byte[1024];
 
