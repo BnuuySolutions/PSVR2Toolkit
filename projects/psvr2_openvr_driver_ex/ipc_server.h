@@ -37,6 +37,7 @@ namespace psvr2_toolkit {
 
       bool m_initialized;
       bool m_running;
+      bool m_doGaze;
       SOCKET m_socket;
       sockaddr_in m_serverAddr;
       std::thread m_receiveThread;
