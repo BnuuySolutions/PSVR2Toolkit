@@ -13,7 +13,8 @@ extern "C" __declspec(dllexport) void *HmdDriverFactory(const char *pInterfaceNa
   if (pHmdDriverLoader->GetHandle()) {
     void *result = pHmdDriverLoader->pfnHmdDriverFactory(pInterfaceName, pReturnCode);
 
-    if (strcmp(vr::IServerTrackedDeviceProvider_Version, pInterfaceName) == 0) {
+    if (strcmp(vr::IServerTrackedDeviceProvider_Version, pInterfaceName) == 0 &&
+        *pReturnCode == vr::VRInitError_None /* no point injecting if the original driver failed to initialise */) {
       static DeviceProviderProxy *pDeviceProviderProxy = DeviceProviderProxy::Instance();
       pDeviceProviderProxy->SetDeviceProvider(static_cast<vr::IServerTrackedDeviceProvider *>(result));
       return pDeviceProviderProxy;
