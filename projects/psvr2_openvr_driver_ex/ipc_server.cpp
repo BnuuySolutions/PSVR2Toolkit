@@ -2,6 +2,7 @@
 
 #include "trigger_effect_manager.h"
 #include "util.h"
+#include "vr_settings.h"
 
 #include <cstdio>
 
@@ -13,6 +14,7 @@ namespace psvr2_toolkit {
     IpcServer::IpcServer()
       : m_initialized(false)
       , m_running(false)
+      , m_doGaze(false)
       , m_socket{}
       , m_serverAddr{}
       , m_pGazeState(nullptr)
@@ -43,6 +45,7 @@ namespace psvr2_toolkit {
       }
 
       m_initialized = true;
+      m_doGaze = !VRSettings::GetBool(STEAMVR_SETTINGS_DISABLE_GAZE, SETTING_DISABLE_GAZE_DEFAULT_VALUE);
     }
 
     void IpcServer::Start() {
@@ -191,46 +194,52 @@ namespace psvr2_toolkit {
         case Command_ClientRequestGazeData: {
           if (pHeader->dataLen == 0 && m_connections.contains(clientPort)) {
 
-            CommandDataServerGazeDataResult_t response = {
+            if (m_doGaze && m_pGazeState) {
+              CommandDataServerGazeDataResult_t response = {
                 .leftEye = {
-                    .isGazeOriginValid = m_pGazeState->leftEye.isGazeOriginValid == Hmd2Bool::HMD2_BOOL_TRUE,
-                    .gazeOriginMm = {
-                        .x = m_pGazeState->leftEye.gazeOriginMm.x,
-                        .y = m_pGazeState->leftEye.gazeOriginMm.y,
-                        .z = m_pGazeState->leftEye.gazeOriginMm.z,
-                    },
-                    .isGazeDirValid = m_pGazeState->leftEye.isGazeDirValid == Hmd2Bool::HMD2_BOOL_TRUE,
-                    .gazeDirNorm {
-                        .x = m_pGazeState->leftEye.gazeDirNorm.x,
-                        .y = m_pGazeState->leftEye.gazeDirNorm.y,
-                        .z = m_pGazeState->leftEye.gazeDirNorm.z,
-                    },
-                    .isPupilDiaValid = m_pGazeState->leftEye.isPupilDiaValid == Hmd2Bool::HMD2_BOOL_TRUE,
-                    .pupilDiaMm = m_pGazeState->leftEye.pupilDiaMm,
-                    .isBlinkValid = m_pGazeState->leftEye.isBlinkValid == Hmd2Bool::HMD2_BOOL_TRUE,
-                    .blink = m_pGazeState->leftEye.blink == Hmd2Bool::HMD2_BOOL_TRUE,
+                  .isGazeOriginValid = m_pGazeState->leftEye.isGazeOriginValid == Hmd2Bool::HMD2_BOOL_TRUE,
+                  .gazeOriginMm = {
+                    .x = m_pGazeState->leftEye.gazeOriginMm.x,
+                    .y = m_pGazeState->leftEye.gazeOriginMm.y,
+                    .z = m_pGazeState->leftEye.gazeOriginMm.z,
+                  },
+                  .isGazeDirValid = m_pGazeState->leftEye.isGazeDirValid == Hmd2Bool::HMD2_BOOL_TRUE,
+                  .gazeDirNorm {
+                    .x = m_pGazeState->leftEye.gazeDirNorm.x,
+                    .y = m_pGazeState->leftEye.gazeDirNorm.y,
+                    .z = m_pGazeState->leftEye.gazeDirNorm.z,
+                  },
+                  .isPupilDiaValid = m_pGazeState->leftEye.isPupilDiaValid == Hmd2Bool::HMD2_BOOL_TRUE,
+                  .pupilDiaMm = m_pGazeState->leftEye.pupilDiaMm,
+                  .isBlinkValid = m_pGazeState->leftEye.isBlinkValid == Hmd2Bool::HMD2_BOOL_TRUE,
+                  .blink = m_pGazeState->leftEye.blink == Hmd2Bool::HMD2_BOOL_TRUE,
                 },
-
+                
                 .rightEye = {
-                    .isGazeOriginValid = m_pGazeState->rightEye.isGazeOriginValid == Hmd2Bool::HMD2_BOOL_TRUE,
-                    .gazeOriginMm = {
-                        .x = m_pGazeState->rightEye.gazeOriginMm.x,
-                        .y = m_pGazeState->rightEye.gazeOriginMm.y,
-                        .z = m_pGazeState->rightEye.gazeOriginMm.z,
-                    },
-                    .isGazeDirValid = m_pGazeState->rightEye.isGazeDirValid == Hmd2Bool::HMD2_BOOL_TRUE,
-                    .gazeDirNorm {
-                        .x = m_pGazeState->rightEye.gazeDirNorm.x,
-                        .y = m_pGazeState->rightEye.gazeDirNorm.y,
-                        .z = m_pGazeState->rightEye.gazeDirNorm.z,
-                    },
-                    .isPupilDiaValid = m_pGazeState->rightEye.isPupilDiaValid == Hmd2Bool::HMD2_BOOL_TRUE,
-                    .pupilDiaMm = m_pGazeState->rightEye.pupilDiaMm,
-                    .isBlinkValid = m_pGazeState->rightEye.isBlinkValid == Hmd2Bool::HMD2_BOOL_TRUE,
-                    .blink = m_pGazeState->rightEye.blink == Hmd2Bool::HMD2_BOOL_TRUE,
+                  .isGazeOriginValid = m_pGazeState->rightEye.isGazeOriginValid == Hmd2Bool::HMD2_BOOL_TRUE,
+                  .gazeOriginMm = {
+                    .x = m_pGazeState->rightEye.gazeOriginMm.x,
+                    .y = m_pGazeState->rightEye.gazeOriginMm.y,
+                    .z = m_pGazeState->rightEye.gazeOriginMm.z,
+                  },
+                  .isGazeDirValid = m_pGazeState->rightEye.isGazeDirValid == Hmd2Bool::HMD2_BOOL_TRUE,
+                  .gazeDirNorm {
+                    .x = m_pGazeState->rightEye.gazeDirNorm.x,
+                    .y = m_pGazeState->rightEye.gazeDirNorm.y,
+                    .z = m_pGazeState->rightEye.gazeDirNorm.z,
+                  },
+                  .isPupilDiaValid = m_pGazeState->rightEye.isPupilDiaValid == Hmd2Bool::HMD2_BOOL_TRUE,
+                  .pupilDiaMm = m_pGazeState->rightEye.pupilDiaMm,
+                  .isBlinkValid = m_pGazeState->rightEye.isBlinkValid == Hmd2Bool::HMD2_BOOL_TRUE,
+                  .blink = m_pGazeState->rightEye.blink == Hmd2Bool::HMD2_BOOL_TRUE,
                 }
-            };
-            SendIpcCommand(clientSocket, Command_ServerGazeDataResult, &response, sizeof(response));
+              };
+              SendIpcCommand(clientSocket, Command_ServerGazeDataResult, &response, sizeof(response));
+            } else {
+                CommandDataServerGazeDataResult_t response = {};
+                SendIpcCommand(clientSocket, Command_ServerGazeDataResult, &response, sizeof(response));
+            }
+            
           }
           break;
         }

@@ -20,7 +20,6 @@ Unofficial modification for the official PlayStation VR2 driver/app.
 
 ## Features
 - Eye tracking\*
-- 10-bit color depth\*
 - Improved controller prediction
 - Improved controller haptics (w/ PCM haptics)
 - Adaptive triggers
@@ -28,8 +27,6 @@ Unofficial modification for the official PlayStation VR2 driver/app.
 For developers, we also have our own API library, which allows you to take full advantage of these features.
 
 \* Eye tracking calibration is closed source and is not available to the public in source form, other than official PlayStation VR2 Toolkit releases.
-
-\* 10-bit color depth is broken on AMD GPUs newer than RDNA2/RX6000-series, due to an issue with AMD's LiquidVR, which is out of our control.
 
 ## Installation Guide
 1.) Open Steam, go to the PS VR2 app, click on the cog wheel, and go to "Manage -> Browse local files". (If you are using a copy of the PS VR2 app not installed by Steam, go to that instead.)
