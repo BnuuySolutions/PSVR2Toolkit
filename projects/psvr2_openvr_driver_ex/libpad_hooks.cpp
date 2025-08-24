@@ -55,9 +55,7 @@ namespace psvr2_toolkit {
 
     struct TimeStruct
     {
-        RollingPercentile<double> deviceClockOffset = RollingPercentile<double>(500, 1.0);
-        RollingPercentile<double> deviceLatency = RollingPercentile<double>(200, 1.0);
-        RollingPercentile<double> timeStampOffset = RollingPercentile<double>(5000, 50.0);
+        RollingPercentile<double> timeStampOffset = RollingPercentile<double>(5000, 99.0);
 
         uint32_t lastDeviceTimestamp = 0;
         uint32_t lastLoopbackTimestamp = 0;
@@ -132,46 +130,28 @@ namespace psvr2_toolkit {
     uint32_t(*libpad_deviceToHost)(TimeSync* timeSync, uint32_t device, ProcessedControllerState* outHost) = nullptr;
     uint32_t libpad_deviceToHostHook(TimeSync* timeSync, uint32_t device, ProcessedControllerState* outHost) {
         TimeStruct* timing = &controllerTimings[timeSync->isLeft ? 0 : 1];
-        uint64_t currentTime64 = getHostTimestamp();
-        // The host's current time, correctly wrapped to the device's clock domain.
-        uint32_t currentTime = static_cast<uint32_t>(currentTime64 % k_unDeviceTimestampModulus);
+        uint64_t currentTime = getHostTimestamp();
 
         // We need a specific caller that actually passes ProcessedControllerState* into outHost.
         // This caller should be from when a controller packet is received.
         if (reinterpret_cast<uintptr_t>(_ReturnAddress()) == packetRecievedReturnAddress)
         {
-            uint32_t loopbackTimestamp = outHost->loopbackTimestamp % k_unDeviceTimestampModulus;
-            uint32_t deviceTimestamp = (outHost->deviceTimestamp / k_unSenseUnitsPerMicrosecond) % k_unDeviceTimestampModulus;
-
-            if (loopbackTimestamp != timing->lastLoopbackTimestamp)
-            {
-                int32_t clockOffset = getWraparoundDifference(deviceTimestamp, loopbackTimestamp);
-                timing->deviceClockOffset.add(static_cast<double>(clockOffset));
-
-                timing->lastDeviceTimestamp = deviceTimestamp;
-                timing->lastLoopbackTimestamp = loopbackTimestamp;
-            }
-
-            // Predict what the host time was when the device sent the packet.
-            // We subtract the clock offset from the device's timestamp to translate it to the host's time domain.
-            // The modulus is added to ensure we do not underflow.
-            uint32_t devicePredictedTime = (deviceTimestamp - static_cast<uint32_t>(timing->deviceClockOffset.getPercentile()) + k_unDeviceTimestampModulus) % k_unDeviceTimestampModulus;
-
-            int32_t latency = getWraparoundDifference(currentTime, devicePredictedTime);
-            timing->deviceLatency.add(static_cast<double>(latency));
+            uint32_t deviceTimestamp = outHost->deviceTimestamp / k_unSenseUnitsPerMicrosecond;
 
             // TODO: Figure out where this offset comes from.
-            // Current best guess is delay from controller (asymmetrical roundtrip).
+			// Probably the real latency between host and device.
             uint32_t offsetInMicroseconds = 2500;
-            uint32_t newOffset = static_cast<uint32_t>(timing->deviceClockOffset.getPercentile()) - static_cast<uint32_t>(timing->deviceLatency.getPercentile()) + offsetInMicroseconds;
-            timing->timeStampOffset.add(static_cast<double>(newOffset));
+            int32_t clockOffset = getWraparoundDifference(deviceTimestamp + offsetInMicroseconds, static_cast<uint32_t>(currentTime));
+
+            timing->timeStampOffset.add(static_cast<double>(clockOffset));
         }
 
         // Translate the device timestamp back to the host's 64-bit time domain.
         uint32_t hostTime = (static_cast<uint32_t>(device) - static_cast<uint32_t>(timing->timeStampOffset.getPercentile()) + k_unDeviceTimestampModulus) % k_unDeviceTimestampModulus;
 
-        int32_t diff = getWraparoundDifference(hostTime, currentTime);
-        outHost->hostReceiveTime = currentTime64 + diff;
+        int32_t difference = getWraparoundDifference(hostTime, static_cast<uint32_t>(currentTime));
+
+        outHost->hostReceiveTime = currentTime + difference;
 
         return 0;
     }
