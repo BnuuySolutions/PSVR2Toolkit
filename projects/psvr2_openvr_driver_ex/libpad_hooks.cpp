@@ -378,6 +378,25 @@ namespace psvr2_toolkit {
             ledSyncPart = 0;
         }
 
+        if (!needsCalibration) {
+            // Use lower LED period time for better battery life.
+            switch (ledSync->phase)
+            {
+            case SenseLEDPhase::PRESCAN:
+                ledSync->period = 36;
+                break;
+            case SenseLEDPhase::BROAD:
+                ledSync->period = 30;
+                break;
+            case SenseLEDPhase::BG:
+                ledSync->period = 20;
+                break;
+            case SenseLEDPhase::STABLE:
+                ledSync->period = 9;
+                break;
+            }
+        }
+
 		// This call uses libpad_hostToDevice, which will factor in the updated latencyOffset.
 		libpad_SetSyncLedBaseTime(timeSync, ledSync);
     }

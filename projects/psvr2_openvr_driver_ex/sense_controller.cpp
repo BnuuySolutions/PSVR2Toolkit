@@ -111,26 +111,6 @@ void SenseController::SendToDevice() {
     
     uint32_t* crc = (uint32_t*)(&buffer.crc);
 
-    // Override LED settings
-    auto& ledData = this->driverTrackingData.settings.ledData;
-
-	//// Use lower LED period time for better battery life.
- //   switch (ledData.phase)
- //   {
- //       case SenseLEDPhase::PRESCAN:
- //           ledData.periodId = 36;
- //           break;
- //       case SenseLEDPhase::BROAD:
- //           ledData.periodId = 36;
- //           break;
- //       case SenseLEDPhase::BG:
- //           ledData.periodId = 20;
- //           break;
-	//	case SenseLEDPhase::STABLE:
- //           ledData.periodId = 9;
- //           break;
- //   }
-
     // With the 0xa0 mode, the rest of the data past the first few bytes are shifted ahead by one byte.
     // So copy what we did starting from the 5th byte in the original buffer to the 6th byte in the new buffer.
     memcpy(&buffer.settings, &this->driverTrackingData.settings, sizeof(SenseControllerSettings_t));
