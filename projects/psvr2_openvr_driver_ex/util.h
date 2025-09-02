@@ -53,7 +53,6 @@ namespace psvr2_toolkit {
 
       va_end(args);
     }
-
   };
 
 } // psvr2_toolkit

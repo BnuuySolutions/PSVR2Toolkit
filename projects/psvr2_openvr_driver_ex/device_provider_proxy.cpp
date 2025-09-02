@@ -13,6 +13,7 @@
 #include "vr_settings.h"
 
 #include <windows.h>
+#include "sense_controller.h"
 
 using namespace psvr2_toolkit::ipc;
 
@@ -56,6 +57,7 @@ namespace psvr2_toolkit {
 
     static DriverContextProxy *pDriverContextProxy = DriverContextProxy::Instance();
     pDriverContextProxy->SetDriverContext(pDriverContext);
+
     return m_pDeviceProvider->Init(pDriverContextProxy);
   }
 
@@ -114,6 +116,9 @@ namespace psvr2_toolkit {
   void DeviceProviderProxy::InitializeSystems() {
     IpcServer::Instance()->Initialize();
     TriggerEffectManager::Instance()->Initialize();
+    if (VRSettings::GetBool(STEAMVR_SETTINGS_USE_ENHANCED_HAPTICS, SETTING_USE_TOOLKIT_SYNC_DEFAULT_VALUE)) {
+        SenseController::Initialize();
+    }
   }
 
 } // psvr2_toolkit

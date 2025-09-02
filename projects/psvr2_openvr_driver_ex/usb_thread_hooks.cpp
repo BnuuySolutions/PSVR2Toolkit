@@ -15,6 +15,17 @@ namespace psvr2_toolkit {
     return result;
   }
 
+  LDPayload currentLDPayload;
+
+  uint64_t(*CaesarUsbThreadLeddet__poll)(void* thisptr) = nullptr;
+  uint64_t CaesarUsbThreadLeddet__pollHook(void* thisptr) {
+      uint64_t result = CaesarUsbThreadLeddet__poll(thisptr);
+
+	  memcpy(&currentLDPayload, reinterpret_cast<uint8_t*>(thisptr) + 0x230, sizeof(LDPayload));
+
+      return result;
+  }
+
   void UsbThreadHooks::InstallHooks() {
     static HmdDriverLoader *pHmdDriverLoader = HmdDriverLoader::Instance();
 
@@ -25,6 +36,11 @@ namespace psvr2_toolkit {
       HookLib::InstallHook(reinterpret_cast<void *>(pHmdDriverLoader->GetBaseAddress() + 0x1268D0),
                            reinterpret_cast<void *>(CaesarUsbThreadImuStatus__pollHook),
                            reinterpret_cast<void **>(&CaesarUsbThreadImuStatus__poll));
+
+	  // CaesarUsbThreadLeddet::poll
+	  HookLib::InstallHook(reinterpret_cast<void*>(pHmdDriverLoader->GetBaseAddress() + 0x126B80),
+		                   reinterpret_cast<void*>(CaesarUsbThreadLeddet__pollHook),
+		                   reinterpret_cast<void**>(&CaesarUsbThreadLeddet__poll));
     }
   }
 
