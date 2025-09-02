@@ -348,7 +348,7 @@ namespace psvr2_toolkit {
                     break;
                 }
 
-                Util::DriverLog("Latency Offset is currently at %d microseconds.", latencyOffset.load());
+                Util::DriverLog("Latency Offset is currently at %d microseconds. %d-%d", latencyOffset.load(), currentLedCount, lastLedCount);
 
 				lastSync = getHostTimestamp();
             }
@@ -386,7 +386,7 @@ namespace psvr2_toolkit {
                 ledSync->period = 36;
                 break;
             case SenseLEDPhase::BROAD:
-                ledSync->period = 30;
+                ledSync->period = 36;
                 break;
             case SenseLEDPhase::BG:
                 ledSync->period = 20;
