@@ -375,10 +375,7 @@ namespace psvr2_toolkit {
         if (latencyOffset < 0 || latencyOffset > 16666)
         {
             latencyOffset = 0;
-            if (--ledSyncPart < 0)
-            {
-				ledSyncPart = 0;
-            }
+            ledSyncPart = 0;
         }
 
 		// This call uses libpad_hostToDevice, which will factor in the updated latencyOffset.
