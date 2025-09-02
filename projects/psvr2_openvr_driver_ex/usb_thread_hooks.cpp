@@ -38,7 +38,7 @@ namespace psvr2_toolkit {
                            reinterpret_cast<void **>(&CaesarUsbThreadImuStatus__poll));
     }
 
-    if (!VRSettings::GetBool(STEAMVR_SETTINGS_USE_TOOLKIT_SYNC, SETTING_USE_TOOLKIT_SYNC_DEFAULT_VALUE)) {
+    if (VRSettings::GetBool(STEAMVR_SETTINGS_USE_TOOLKIT_SYNC, SETTING_USE_TOOLKIT_SYNC_DEFAULT_VALUE)) {
 	  // CaesarUsbThreadLeddet::poll
 	  HookLib::InstallHook(reinterpret_cast<void*>(pHmdDriverLoader->GetBaseAddress() + 0x126B80),
 		                   reinterpret_cast<void*>(CaesarUsbThreadLeddet__pollHook),
