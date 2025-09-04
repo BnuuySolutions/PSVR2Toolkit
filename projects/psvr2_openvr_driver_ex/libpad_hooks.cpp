@@ -254,19 +254,14 @@ namespace psvr2_toolkit {
 
         static int currentController = -1;
         static int ledSyncPart = 0;
+        static int ledSyncSteps = 0;
 		static int lastLedCount = 0;
-        static uint64_t timeout = getHostTimestamp();
+        static uint64_t syncStartTime = getHostTimestamp();
         static uint64_t lastSync = getHostTimestamp();
 
-        // We only want one controller to run this logic.
-        if (currentController == -1) {
-            currentController = controller;
-        }
-
+        // Bottom cameras only
         int currentLedCount = currentLDPayload.cameras[0].num_leds
-            + currentLDPayload.cameras[1].num_leds
-            + currentLDPayload.cameras[2].num_leds
-            + currentLDPayload.cameras[3].num_leds;
+            + currentLDPayload.cameras[1].num_leds;
 
         // TODO: calibration should be triggered via IPC
         if (GetAsyncKeyState(VK_F9) & 0x8000) {
@@ -274,29 +269,37 @@ namespace psvr2_toolkit {
             ledSyncPart = 0;
             currentController = -1;
 
-            ledSync->seq++;
-            timeout = getHostTimestamp();
+            syncStartTime = getHostTimestamp();
         }
 
-		bool needsCalibration = (ledSyncPart < 4);
+        #define NEEDS_LATENCY_CALIBRATION (ledSyncPart < 5)
 
-        if (needsCalibration)
+        if (NEEDS_LATENCY_CALIBRATION)
         {
             ledSync->last_timestamp -= 10000000; // Force the update.
         }
 
-		// Before we start calibration, we need to
+        // Ensure there are enough samples before starting the calibration
+        if (samples < 500)
+        {
+            syncStartTime = getHostTimestamp();
+        }
+        // We only want one controller to run the calibration.
+        else if (currentController == -1)
+        {
+            currentController = controller;
+        }
+
+		// Before we start calibration and turn the LEDs on, we need to:
 		// - Check that we need calibration.
-        // - Ensure there are enough samples for getting the time offset.
-		// - Ensure we have waited at least 1 second since the last calibration step.
+		// - Ensure we have waited at least 1/5 of a second since calibration start to ensure controllers were off for long enough.
 		// - Ensure this is the controller that is doing the calibration.
-        if (needsCalibration
-            && samples > 500
-            && getHostTimestamp() - timeout > 1000000
+        if (NEEDS_LATENCY_CALIBRATION
+            && getHostTimestamp() - syncStartTime > 200000
             && currentController == controller) {
 			// Force to PRESCAN phase while calibrating.
             ledSync->phase = PRESCAN;
-            ledSync->period = 6;
+            ledSync->period = 36;
 
 			uint32_t fullWindow = (ledSync->oneSubGridTime * static_cast<int32_t>(ledSync->period)) + ledSync->camExposure;
 
@@ -305,55 +308,83 @@ namespace psvr2_toolkit {
                 switch (ledSyncPart)
                 {
                 case 0:
-                    latencyOffset += fullWindow / 3;
+                    // First part should not count any steps.
+                    ledSyncSteps = 0;
 
                     // We want to see an increase in the number of LEDs tracked. (right edge)
                     if (currentLedCount > lastLedCount) {
                         ledSyncPart++;
+                        // Fall through to next part.
                     }
-
-                    break;
+                    else
+                    {
+                        latencyOffset += static_cast<uint32_t>(fullWindow / 1.2);
+                        break;
+                    }
                 case 1:
-                    latencyOffset -= fullWindow / 9;
-
                     // We want to see a decrease in the number of LEDs tracked. (left edge)
                     if (currentLedCount <= lastLedCount) {
                         ledSyncPart++;
+                        // Fall through to next part.
                     }
-
-                    break;
+                    else
+                    {
+                        latencyOffset -= fullWindow / 6;
+                        break;
+                    }
                 case 2:
-                    latencyOffset += fullWindow / 16;
-
                     // We want to see an increase in the number of LEDs tracked. (right edge)
                     if (currentLedCount > lastLedCount) {
                         ledSyncPart++;
+                        // Fall through to next part.
                     }
-                    break;
+                    else
+                    {
+                        latencyOffset += fullWindow / 16;
+                        break;
+                    }
                 case 3:
-                    latencyOffset -= fullWindow / 48;
-
-                    // We want to see a decrease in the number of LEDs tracked.
-                    // At this point, we should be on the edge by 10 microseconds.
+                    // We want to see a decrease in the number of LEDs tracked. (left edge)
                     if (currentLedCount <= lastLedCount) {
+                        ledSyncPart++;
+                        // Fall through to next part.
+                    }
+                    else
+                    {
+                        latencyOffset -= fullWindow / 64;
+                        break;
+                    }
+                case 4:
+                    // We want to see a decrease in the number of LEDs tracked.
+                    // At this point, we should be on the edge by a few microseconds.
+                    if (currentLedCount > lastLedCount) {
                         ledSyncPart++;
 
                         // Go to the center of this cycle, and then we now have our correct latency offset.
                         latencyOffset += fullWindow / 2;
 
                         Util::DriverLog("Completed latency calibration. Final latency offset: %d microseconds", latencyOffset.load());
+                        break;
                     }
-                    break;
+                    else
+                    {
+                        latencyOffset += fullWindow / 256;
+                        break;
+                    }
                 default:
                     break;
                 }
 
-                Util::DriverLog("Latency Offset is currently at %d microseconds. %d-%d", latencyOffset.load(), currentLedCount, lastLedCount);
+                if (NEEDS_LATENCY_CALIBRATION)
+                {
+                    Util::DriverLog("Latency Offset is currently at %d microseconds.", latencyOffset.load());
 
-				lastSync = getHostTimestamp();
+                    lastSync = getHostTimestamp();
+                    ledSyncSteps++;
+                }
             }
 		}
-        else if (needsCalibration) {
+        else if (NEEDS_LATENCY_CALIBRATION) {
 			// Ensure LEDs are off before we start calibration,
             // or if we're not the controller doing calibration.
 			ledSync->phase = LED_ALL_OFF;
@@ -363,7 +394,7 @@ namespace psvr2_toolkit {
             {
                 // Set baseline LED count. The blob tracking may pick up other sources.
                 // Also add a small margin of error.
-                lastLedCount = currentLedCount + 12;
+                lastLedCount = currentLedCount + 6;
             }
         }
         else if (getHostTimestamp() - lastSync < 1000000)
@@ -372,13 +403,13 @@ namespace psvr2_toolkit {
             ledSync->phase = PRESCAN;
         }
 
-        if (latencyOffset < 0 || latencyOffset > 16666)
+        if (latencyOffset < 0 || latencyOffset > 16666 || ledSyncSteps > 50)
         {
             latencyOffset = 0;
             ledSyncPart = 0;
         }
 
-        if (!needsCalibration) {
+        if (!NEEDS_LATENCY_CALIBRATION) {
             // Use lower LED period time for better battery life.
             switch (ledSync->phase)
             {
