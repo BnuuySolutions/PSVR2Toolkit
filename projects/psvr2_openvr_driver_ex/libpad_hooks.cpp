@@ -83,7 +83,11 @@ namespace psvr2_toolkit {
     const int k_libpadDeviceTypeSenseLeft = 3;
     const int k_libpadDeviceTypeSenseRight = 4;
 
-    TimeStruct controllerTimings[2];
+    const int k_driverDeviceTypeHmd = 0;
+    const int k_driverDeviceTypeSenseLeft = 2;
+    const int k_driverDeviceTypeSenseRight = 1;
+
+    ControllerStruct controllerTimings[2];
 
     const uint32_t k_unSenseUnitsPerMicrosecond = 3;
 
@@ -142,7 +146,7 @@ namespace psvr2_toolkit {
 
     uint32_t(*libpad_hostToDevice)(TimeSync* timeSync, uint32_t host, uint32_t* outDevice) = nullptr;
     uint32_t libpad_hostToDeviceHook(TimeSync* timeSync, uint32_t host, uint32_t* outDevice) {
-        TimeStruct* timing = &controllerTimings[timeSync->isLeft ? 0 : 1];
+        ControllerStruct* timing = &controllerTimings[timeSync->isLeft ? 0 : 1];
         std::scoped_lock lock(timing->mutex);
 
         uint64_t calculatedTimestamp = static_cast<uint64_t>(host)
@@ -156,7 +160,7 @@ namespace psvr2_toolkit {
 
     uint32_t(*libpad_deviceToHost)(TimeSync* timeSync, uint32_t device, ProcessedControllerState* outHost) = nullptr;
     uint32_t libpad_deviceToHostHook(TimeSync* timeSync, uint32_t device, ProcessedControllerState* outHost) {
-        TimeStruct* timing = &controllerTimings[timeSync->isLeft ? 0 : 1];
+        ControllerStruct* timing = &controllerTimings[timeSync->isLeft ? 0 : 1];
 		std::scoped_lock lock(timing->mutex);
 
         uint64_t currentTime = getHostTimestamp();
@@ -245,12 +249,15 @@ namespace psvr2_toolkit {
 
 		int controller = timeSync->isLeft ? 0 : 1;
         int samples;
-
+        bool isTracking;
+		uint64_t lastTrackedTimestamp;
         {
-            TimeStruct* timing = &controllerTimings[controller];
+            ControllerStruct* timing = &controllerTimings[controller];
             std::scoped_lock lock(timing->mutex);
             samples = static_cast<int>(timing->timeStampOffset.size());
-        }
+            isTracking = timing->isTracking;
+			lastTrackedTimestamp = timing->lastTrackedTimestamp;
+		}
 
         static int currentController = -1;
         static int ledSyncPart = 0;
@@ -397,16 +404,29 @@ namespace psvr2_toolkit {
                 lastLedCount = currentLedCount + 6;
             }
         }
-        else if (getHostTimestamp() - lastSync < 1000000)
+        else if (getHostTimestamp() - lastSync < 5000000)
         {
             // If calibration finished recently, we need to make sure the controllers both go back into prescan mode.
             ledSync->phase = PRESCAN;
+
+			// If we haven't tracked for 2 seconds, reset the calibration.
+            if (currentController == controller && !isTracking && static_cast<int64_t>(getHostTimestamp() - lastTrackedTimestamp) > 2000000) {
+                latencyOffset = 0;
+                ledSyncPart = 0;
+                currentController = -1;
+
+                syncStartTime = getHostTimestamp();
+
+                Util::DriverLog("Reset latency calibration due to not tracking. %lld", static_cast<int64_t>(getHostTimestamp() - lastTrackedTimestamp));
+			}
         }
 
         if (latencyOffset < 0 || latencyOffset > 16666 || ledSyncSteps > 50)
         {
             latencyOffset = 0;
             ledSyncPart = 0;
+
+            syncStartTime = getHostTimestamp();
         }
 
         if (!NEEDS_LATENCY_CALIBRATION) {
@@ -432,6 +452,38 @@ namespace psvr2_toolkit {
 		libpad_SetSyncLedBaseTime(timeSync, ledSync);
     }
 
+    // logDeviceTrackingState
+    void (*logDeviceTrackingState)(void* session, int deviceType, uint64_t timestamp,
+        void* previousPose, void* previousMeta, void* currentPose, void* currentMeta) = nullptr;
+    void logDeviceTrackingStateHook(void* session, int deviceType, uint64_t timestamp,
+		void* previousPose, void* previousMeta, void* currentPose, void* currentMeta) {
+        char* trackingFlag = reinterpret_cast<char*>(currentMeta) + 0x8;
+
+		int controller = -1;
+
+        if (deviceType == k_driverDeviceTypeSenseLeft) {
+            controller = 0;
+        }
+        else if (deviceType == k_driverDeviceTypeSenseRight) {
+            controller = 1;
+		}
+        
+		if (controller != -1)
+        {
+            ControllerStruct* timing = &controllerTimings[controller];
+            std::scoped_lock lock(timing->mutex);
+			timing->isTracking = (*trackingFlag == 9);
+
+
+            if (timing->isTracking) {
+                timing->lastTrackedTimestamp = getHostTimestamp();
+            }
+        }
+
+        logDeviceTrackingState(session, deviceType, timestamp,
+            previousPose, previousMeta, currentPose, currentMeta);
+	}
+
     void LibpadHooks::InstallHooks() {
         static HmdDriverLoader* pHmdDriverLoader = HmdDriverLoader::Instance();
 
@@ -454,6 +506,12 @@ namespace psvr2_toolkit {
             HookLib::InstallHook(reinterpret_cast<void*>(pHmdDriverLoader->GetBaseAddress() + 0x1C27D0),
                 reinterpret_cast<void*>(libpad_SetSyncLedBaseTimeHook),
                 reinterpret_cast<void**>(&libpad_SetSyncLedBaseTime));
+
+            // TODO: this should be moved out
+            // driver function for void logDeviceTrackingState(void* session, int deviceType, uint64_t timestamp, void* previousPose, void* previousMeta, void* currentPose, void* currentMeta) @ 0x161520
+            HookLib::InstallHook(reinterpret_cast<void*>(pHmdDriverLoader->GetBaseAddress() + 0x161520),
+                reinterpret_cast<void*>(logDeviceTrackingStateHook),
+				reinterpret_cast<void**>(&logDeviceTrackingState));
         }
 
         if (VRSettings::GetBool(STEAMVR_SETTINGS_USE_ENHANCED_HAPTICS, SETTING_USE_TOOLKIT_SYNC_DEFAULT_VALUE)) {

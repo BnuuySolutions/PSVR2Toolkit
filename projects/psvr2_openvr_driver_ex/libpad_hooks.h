@@ -4,10 +4,12 @@
 #include <mutex>
 
 namespace psvr2_toolkit {
-  struct TimeStruct
+  // TODO: Move this into SenseController
+  struct ControllerStruct
   {
     RollingPercentile<double> timeStampOffset = RollingPercentile<double>(5000, 99.9);
-    bool shouldBumpLEDSequence = false;
+    bool isTracking = false;
+	uint64_t lastTrackedTimestamp = 0;
     std::mutex mutex;
   };
 
