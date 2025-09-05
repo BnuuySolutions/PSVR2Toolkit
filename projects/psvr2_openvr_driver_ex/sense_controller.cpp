@@ -88,115 +88,127 @@ void SenseController::SetHandle(void* handle, int padHandle) {
         this->padHandle = padHandle;
     }
 
-    this->SetGeneratedHaptic(800.0f, k_unSenseMaxHapticAmplitude, 1500, false);
+    if (handle != nullptr)
+    {
+        this->SetGeneratedHaptic(800.0f, k_unSenseMaxHapticAmplitude, 1500, false);
+    }
 }
 
 uint32_t offset = 0;
 
 void SenseController::SendToDevice() {
-    std::scoped_lock<std::mutex> lock(this->controllerMutex);
-
-    if (this->handle == NULL)
-    {
-        return;
-    }
-
     SenseControllerPacket_t buffer;
 
-	memset(&buffer, 0, sizeof(buffer));
-
-    buffer.reportId = 0x31;
-    buffer.mode = 0xa0;
-    buffer.unkData1 = 0x10;
-    
-    uint32_t* crc = (uint32_t*)(&buffer.crc);
-
-    // With the 0xa0 mode, the rest of the data past the first few bytes are shifted ahead by one byte.
-    // So copy what we did starting from the 5th byte in the original buffer to the 6th byte in the new buffer.
-    memcpy(&buffer.settings, &this->driverTrackingData.settings, sizeof(SenseControllerSettings_t));
-
-	// Disallow normal haptics, we are using PCM haptics.
-    buffer.settings.unkData1[0] &= 0b11111101;
-
-	// Always enable adaptive triggers
-	buffer.settings.unkData1[0] |= 0b00000100;
-
-    // Always enable LED setting change
-    buffer.settings.unkData1[1] |= 0b00000100;
-
-    // Adaptive trigger data
-    memcpy(&buffer.settings.adaptiveTriggerData, &this->adaptiveTriggerData, sizeof(SenseAdaptiveTriggerCommand_t));
-
-    buffer.settings.ledEnable = g_StatusLED ? 0x01 : 0x00;
-    buffer.packetNum = this->hapticPacketIncrement++;
-
-    auto& pcmData = this->pcmData;
-
-    // Copy the PCM data to the buffer. We need to make sure we don't go out of bounds.
-    size_t bytesToCopy = std::min(pcmData.size() - this->samplesRead, static_cast<size_t>(32));
-    if (bytesToCopy != 0)
     {
-        memcpy_s(&buffer.hapticPCM, sizeof(buffer.hapticPCM), pcmData.data() + this->samplesRead, bytesToCopy);
-        this->samplesRead += bytesToCopy;
-    }
+        std::scoped_lock<std::mutex> lock(this->controllerMutex);
 
-    // We basically want to make a thud
-    if (this->phaseJump)
-    {
-        this->phaseJump = false;
-        hapticPosition = hapticPosition > k_unSenseHalfSamplePosition ? 0 : k_unSenseHalfSamplePosition;
-
-        // Back up a bit that so the actuator can move down in 6 samples, then all the way up.
-        hapticPosition -= 6;
-    }
-
-    // Calculate the haptic overdrive based on frequency. We want overdrive to range from 25.0 to 1.0.
-    // Basically, this makes a square wave from the cosine wave. Lower frequencies will have a higher overdrive.
-    // We also overdrive for frequencies above 500 Hz.
-
-    double overdrive = 25.0;
-
-    // Make sure we don't divide by zero
-    if (this->hapticFreq != 0.0)
-    {
-        overdrive = Clamp(1000.0 / this->hapticFreq, 10.0 + 1.0, 35.0) - 10.0 + (this->hapticFreq - 500.0);
-    }
-    
-    // In addition to copying the PCM data, we also want to add the generated haptic data to the buffer.
-    for (int i = 0; i < sizeof(buffer.hapticPCM); i++)
-    {
-        if (this->hapticSamplesLeft != 0)
+        if (this->handle == NULL)
         {
-            buffer.hapticPCM[i] = ClampedAdd(buffer.hapticPCM[i], CosineToByte(hapticPosition, k_unSenseMaxSamplePosition, this->hapticAmp, overdrive));
-            hapticPosition = (hapticPosition + static_cast<int32_t>(this->hapticFreq * k_unSenseSubsamples)) % k_unSenseMaxSamplePosition;
-            
-            this->hapticSamplesLeft -= 1;
+            return;
         }
-    }
-    
-    if (this->hapticSamplesLeft == 0)
-    {
-        // Set position to the peak of a rise or fall to make sure the next haptic has a good start.
-        hapticPosition = hapticPosition > k_unSenseHalfSamplePosition ? 0 : k_unSenseHalfSamplePosition;
-    }
 
-    buffer.settings.timeStampMicrosecondsLastSend = GetHostTimestamp();
+        memset(&buffer, 0, sizeof(buffer));
 
-    *crc = CalculateSenseCRC32(&buffer, sizeof(buffer) - sizeof(buffer.crc));
+        buffer.reportId = 0x31;
+        buffer.mode = 0xa0;
+        buffer.unkData1 = 0x10;
+
+        uint32_t* crc = (uint32_t*)(&buffer.crc);
+
+        // With the 0xa0 mode, the rest of the data past the first few bytes are shifted ahead by one byte.
+        // So copy what we did starting from the 5th byte in the original buffer to the 6th byte in the new buffer.
+        memcpy(&buffer.settings, &this->driverTrackingData.settings, sizeof(SenseControllerSettings_t));
+
+        // Disallow normal haptics, we are using PCM haptics.
+        buffer.settings.unkData1[0] &= 0b11111101;
+
+        // Always enable adaptive triggers
+        buffer.settings.unkData1[0] |= 0b00000100;
+
+        // Always enable LED setting change
+        buffer.settings.unkData1[1] |= 0b00000100;
+
+        // Adaptive trigger data
+        memcpy(&buffer.settings.adaptiveTriggerData, &this->adaptiveTriggerData, sizeof(SenseAdaptiveTriggerCommand_t));
+
+        buffer.settings.ledEnable = g_StatusLED ? 0x01 : 0x00;
+        buffer.packetNum = this->hapticPacketIncrement++;
+
+        auto& pcmData = this->pcmData;
+
+        // Copy the PCM data to the buffer. We need to make sure we don't go out of bounds.
+        size_t bytesToCopy = std::min(pcmData.size() - this->samplesRead, static_cast<size_t>(32));
+        if (bytesToCopy != 0)
+        {
+            memcpy_s(&buffer.hapticPCM, sizeof(buffer.hapticPCM), pcmData.data() + this->samplesRead, bytesToCopy);
+            this->samplesRead += bytesToCopy;
+        }
+
+        // We basically want to make a thud
+        if (this->phaseJump)
+        {
+            this->phaseJump = false;
+            hapticPosition = hapticPosition > k_unSenseHalfSamplePosition ? 0 : k_unSenseHalfSamplePosition;
+
+            // Back up a bit that so the actuator can move down in 6 samples, then all the way up.
+            hapticPosition -= 6;
+        }
+
+        // Calculate the haptic overdrive based on frequency. We want overdrive to range from 25.0 to 1.0.
+        // Basically, this makes a square wave from the cosine wave. Lower frequencies will have a higher overdrive.
+        // We also overdrive for frequencies above 500 Hz.
+
+        double overdrive = 25.0;
+
+        // Make sure we don't divide by zero
+        if (this->hapticFreq != 0.0)
+        {
+            overdrive = Clamp(1000.0 / this->hapticFreq, 10.0 + 1.0, 35.0) - 10.0 + (this->hapticFreq - 500.0);
+        }
+
+        // In addition to copying the PCM data, we also want to add the generated haptic data to the buffer.
+        for (int i = 0; i < sizeof(buffer.hapticPCM); i++)
+        {
+            if (this->hapticSamplesLeft != 0)
+            {
+                buffer.hapticPCM[i] = ClampedAdd(buffer.hapticPCM[i], CosineToByte(hapticPosition, k_unSenseMaxSamplePosition, this->hapticAmp, overdrive));
+                hapticPosition = (hapticPosition + static_cast<int32_t>(this->hapticFreq * k_unSenseSubsamples)) % k_unSenseMaxSamplePosition;
+
+                this->hapticSamplesLeft -= 1;
+            }
+        }
+
+        if (this->hapticSamplesLeft == 0)
+        {
+            // Set position to the peak of a rise or fall to make sure the next haptic has a good start.
+            hapticPosition = hapticPosition > k_unSenseHalfSamplePosition ? 0 : k_unSenseHalfSamplePosition;
+        }
+
+        buffer.settings.timeStampMicrosecondsLastSend = GetHostTimestamp();
+
+        *crc = CalculateSenseCRC32(&buffer, sizeof(buffer) - sizeof(buffer.crc));
+    }
 
     long pendingOperationCount = asyncWriter.GetPendingOperationCount();
     if (pendingOperationCount > 2)
     {
-        Util::DriverLog("Failed to send. Too many pending operations. Pending operations: %ld\r\n", pendingOperationCount);
+        Util::DriverLog("Failed to send. Too many pending operations.\r\n");
         return;
     }
 
-    if (!asyncWriter.Write(this->handle, &buffer, 78))
+    auto timeoutLambda = [this]() {
+		Util::DriverLog("Send operation timed out. Closing device.\r\n");
+
+        CloseHandle(this->handle);
+
+		this->SetHandle(NULL, -1);
+	};
+
+    if (!asyncWriter.Write(this->handle, &buffer, 78, 5000, timeoutLambda))
     {
 		CloseHandle(this->handle);
 
-        this->handle = nullptr;
-        this->padHandle = -1;
+        this->SetHandle(NULL, -1);
 
         Util::DriverLog("Failed to send. Closing device. Last error: %#x\r\n", GetLastError());
         return;
