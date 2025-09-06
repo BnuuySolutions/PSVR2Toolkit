@@ -1,6 +1,7 @@
 #pragma once
 
 #include "math_helpers.h"
+#include "libpad_hooks.h"
 #include "rolling_percentile.h"
 #include "write_file_async.h"
 
@@ -18,18 +19,7 @@ constexpr uint8_t k_unSenseMaxHapticAmplitude = 127;
 
 constexpr uint32_t k_unSenseUnitsPerMicrosecond = 3;
 
-enum SenseLEDPhase : uint8_t {
-	INIT = 0x0,
-    PRESCAN = 0x1,
-	BROAD = 0x2,
-	BG = 0x3,
-	STABLE = 0x4,
-	LED_ALL_OFF = 0x5,
-	LED_ALL_ON = 0x6,
-	DEBUG = 0x7
-};
-
-// Do not care about alignment
+// Do not apply alignment
 #pragma pack(push, 1)
 struct SenseAdaptiveTriggerCommand_t {
     uint8_t mode;
@@ -46,7 +36,7 @@ struct SenseResponse_t {
 }; static_assert(sizeof(SenseResponse_t) == 78, "Size of SenseResponse_t is not 78 bytes!");
 
 struct SenseLED_t {
-    SenseLEDPhase phase;
+    uint8_t phase;
     uint8_t sequenceNumber; // Increment when this struct changes
     uint8_t periodId;
     uint32_t cyclePosition; // For PRESCAN, this sets the position in the cycle, for other phases this is an offset from the existing cycle position.
@@ -85,23 +75,8 @@ struct SenseControllerPCModePacket_t {
 #pragma pack(pop)
 
 // The official driver calculates the host timestamp this way.
-// It simply converts QueryPerformanceCounter to unsigned 32bit microseconds.
-inline const uint32_t GetHostTimestamp()
-{
-    static LARGE_INTEGER frequency{};
-    if (frequency.QuadPart == 0)
-    {
-        QueryPerformanceFrequency(&frequency);
-    }
-
-    LARGE_INTEGER now;
-    QueryPerformanceCounter(&now);
-
-    return static_cast<uint32_t>((static_cast<double>(now.QuadPart) /
-        static_cast<double>(frequency.QuadPart)) * 1e6);
-}
-
-inline const uint64_t GetHostTimestamp64()
+// It simply converts QueryPerformanceCounter to unsigned 64bit microseconds.
+inline const uint64_t GetHostTimestamp()
 {
     static LARGE_INTEGER frequency{};
     if (frequency.QuadPart == 0)
@@ -116,25 +91,10 @@ inline const uint64_t GetHostTimestamp64()
         static_cast<double>(frequency.QuadPart)) * 1e6);
 }
 
-inline const uint32_t GetHostImuTimestamp()
-{
-    static LARGE_INTEGER frequency{};
-    if (frequency.QuadPart == 0)
-    {
-        QueryPerformanceFrequency(&frequency);
-    }
-
-    LARGE_INTEGER now;
-    QueryPerformanceCounter(&now);
-
-    return static_cast<uint32_t>((static_cast<double>(now.QuadPart) /
-        static_cast<double>(frequency.QuadPart)) * 1e6 * static_cast<double>(k_unSenseUnitsPerMicrosecond));
-}
-
 namespace psvr2_toolkit {
     class SenseController {
     public:
-        SenseController() = default;
+        SenseController(bool isLeft) : isLeft(isLeft) {}
         ~SenseController() = default;
 
         static void Initialize();
@@ -148,7 +108,46 @@ namespace psvr2_toolkit {
 
         void SetTrackingControllerSettings(const SenseControllerPCModePacket_t* data);
         void SetAdaptiveTriggerData(const SenseAdaptiveTriggerCommand_t* data);
-        static void SetLastLDTimestamp(uint32_t timestamp);
+
+        void SetIsTracking(bool tracking, uint64_t timestamp) {
+            std::scoped_lock<std::mutex> lock(this->controllerMutex);
+            this->isTracking = tracking;
+            if (tracking) {
+                this->lastTrackedTimestamp = timestamp;
+			}
+        }
+        bool GetTrackingState(uint64_t& outLastTrackedTimestamp) {
+            std::scoped_lock<std::mutex> lock(this->controllerMutex);
+            outLastTrackedTimestamp = this->lastTrackedTimestamp;
+			return this->isTracking;
+        }
+        void GetLibpadSyncs(LibpadTimeSync*& outTimeSync, LibpadLedSync*& outLedSync) {
+            std::scoped_lock<std::mutex> lock(this->controllerMutex);
+            outTimeSync = this->timeSync;
+			outLedSync = this->ledSync;
+        }
+        void SetLibpadSyncs(LibpadTimeSync* timeSync, LibpadLedSync* ledSync) {
+			std::scoped_lock<std::mutex> lock(this->controllerMutex);
+			this->timeSync = timeSync;
+			this->ledSync = ledSync;
+        }
+
+        double GetTimestampOffset() {
+            std::scoped_lock<std::mutex> lock(this->controllerMutex);
+            return this->timeStampOffset.getPercentile();
+		}
+        size_t GetTimestampOffsetSampleCount() {
+            std::scoped_lock<std::mutex> lock(this->controllerMutex);
+            return this->timeStampOffset.size();
+        }
+        void AddTimestampOffsetSample(double sample) {
+            std::scoped_lock<std::mutex> lock(this->controllerMutex);
+            this->timeStampOffset.add(sample);
+		}
+        void ClearTimestampOffsetSamples() {
+            std::scoped_lock<std::mutex> lock(this->controllerMutex);
+            this->timeStampOffset.clear();
+        }
 
         const void* GetHandle();
         void SetHandle(void* handle, int padHandle);
@@ -159,6 +158,8 @@ namespace psvr2_toolkit {
         static SenseController& GetRightController() { return rightController; }
 
         static SenseController& GetControllerByPadHandle(int padHandle) {
+			std::scoped_lock<std::mutex, std::mutex> lock1(leftController.controllerMutex, rightController.controllerMutex);
+
             if (leftController.padHandle == padHandle) {
                 return leftController;
             }
@@ -167,6 +168,12 @@ namespace psvr2_toolkit {
             }
             throw std::runtime_error("No controller with the given pad handle.");
 		}
+
+        static SenseController& GetControllerByIsLeft(bool isLeft) {
+            return isLeft ? leftController : rightController;
+		}
+
+        const bool isLeft;
 
         // Should visible LEDs on the controllers be on or off?
         // This should be set to false to save power when the user is wearing the headset and doesn't need to see the LEDs.
@@ -178,6 +185,14 @@ namespace psvr2_toolkit {
 		int padHandle = -1;
         std::mutex controllerMutex;
 
+        RollingPercentile<double> timeStampOffset = RollingPercentile<double>(5000, 99.9);
+
+        bool isTracking = false;
+        uint64_t lastTrackedTimestamp = 0;
+
+        LibpadTimeSync* timeSync = nullptr;
+        LibpadLedSync* ledSync = nullptr;
+
         AsyncFileWriter asyncWriter;
 
         SenseControllerPCModePacket_t driverTrackingData = {};
@@ -185,8 +200,6 @@ namespace psvr2_toolkit {
 
         static SenseController leftController;
         static SenseController rightController;
-
-        static std::atomic<uint32_t> lastLDTimestamp;
 
         uint32_t lastDeviceTimestamp = 0;
         uint32_t lastLoopbackTimestamp = 0;

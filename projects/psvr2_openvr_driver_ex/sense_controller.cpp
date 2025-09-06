@@ -20,9 +20,8 @@ using namespace psvr2_toolkit;
 
 std::atomic<bool> SenseController::g_StatusLED = true;
 std::atomic<uint8_t> SenseController::g_ShouldResetLEDTrackingInTicks = 0;
-std::atomic<uint32_t> SenseController::lastLDTimestamp;
-SenseController SenseController::leftController;
-SenseController SenseController::rightController;
+SenseController SenseController::leftController = SenseController(true);
+SenseController SenseController::rightController = SenseController(false);
 
 std::atomic<std::thread*> hapticsThread;
 
@@ -70,10 +69,6 @@ void SenseController::SetAdaptiveTriggerData(const SenseAdaptiveTriggerCommand_t
     memcpy(&this->adaptiveTriggerData, data, sizeof(SenseAdaptiveTriggerCommand_t));
 }
 
-void SenseController::SetLastLDTimestamp(uint32_t timestamp) {
-    lastLDTimestamp = timestamp;
-}
-
 const void* SenseController::GetHandle() {
     std::scoped_lock<std::mutex> lock(controllerMutex);
 
@@ -91,6 +86,7 @@ void SenseController::SetHandle(void* handle, int padHandle) {
     if (handle != nullptr)
     {
         this->SetGeneratedHaptic(800.0f, k_unSenseMaxHapticAmplitude, 1500, false);
+		this->ClearTimestampOffsetSamples();
     }
 }
 
@@ -184,7 +180,7 @@ void SenseController::SendToDevice() {
             hapticPosition = hapticPosition > k_unSenseHalfSamplePosition ? 0 : k_unSenseHalfSamplePosition;
         }
 
-        buffer.settings.timeStampMicrosecondsLastSend = GetHostTimestamp();
+        buffer.settings.timeStampMicrosecondsLastSend = static_cast<uint32_t>(GetHostTimestamp());
 
         *crc = CalculateSenseCRC32(&buffer, sizeof(buffer) - sizeof(buffer.crc));
     }
