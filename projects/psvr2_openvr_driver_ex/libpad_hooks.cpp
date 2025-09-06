@@ -47,31 +47,6 @@ namespace psvr2_toolkit {
         uint8_t  rightBattery;
     };
 
-    struct TimeSync
-    {
-        uint8_t unknown0x0[0x810];
-        uint8_t isLeft;
-        uint8_t unknown0x812[0x16f];
-    }; static_assert(sizeof(TimeSync) == 0x980, "Size of TimeSync is not 0x980 bytes!");
-
-	// This is slightly different from SenseLED_t, as this
-    // is not packed and contains some additional data.
-    struct LedSync
-    {
-        SenseLEDPhase phase;
-        uint8_t seq;
-        uint8_t period;
-        int32_t baseTime;
-        int32_t frameCycle;
-        uint8_t leds[4];
-        int64_t last_timestamp;
-        bool unknown0x18; // Is LED sync data valid?
-        int32_t camExposure;
-        int32_t oneSubGridTime;
-        int32_t oneSubGridTime_x15; // Unsure what this is, but this is oneSubGridTime times 15.
-		bool unknown0x28; // Is camera data valid?
-    }; static_assert(sizeof(LedSync) == 0x30, "Size of LedSync is not 0x30 bytes!");
-
     struct HidDeviceDescriptor
     {
         uint32_t unknown1[2];
@@ -146,12 +121,12 @@ namespace psvr2_toolkit {
 
     uint32_t(*libpad_hostToDevice)(TimeSync* timeSync, uint32_t host, uint32_t* outDevice) = nullptr;
     uint32_t libpad_hostToDeviceHook(TimeSync* timeSync, uint32_t host, uint32_t* outDevice) {
-        ControllerStruct* timing = &controllerTimings[timeSync->isLeft ? 0 : 1];
-        std::scoped_lock lock(timing->mutex);
+        ControllerStruct* controllerData = &controllerTimings[timeSync->isLeft ? 0 : 1];
+        std::scoped_lock lock(controllerData->mutex);
 
         uint64_t calculatedTimestamp = static_cast<uint64_t>(host)
             + static_cast<uint64_t>(latencyOffset)
-            + static_cast<uint64_t>(timing->timeStampOffset.getPercentile());
+            + static_cast<uint64_t>(controllerData->timeStampOffset.getPercentile());
 
         *outDevice = static_cast<uint32_t>(calculatedTimestamp % k_unDeviceTimestampModulus);
 
@@ -160,8 +135,8 @@ namespace psvr2_toolkit {
 
     uint32_t(*libpad_deviceToHost)(TimeSync* timeSync, uint32_t device, ProcessedControllerState* outHost) = nullptr;
     uint32_t libpad_deviceToHostHook(TimeSync* timeSync, uint32_t device, ProcessedControllerState* outHost) {
-        ControllerStruct* timing = &controllerTimings[timeSync->isLeft ? 0 : 1];
-		std::scoped_lock lock(timing->mutex);
+        ControllerStruct* controllerData = &controllerTimings[timeSync->isLeft ? 0 : 1];
+		std::scoped_lock lock(controllerData->mutex);
 
         uint64_t currentTime = getHostTimestamp();
 
@@ -173,12 +148,12 @@ namespace psvr2_toolkit {
 
             int32_t clockOffset = getWraparoundDifference(deviceTimestamp, static_cast<uint32_t>(currentTime));
 
-            timing->timeStampOffset.add(static_cast<double>(clockOffset));
+            controllerData->timeStampOffset.add(static_cast<double>(clockOffset));
         }
 
         // Translate the device timestamp back to the host's 64-bit time domain.
         uint32_t hostTime = (static_cast<uint32_t>(device)
-                            - static_cast<uint32_t>(timing->timeStampOffset.getPercentile())
+                            - static_cast<uint32_t>(controllerData->timeStampOffset.getPercentile())
                             + k_unDeviceTimestampModulus) % k_unDeviceTimestampModulus;
 
         int32_t difference = getWraparoundDifference(hostTime, static_cast<uint32_t>(currentTime)) - latencyOffset;
@@ -190,7 +165,7 @@ namespace psvr2_toolkit {
 
     HidDeviceDescriptor* (*libpad_CreateHidDevice)(HidDeviceDescriptor* device, const wchar_t* name, int deviceType) = nullptr;
     HidDeviceDescriptor* libpad_CreateHidDeviceHook(HidDeviceDescriptor* device, const wchar_t* name, int deviceType) {
-        Util::DriverLog("CreateHidDeviceHook called for device: %ls, type: %d", name, deviceType);
+        Util::DriverLog("libpad_CreateHidDeviceHook called for device: %ls, type: %d", name, deviceType);
 
 		HidDeviceDescriptor* result = libpad_CreateHidDevice(device, name, deviceType);
 
@@ -210,7 +185,7 @@ namespace psvr2_toolkit {
 
     void (*libpad_Disconnect)(int device) = nullptr;
     void libpad_DisconnectHook(int device) {
-        Util::DriverLog("libpadDisconnectHook called for device handle: %d", device);
+        Util::DriverLog("libpad_DisconnectHook called for device handle: %d", device);
 
         try {
             SenseController& controller = SenseController::GetControllerByPadHandle(device);
@@ -242,6 +217,64 @@ namespace psvr2_toolkit {
         return 0;
     }
 
+
+    enum class CommandType : uint8_t {
+        SET_SYNC_PHASE = 1,
+        SET_LEDS_IMMEDIATE = 2,
+        ADJUST_FRAME_CYCLE = 3,
+        ADJUST_BASE_TIME = 4,
+        ADJUST_TIME_AND_CYCLE = 5,
+        SYSTEM_CONTROL = 7
+    };
+
+#pragma pack(push, 1)
+    struct SetSyncPhasePayload {
+        uint8_t phase;
+        uint8_t period;
+        uint8_t leds[4];
+        uint32_t frameCycle;
+    };
+
+    struct SetLedsPayload {
+        uint8_t leds[4];
+    };
+
+    struct AdjustFrameCyclePayload {
+        float adjustmentFactor;
+    };
+
+    struct AdjustBaseTimePayload {
+        uint32_t offset;
+    };
+
+    struct AdjustTimeAndCyclePayload {
+        float adjustmentFactor;
+        uint32_t offset;
+    };
+
+    struct SystemControlPayload {
+        uint8_t subCommand;
+        uint8_t subCommandPayload;
+    };
+
+    struct LedCommand {
+        CommandType type;
+
+        union Payload {
+            SetSyncPhasePayload         syncPhase;
+            SetLedsPayload              setLeds;
+            AdjustFrameCyclePayload     adjustCycle;
+            AdjustBaseTimePayload       adjustTime;
+            AdjustTimeAndCyclePayload   adjustTimeAndCycle;
+            SystemControlPayload        sysControl;
+        } payload;
+    };
+#pragma pack(pop)
+    void (*libpad_SetSyncLedCommand)(TimeSync* timeSync, LedSync* ledSync, LedCommand* ledCommand, uint8_t commandSize, bool isLeft) = nullptr;
+
+    static int ledSyncPart = 0;
+    #define NEEDS_LATENCY_CALIBRATION (ledSyncPart < 5)
+
     void (*libpad_SetSyncLedBaseTime)(TimeSync* timeSync, LedSync* ledSync) = nullptr;
     void libpad_SetSyncLedBaseTimeHook(TimeSync* timeSync, LedSync* ledSync) {
         static std::mutex ledSyncMutex;
@@ -252,15 +285,18 @@ namespace psvr2_toolkit {
         bool isTracking;
 		uint64_t lastTrackedTimestamp;
         {
-            ControllerStruct* timing = &controllerTimings[controller];
-            std::scoped_lock lock(timing->mutex);
-            samples = static_cast<int>(timing->timeStampOffset.size());
-            isTracking = timing->isTracking;
-			lastTrackedTimestamp = timing->lastTrackedTimestamp;
+            ControllerStruct* controllerData = &controllerTimings[controller];
+            std::scoped_lock lock(controllerData->mutex);
+
+            controllerData->timeSync = timeSync;
+            controllerData->ledSync = ledSync;
+
+            samples = static_cast<int>(controllerData->timeStampOffset.size());
+            isTracking = controllerData->isTracking;
+			lastTrackedTimestamp = controllerData->lastTrackedTimestamp;
 		}
 
         static int currentController = -1;
-        static int ledSyncPart = 0;
         static int ledSyncSteps = 0;
 		static int lastLedCount = 0;
         static uint64_t syncStartTime = getHostTimestamp();
@@ -277,13 +313,6 @@ namespace psvr2_toolkit {
             currentController = -1;
 
             syncStartTime = getHostTimestamp();
-        }
-
-        #define NEEDS_LATENCY_CALIBRATION (ledSyncPart < 5)
-
-        if (NEEDS_LATENCY_CALIBRATION)
-        {
-            ledSync->last_timestamp -= 10000000; // Force the update.
         }
 
         // Ensure there are enough samples before starting the calibration
@@ -306,7 +335,7 @@ namespace psvr2_toolkit {
             && currentController == controller) {
 			// Force to PRESCAN phase while calibrating.
             ledSync->phase = PRESCAN;
-            ledSync->period = 36;
+            ledSync->period = 32;
 
 			uint32_t fullWindow = (ledSync->oneSubGridTime * static_cast<int32_t>(ledSync->period)) + ledSync->camExposure;
 
@@ -328,6 +357,7 @@ namespace psvr2_toolkit {
                         latencyOffset += static_cast<uint32_t>(fullWindow / 1.2);
                         break;
                     }
+                    [[fallthrough]];
                 case 1:
                     // We want to see a decrease in the number of LEDs tracked. (left edge)
                     if (currentLedCount <= lastLedCount) {
@@ -339,6 +369,7 @@ namespace psvr2_toolkit {
                         latencyOffset -= fullWindow / 6;
                         break;
                     }
+                    [[fallthrough]];
                 case 2:
                     // We want to see an increase in the number of LEDs tracked. (right edge)
                     if (currentLedCount > lastLedCount) {
@@ -350,6 +381,7 @@ namespace psvr2_toolkit {
                         latencyOffset += fullWindow / 16;
                         break;
                     }
+                    [[fallthrough]];
                 case 3:
                     // We want to see a decrease in the number of LEDs tracked. (left edge)
                     if (currentLedCount <= lastLedCount) {
@@ -361,8 +393,9 @@ namespace psvr2_toolkit {
                         latencyOffset -= fullWindow / 64;
                         break;
                     }
+                    [[fallthrough]];
                 case 4:
-                    // We want to see a decrease in the number of LEDs tracked.
+                    // We want to see a increase in the number of LEDs tracked.
                     // At this point, we should be on the edge by a few microseconds.
                     if (currentLedCount > lastLedCount) {
                         ledSyncPart++;
@@ -371,20 +404,47 @@ namespace psvr2_toolkit {
                         latencyOffset += fullWindow / 2;
 
                         Util::DriverLog("Completed latency calibration. Final latency offset: %d microseconds", latencyOffset.load());
-                        break;
+
+                        // Fully reinitialize both controllers.
+                        for (size_t i = 0; i < 2; i++)
+                        {
+                            ControllerStruct* controllerData = &controllerTimings[i];
+
+                            LedCommand command = {};
+                            command.type = CommandType::SET_SYNC_PHASE;
+                            command.payload.syncPhase.phase = PRESCAN;
+                            command.payload.syncPhase.period = 32;
+
+                            libpad_SetSyncLedCommand(
+                                controllerData->timeSync,
+                                controllerData->ledSync,
+                                &command, sizeof(command.type) + sizeof(command.payload.syncPhase) - sizeof(command.payload.syncPhase.frameCycle),
+                                controllerData->timeSync->isLeft);
+                        }
                     }
                     else
                     {
                         latencyOffset += fullWindow / 256;
-                        break;
                     }
+                    break;
                 default:
                     break;
                 }
 
                 if (NEEDS_LATENCY_CALIBRATION)
                 {
-                    Util::DriverLog("Latency Offset is currently at %d microseconds.", latencyOffset.load());
+                    LedCommand command = {};
+                    command.type = CommandType::SET_SYNC_PHASE;
+                    command.payload.syncPhase.phase = PRESCAN;
+                    command.payload.syncPhase.period = 32;
+
+                    libpad_SetSyncLedCommand(
+                        timeSync,
+                        ledSync,
+                        &command, sizeof(command.type) + sizeof(command.payload.syncPhase) - sizeof(command.payload.syncPhase.frameCycle),
+                        timeSync->isLeft);
+
+                    Util::DriverLog("Latency Offset is currently at %d microseconds. %d-%d", latencyOffset.load(), currentLedCount, lastLedCount);
 
                     lastSync = getHostTimestamp();
                     ledSyncSteps++;
@@ -394,7 +454,7 @@ namespace psvr2_toolkit {
         else if (NEEDS_LATENCY_CALIBRATION) {
 			// Ensure LEDs are off before we start calibration,
             // or if we're not the controller doing calibration.
-			ledSync->phase = LED_ALL_OFF;
+            ledSync->phase = LED_ALL_OFF;
             ledSync->seq++;
 
             if (currentController == controller)
@@ -406,10 +466,7 @@ namespace psvr2_toolkit {
         }
         else if (getHostTimestamp() - lastSync < 5000000)
         {
-            // If calibration finished recently, we need to make sure the controllers both go back into prescan mode.
-            ledSync->phase = PRESCAN;
-
-			// If we haven't tracked for 2 seconds, reset the calibration.
+            // If we haven't tracked for 2 seconds, reset the calibration.
             if (currentController == controller && !isTracking && static_cast<int64_t>(getHostTimestamp() - lastTrackedTimestamp) > 2000000) {
                 latencyOffset = 0;
                 ledSyncPart = 0;
@@ -417,10 +474,11 @@ namespace psvr2_toolkit {
 
                 syncStartTime = getHostTimestamp();
 
-                Util::DriverLog("Reset latency calibration due to not tracking. %lld", static_cast<int64_t>(getHostTimestamp() - lastTrackedTimestamp));
+                Util::DriverLog("Reset latency calibration due to controller not tracking. %lld", static_cast<int64_t>(getHostTimestamp() - lastTrackedTimestamp));
 			}
         }
 
+		// If we're out of range or have taken too many steps, reset the calibration.
         if (latencyOffset < 0 || latencyOffset > 16666 || ledSyncSteps > 50)
         {
             latencyOffset = 0;
@@ -429,30 +487,85 @@ namespace psvr2_toolkit {
             syncStartTime = getHostTimestamp();
         }
 
-        if (!NEEDS_LATENCY_CALIBRATION) {
-            // Use lower LED period time for better battery life.
-            switch (ledSync->phase)
-            {
-            case SenseLEDPhase::PRESCAN:
-                ledSync->period = 36;
-                break;
-            case SenseLEDPhase::BROAD:
-                ledSync->period = 36;
-                break;
-            case SenseLEDPhase::BG:
-                ledSync->period = 20;
-                break;
-            case SenseLEDPhase::STABLE:
-                ledSync->period = 9;
-                break;
-            }
-        }
-
 		// This call uses libpad_hostToDevice, which will factor in the updated latencyOffset.
 		libpad_SetSyncLedBaseTime(timeSync, ledSync);
     }
 
-    // logDeviceTrackingState
+    void libpad_SetSyncLedCommandHook(TimeSync* timeSync, LedSync* ledSync, LedCommand* ledCommand, uint8_t commandSize, bool isLeft) {
+        static std::mutex ledCommandMutex;
+        std::scoped_lock lock(ledCommandMutex);
+
+        if (NEEDS_LATENCY_CALIBRATION)
+        {
+			// Don't allow the driver to issue LED commands while calibrating.
+            return;
+        }
+
+        switch (ledCommand->type) {
+            case CommandType::SET_SYNC_PHASE:
+
+            // Use lower LED period time for better battery life.
+            switch (ledCommand->payload.syncPhase.phase)
+            {
+            case SenseLEDPhase::PRESCAN:
+                ledCommand->payload.syncPhase.period = 32;
+                break;
+            case SenseLEDPhase::BROAD:
+                ledCommand->payload.syncPhase.period = 32;
+                break;
+            case SenseLEDPhase::BG:
+                ledCommand->payload.syncPhase.period = 20;
+                break;
+            case SenseLEDPhase::STABLE:
+                ledCommand->payload.syncPhase.period = 9;
+
+                // Ensure we correctly line up with the center due to the difference in period
+                ledCommand->payload.syncPhase.frameCycle = (ledSync->oneSubGridTime * (20 - 9));
+
+                break;
+            }
+
+            Util::DriverLog("SET_SYNC_PHASE: phase=%d, period=%d, frameCycle=%d, leds=[%d,%d,%d,%d] %d",
+                ledCommand->payload.syncPhase.phase,
+                ledCommand->payload.syncPhase.period,
+                ledCommand->payload.syncPhase.frameCycle,
+                ledCommand->payload.syncPhase.leds[0],
+                ledCommand->payload.syncPhase.leds[1],
+                ledCommand->payload.syncPhase.leds[2],
+                ledCommand->payload.syncPhase.leds[3], commandSize);
+			break;
+            case CommandType::SET_LEDS_IMMEDIATE:
+            Util::DriverLog("SET_LEDS_IMMEDIATE: leds=[%d,%d,%d,%d]",
+                ledCommand->payload.setLeds.leds[0],
+                ledCommand->payload.setLeds.leds[1],
+                ledCommand->payload.setLeds.leds[2],
+				ledCommand->payload.setLeds.leds[3]);
+            break;
+            case CommandType::ADJUST_FRAME_CYCLE:
+            Util::DriverLog("ADJUST_FRAME_CYCLE: adjustmentFactor=%f",
+				ledCommand->payload.adjustCycle.adjustmentFactor);
+            break;
+            case CommandType::ADJUST_BASE_TIME:
+				Util::DriverLog("ADJUST_BASE_TIME: offset=%d",
+                    ledCommand->payload.adjustTime.offset);
+            break;
+            case CommandType::ADJUST_TIME_AND_CYCLE:
+				Util::DriverLog("ADJUST_TIME_AND_CYCLE: adjustmentFactor=%f, offset=%d",
+                    ledCommand->payload.adjustTimeAndCycle.adjustmentFactor,
+                    ledCommand->payload.adjustTimeAndCycle.offset);
+            break;
+			case CommandType::SYSTEM_CONTROL:
+                Util::DriverLog("SYSTEM_CONTROL: subCommand=%d, subCommandPayload=%d",
+                    ledCommand->payload.sysControl.subCommand,
+                    ledCommand->payload.sysControl.subCommandPayload);
+            break;
+            default:
+                break;
+		}
+
+        libpad_SetSyncLedCommand(timeSync, ledSync, ledCommand, commandSize, isLeft);
+	}
+
     void (*logDeviceTrackingState)(void* session, int deviceType, uint64_t timestamp,
         void* previousPose, void* previousMeta, void* currentPose, void* currentMeta) = nullptr;
     void logDeviceTrackingStateHook(void* session, int deviceType, uint64_t timestamp,
@@ -470,13 +583,13 @@ namespace psvr2_toolkit {
         
 		if (controller != -1)
         {
-            ControllerStruct* timing = &controllerTimings[controller];
-            std::scoped_lock lock(timing->mutex);
-			timing->isTracking = (*trackingFlag == 9);
+            ControllerStruct* controllerData = &controllerTimings[controller];
+            std::scoped_lock lock(controllerData->mutex);
+			controllerData->isTracking = (*trackingFlag == 9);
 
 
-            if (timing->isTracking) {
-                timing->lastTrackedTimestamp = getHostTimestamp();
+            if (controllerData->isTracking) {
+                controllerData->lastTrackedTimestamp = getHostTimestamp();
             }
         }
 
@@ -506,6 +619,11 @@ namespace psvr2_toolkit {
             HookLib::InstallHook(reinterpret_cast<void*>(pHmdDriverLoader->GetBaseAddress() + 0x1C27D0),
                 reinterpret_cast<void*>(libpad_SetSyncLedBaseTimeHook),
                 reinterpret_cast<void**>(&libpad_SetSyncLedBaseTime));
+
+            // libpad function for void libpad_SetSyncLedCommand(TimeSync* timeSync, LedSync* ledSync, LedCommand* ledCommand, uint8_t commandSize, bool isLeft) @ 0x1C1880
+            HookLib::InstallHook(reinterpret_cast<void*>(pHmdDriverLoader->GetBaseAddress() + 0x1C1880),
+                reinterpret_cast<void*>(libpad_SetSyncLedCommandHook),
+                reinterpret_cast<void**>(&libpad_SetSyncLedCommand));
 
             // TODO: this should be moved out
             // driver function for void logDeviceTrackingState(void* session, int deviceType, uint64_t timestamp, void* previousPose, void* previousMeta, void* currentPose, void* currentMeta) @ 0x161520
