@@ -121,20 +121,30 @@ namespace psvr2_toolkit {
             outLastTrackedTimestamp = this->lastTrackedTimestamp;
 			return this->isTracking;
         }
-        void GetLibpadSyncs(LibpadTimeSync*& outTimeSync, LibpadLedSync*& outLedSync) {
-            std::scoped_lock<std::mutex> lock(this->controllerMutex);
-            outTimeSync = this->timeSync;
-			outLedSync = this->ledSync;
-        }
         void SetLibpadSyncs(LibpadTimeSync* timeSync, LibpadLedSync* ledSync) {
 			std::scoped_lock<std::mutex> lock(this->controllerMutex);
 			this->timeSync = timeSync;
 			this->ledSync = ledSync;
         }
+        void GetLibpadSyncs(LibpadTimeSync*& outTimeSync, LibpadLedSync*& outLedSync) {
+            std::scoped_lock<std::mutex> lock(this->controllerMutex);
+            outTimeSync = this->timeSync;
+			outLedSync = this->ledSync;
+        }
+
+        int32_t GetLatencyOffset() {
+            std::scoped_lock<std::mutex> lock(this->controllerMutex);
+            return this->offsetLatency;
+        }
+
+        void SetLatencyOffset(int32_t newOffsetLatency) {
+            std::scoped_lock<std::mutex> lock(this->controllerMutex);
+            this->offsetLatency = newOffsetLatency;
+        }
 
         double GetTimestampOffset() {
             std::scoped_lock<std::mutex> lock(this->controllerMutex);
-            return this->timeStampOffset.getPercentile();
+            return this->timeStampOffset.getPercentile() + this->offsetLatency;
 		}
         size_t GetTimestampOffsetSampleCount() {
             std::scoped_lock<std::mutex> lock(this->controllerMutex);
@@ -147,6 +157,9 @@ namespace psvr2_toolkit {
         void ClearTimestampOffsetSamples() {
             std::scoped_lock<std::mutex> lock(this->controllerMutex);
             this->timeStampOffset.clear();
+
+            // Also reset offset for latency
+            this->offsetLatency = -1;
         }
 
         const void* GetHandle();
@@ -185,10 +198,12 @@ namespace psvr2_toolkit {
 		int padHandle = -1;
         std::mutex controllerMutex;
 
-        RollingPercentile<double> timeStampOffset = RollingPercentile<double>(5000, 99.9);
+        RollingPercentile<double> timeStampOffset = RollingPercentile<double>(5000, 99.0);
 
         bool isTracking = false;
         uint64_t lastTrackedTimestamp = 0;
+
+        int32_t offsetLatency = -1;
 
         LibpadTimeSync* timeSync = nullptr;
         LibpadLedSync* ledSync = nullptr;

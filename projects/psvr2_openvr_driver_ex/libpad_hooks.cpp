@@ -129,10 +129,8 @@ namespace psvr2_toolkit {
 
     uintptr_t packetRecievedReturnAddress = 0;
 
-    std::atomic<int32_t> latencyOffset = 0;
-
-    int ledSyncPart = 0;
-    #define NEEDS_LATENCY_CALIBRATION (ledSyncPart < 7)
+    int ledSyncPart = -1;
+    #define IN_LATENCY_CALIBRATION (ledSyncPart != -1)
 
     inline int32_t GetWraparoundDifference(uint32_t newTimestamp, uint32_t oldTimestamp)
     {
@@ -165,7 +163,6 @@ namespace psvr2_toolkit {
         SenseController& senseController = SenseController::GetControllerByIsLeft(timeSync->isLeft);
 
         uint64_t calculatedTimestamp = static_cast<uint64_t>(host)
-            + static_cast<uint64_t>(latencyOffset)
             + static_cast<uint64_t>(senseController.GetTimestampOffset());
 
         *outDevice = static_cast<uint32_t>(calculatedTimestamp % k_unDeviceTimestampModulus);
@@ -195,7 +192,7 @@ namespace psvr2_toolkit {
                             - static_cast<uint32_t>(senseController.GetTimestampOffset())
                             + k_unDeviceTimestampModulus) % k_unDeviceTimestampModulus;
 
-        int32_t difference = GetWraparoundDifference(hostTime, static_cast<uint32_t>(currentTime)) - latencyOffset;
+        int32_t difference = GetWraparoundDifference(hostTime, static_cast<uint32_t>(currentTime));
 
         outHost->hostReceiveTime = currentTime + difference;
 
@@ -259,7 +256,7 @@ namespace psvr2_toolkit {
         static std::mutex ledCommandMutex;
         std::scoped_lock lock(ledCommandMutex);
 
-        if (NEEDS_LATENCY_CALIBRATION)
+        if (IN_LATENCY_CALIBRATION)
         {
             // Don't allow the driver to issue LED commands while calibrating.
             return;
@@ -336,20 +333,18 @@ namespace psvr2_toolkit {
         std::scoped_lock lock(ledSyncMutex);
 
         int controller = timeSync->isLeft ? 0 : 1;
-        int samples;
-        bool isTracking;
+        char controllerChar = timeSync->isLeft ? 'L' : 'R';
         uint64_t lastTrackedTimestamp;
-        {
-            SenseController& senseController = SenseController::GetControllerByIsLeft(timeSync->isLeft);
 
-            senseController.SetLibpadSyncs(timeSync, ledSync);
+        SenseController& senseController = SenseController::GetControllerByIsLeft(timeSync->isLeft);
 
-            samples = static_cast<int>(senseController.GetTimestampOffsetSampleCount());
-            isTracking = senseController.GetTrackingState(lastTrackedTimestamp);
-        }
+        senseController.SetLibpadSyncs(timeSync, ledSync);
+
+        int32_t latencyOffset = senseController.GetLatencyOffset();
+        size_t samples = senseController.GetTimestampOffsetSampleCount();
+        bool isTracking = senseController.GetTrackingState(lastTrackedTimestamp);
 
         static int currentController = -1;
-        static int ledSyncSteps = 0;
         static int thresholdLedCount = 0;
         static uint64_t syncStartTime = GetHostTimestamp();
         static uint64_t lastSync = GetHostTimestamp();
@@ -359,15 +354,13 @@ namespace psvr2_toolkit {
         static int rightEdgeUpperBound = 16666;
 
         auto resetCalibration = [&]() {
-            latencyOffset = 0;
+            senseController.SetLatencyOffset(-1);
             ledSyncPart = 0;
-            currentController = -1;
-            ledSyncSteps = 0;
             syncStartTime = GetHostTimestamp();
             leftEdgeLowerBound = 0;
             rightEdgeUpperBound = 16666;
             previousLatencyOffset = 0;
-            Util::DriverLog("Latency calibration has been reset.");
+            Util::DriverLog("[%c] Latency calibration has been reset.", controllerChar);
         };
 
         // Bottom cameras only
@@ -380,21 +373,25 @@ namespace psvr2_toolkit {
         }
 
         // Ensure there are enough samples before starting the calibration
-        if (samples < 500)
+        // We only want one controller to run the calibration if it's uncalibrated.
+        if (samples > 300 && currentController == -1 && latencyOffset == -1)
         {
+            // Start calibration on this controller.
+            currentController = controller;
+            ledSyncPart = 0;
+            senseController.SetLatencyOffset(0);
             syncStartTime = GetHostTimestamp();
         }
-        // We only want one controller to run the calibration.
         else if (currentController == -1)
         {
-            currentController = controller;
+            ledSyncPart = -1;
         }
 
         // Before we start calibration and turn the LEDs on, we need to:
         // - Check that we need calibration.
         // - Ensure we have waited at least 1/5 of a second since calibration start to ensure controllers were off for long enough.
         // - Ensure this is the controller that is doing the calibration.
-        if (NEEDS_LATENCY_CALIBRATION
+        if (IN_LATENCY_CALIBRATION
             && GetHostTimestamp() - syncStartTime > 200000
             && currentController == controller) {
             // Force to PRESCAN phase while calibrating.
@@ -408,86 +405,83 @@ namespace psvr2_toolkit {
                 switch (ledSyncPart)
                 {
                 case 0:
-                    // First part should not count any steps.
-                    ledSyncSteps = 0;
-
                     // We want to see an increase in the number of LEDs tracked. (right edge)
                     if (currentLedCount > thresholdLedCount) {
-                        rightEdgeUpperBound = latencyOffset.load();
+                        rightEdgeUpperBound = latencyOffset;
                         ledSyncPart++;
                         // Fall through to next part.
                     }
                     else
                     {
-                        previousLatencyOffset = latencyOffset.load();
-                        latencyOffset += fullWindow / 2;
+                        previousLatencyOffset = latencyOffset;
+                        senseController.SetLatencyOffset(latencyOffset + (fullWindow / 2));
                         break;
                     }
                     [[fallthrough]];
                 case 1:
                     // We want to see a decrease in the number of LEDs tracked. (left edge)
                     if (currentLedCount <= thresholdLedCount) {
-                        leftEdgeLowerBound = latencyOffset.load();
+                        leftEdgeLowerBound = latencyOffset;
                         ledSyncPart++;
                         // Fall through to next part.
                     }
                     else
                     {
-                        previousLatencyOffset = latencyOffset.load();
-                        latencyOffset -= fullWindow / 8;
+                        previousLatencyOffset = latencyOffset;
+                        senseController.SetLatencyOffset(latencyOffset - (fullWindow / 8));
                         break;
                     }
                     [[fallthrough]];
                 case 2:
                     // We want to see an increase in the number of LEDs tracked. (right edge)
                     if (currentLedCount > thresholdLedCount) {
-                        rightEdgeUpperBound = latencyOffset.load();
+                        rightEdgeUpperBound = latencyOffset;
                         ledSyncPart++;
                         // Fall through to next part.
                     }
                     else
                     {
-                        previousLatencyOffset = latencyOffset.load();
-                        latencyOffset += fullWindow / 16;
+                        previousLatencyOffset = latencyOffset;
+                        senseController.SetLatencyOffset(latencyOffset + (fullWindow / 16));
                         break;
                     }
                     [[fallthrough]];
                 case 3:
                     // We want to see a decrease in the number of LEDs tracked. (left edge)
                     if (currentLedCount <= thresholdLedCount) {
-                        leftEdgeLowerBound = latencyOffset.load();
+                        leftEdgeLowerBound = latencyOffset;
                         ledSyncPart++;
                         // Fall through to next part.
                     }
                     else
                     {
-                        previousLatencyOffset = latencyOffset.load();
-                        latencyOffset -= fullWindow / 64;
+                        previousLatencyOffset = latencyOffset;
+                        senseController.SetLatencyOffset(latencyOffset - (fullWindow / 64));
                         break;
                     }
                     [[fallthrough]];
                 case 4:
                     // We want to see a increase in the number of LEDs tracked. (right edge)
                     if (currentLedCount > thresholdLedCount) {
-                        rightEdgeUpperBound = latencyOffset.load();
+                        rightEdgeUpperBound = latencyOffset;
                         ledSyncPart++;
 
                         // Shift to left edge.
-                        latencyOffset -= fullWindow / 64;
+                        senseController.SetLatencyOffset(latencyOffset - (fullWindow / 64));
                     }
                     else
                     {
-                        previousLatencyOffset = latencyOffset.load();
-                        latencyOffset += fullWindow / 256;
+                        previousLatencyOffset = latencyOffset;
+                        senseController.SetLatencyOffset(latencyOffset + (fullWindow / 256));
                     }
                     break;
                 case 5:
                     // Confirm that we're on the left edge.
                     if (currentLedCount <= thresholdLedCount) {
-                        leftEdgeLowerBound = latencyOffset.load();
+                        leftEdgeLowerBound = latencyOffset;
                         ledSyncPart++;
 
-                        latencyOffset += fullWindow / 64;
+                        senseController.SetLatencyOffset(latencyOffset + (fullWindow / 64));
                     }
                     // If not, we may not be calibrated correctly.
                     else
@@ -497,7 +491,7 @@ namespace psvr2_toolkit {
                     break;
                 case 6:
                     if (currentLedCount > thresholdLedCount) {
-                        ledSyncPart++;
+                        ledSyncPart = -1;
 
                         // It should be in between the two values we checked to ensure there was a difference.
                         latencyOffset += fullWindow / 128;
@@ -505,7 +499,9 @@ namespace psvr2_toolkit {
                         // Go to the center of this cycle, and then we now have our correct latency offset.
                         latencyOffset += fullWindow / 2;
 
-                        Util::DriverLog("Completed latency calibration. Final latency offset: %d microseconds", latencyOffset.load());
+                        senseController.SetLatencyOffset(latencyOffset);
+
+                        Util::DriverLog("[%c] Final latency offset: %d microseconds", controllerChar, latencyOffset);
 
                         // Fully reinitialize both controllers.
                         for (size_t i = 0; i < 2; i++)
@@ -545,13 +541,15 @@ namespace psvr2_toolkit {
                     break;
                 }
 
+                latencyOffset = senseController.GetLatencyOffset();
+
                 // Reset if the offset goes outside the bounds.
-                if (ledSyncPart < 5 && (latencyOffset < leftEdgeLowerBound || latencyOffset > rightEdgeUpperBound)) {
-                    Util::DriverLog("Latency offset (%d) went out of bounds [%d, %d].", latencyOffset.load(), leftEdgeLowerBound, rightEdgeUpperBound);
+                if (ledSyncPart >= 0 && ledSyncPart < 5 && (latencyOffset < leftEdgeLowerBound || latencyOffset > rightEdgeUpperBound)) {
+                    Util::DriverLog("[%c] Latency offset (%d) went out of bounds [%d, %d].", controllerChar, latencyOffset, leftEdgeLowerBound, rightEdgeUpperBound);
                     resetCalibration();
                 }
 
-                if (NEEDS_LATENCY_CALIBRATION)
+                if (IN_LATENCY_CALIBRATION)
                 {
                     LedCommand command = {};
                     command.type = CommandType::SET_SYNC_PHASE;
@@ -565,14 +563,13 @@ namespace psvr2_toolkit {
                         &command, sizeof(command.type) + sizeof(command.payload.syncPhase) - sizeof(command.payload.syncPhase.frameCycle),
                         timeSync->isLeft);
 
-                    Util::DriverLog("Latency Offset is currently at %d microseconds. Current LED count: %d Threshold: %d Step: %d", latencyOffset.load(), currentLedCount, thresholdLedCount, ledSyncPart);
+                    Util::DriverLog("[%c] Latency Offset is currently at %d microseconds. Current LED count: %d Threshold: %d Step: %d", controllerChar, latencyOffset, currentLedCount, thresholdLedCount, ledSyncPart);
 
                     lastSync = GetHostTimestamp();
-                    ledSyncSteps++;
                 }
             }
         }
-        else if (NEEDS_LATENCY_CALIBRATION) {
+        else if (IN_LATENCY_CALIBRATION) {
             // Ensure LEDs are off before we start calibration,
             // or if we're not the controller doing calibration.
             ledSync->phase = LED_ALL_OFF;
@@ -585,21 +582,20 @@ namespace psvr2_toolkit {
                 thresholdLedCount = currentLedCount + 6;
             }
         }
-        else if (GetHostTimestamp() - lastSync < 5000000)
+        else if (currentController == controller && GetHostTimestamp() - lastSync < 250000)
         {
-            // If we haven't tracked for 2 seconds, reset the calibration.
-            if (currentController == controller && !isTracking && static_cast<int64_t>(GetHostTimestamp() - lastTrackedTimestamp) > 2000000) {
-                Util::DriverLog("Reset latency calibration due to controller not tracking. %lld", static_cast<int64_t>(GetHostTimestamp() - lastTrackedTimestamp));
+            // If we haven't tracked in the last 2 seconds, reset the calibration.
+            if (!isTracking && static_cast<int64_t>(GetHostTimestamp() - lastTrackedTimestamp) > 2000000) {
+                Util::DriverLog("[%c] Reset latency calibration due to controller not tracking. %lld", controllerChar, static_cast<int64_t>(GetHostTimestamp() - lastTrackedTimestamp));
                 resetCalibration();
             }
         }
-
-        // If we have taken too many steps, reset the calibration.
-        if (ledSyncSteps > 50)
+        else if (currentController == controller)
         {
-            Util::DriverLog("Resetting due to too many calibration steps.");
+            // Calibration is now complete since the controller is tracking properly.
+            currentController = -1;
 
-            resetCalibration();
+            Util::DriverLog("[%c] Completed latency calibration.", controllerChar);
         }
 
         // This call uses libpad_hostToDevice, which will factor in the updated latencyOffset.
