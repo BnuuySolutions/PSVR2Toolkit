@@ -93,19 +93,19 @@ namespace psvr2_toolkit {
   void HmdDeviceHooks::UpdateGaze(void* pData, size_t dwSize)
   {
       Hmd2GazeState* pGazeState = reinterpret_cast<Hmd2GazeState*>(pData);
-      vr::VREyeTrackingData_t et {};
+      vr::VREyeTrackingData_t eyeTrackingData {};
 
       bool valid = pGazeState->combined.isGazeDirValid;
 
-      et.bActive = valid;
-      et.bTracked = valid;
-      et.bValid = valid;
+      eyeTrackingData.bActive = valid;
+      eyeTrackingData.bTracked = valid;
+      eyeTrackingData.bValid = valid;
 
       auto& origin = pGazeState->combined.gazeOriginMm;
       auto& direction = pGazeState->combined.gazeDirNorm;
 
-      et.vGazeOrigin = vr::HmdVector3_t { -origin.x / 1000.0f, origin.y / 1000.0f, -origin.z / 1000.0f };
-      et.vGazeTarget = vr::HmdVector3_t { -direction.x, direction.y, -direction.z };
+      eyeTrackingData.vGazeOrigin = vr::HmdVector3_t { -origin.x / 1000.0f, origin.y / 1000.0f, -origin.z / 1000.0f };
+      eyeTrackingData.vGazeTarget = vr::HmdVector3_t { -direction.x, direction.y, -direction.z };
 
       int64_t hmdToHostOffset;
 
@@ -113,7 +113,7 @@ namespace psvr2_toolkit {
 
       double timeOffset = ((static_cast<int64_t>(pGazeState->combined.timestamp) + hmdToHostOffset) - GetHostTimestamp()) / 1e6;
 
-      (vr::VRDriverInput())->UpdateEyeTrackingComponent(eyeTrackingComponent, &et, timeOffset);
+      (vr::VRDriverInput())->UpdateEyeTrackingComponent(eyeTrackingComponent, &eyeTrackingData, timeOffset);
 
 #ifdef OPENVR_EXTENSIONS_AVAILABLE
     if (g_pOpenVRExHandle) {
