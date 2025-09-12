@@ -64,6 +64,10 @@ namespace psvr2_toolkit {
   void DeviceProviderProxy::Cleanup() {
     IpcServer::Instance()->Stop();
 
+    if (VRSettings::GetBool(STEAMVR_SETTINGS_USE_ENHANCED_HAPTICS, SETTING_USE_TOOLKIT_SYNC_DEFAULT_VALUE)) {
+        SenseController::Destroy();
+    }
+
     m_pDeviceProvider->Cleanup();
   }
 
