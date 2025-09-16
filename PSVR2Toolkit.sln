@@ -13,6 +13,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "UnifiedTelemetry.Service_st
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PSVR2Toolkit.IPC", "projects\PSVR2Toolkit.IPC\PSVR2Toolkit.IPC.csproj", "{48FCC06F-F55F-F3B4-0563-5CD83BA2FC85}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PSVR2Toolkit.App", "projects\PSVR2Toolkit.App\PSVR2Toolkit.App.csproj", "{8E6661D1-6A40-4949-93CC-2280909E2DB3}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -39,6 +41,10 @@ Global
 		{48FCC06F-F55F-F3B4-0563-5CD83BA2FC85}.Debug|x64.Build.0 = Debug|Any CPU
 		{48FCC06F-F55F-F3B4-0563-5CD83BA2FC85}.Release|x64.ActiveCfg = Release|Any CPU
 		{48FCC06F-F55F-F3B4-0563-5CD83BA2FC85}.Release|x64.Build.0 = Release|Any CPU
+		{8E6661D1-6A40-4949-93CC-2280909E2DB3}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{8E6661D1-6A40-4949-93CC-2280909E2DB3}.Debug|x64.Build.0 = Debug|Any CPU
+		{8E6661D1-6A40-4949-93CC-2280909E2DB3}.Release|x64.ActiveCfg = Release|Any CPU
+		{8E6661D1-6A40-4949-93CC-2280909E2DB3}.Release|x64.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
