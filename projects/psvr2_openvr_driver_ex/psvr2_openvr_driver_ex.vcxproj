@@ -45,13 +45,13 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <TargetName>driver_playstation_vr2</TargetName>
-    <IncludePath>.\minhook\include;.\psvr2_openvr_driver\openvr\headers;$(IncludePath)</IncludePath>
-    <LibraryPath>.\minhook\lib\Debug;$(LibraryPath)</LibraryPath>
+    <IncludePath>.\libusb\include;.\minhook\include;.\psvr2_openvr_driver\openvr\headers;$(IncludePath)</IncludePath>
+    <LibraryPath>.\libusb\lib;.\minhook\lib\Debug;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <TargetName>driver_playstation_vr2</TargetName>
-    <IncludePath>.\minhook\include;.\psvr2_openvr_driver\openvr\headers;$(IncludePath)</IncludePath>
-    <LibraryPath>.\minhook\lib\Release;$(LibraryPath)</LibraryPath>
+    <IncludePath>.\libusb\include;.\minhook\include;.\psvr2_openvr_driver\openvr\headers;$(IncludePath)</IncludePath>
+    <LibraryPath>.\libusb\lib;.\minhook\lib\Release;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -69,7 +69,7 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalDependencies>libMinHook.x64.lib;shlwapi.lib;ws2_32.lib;winusb.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>libMinHook.x64.lib;shlwapi.lib;ws2_32.lib;winusb.lib;libusb.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -92,7 +92,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalDependencies>libMinHook.x64.lib;shlwapi.lib;ws2_32.lib;winusb.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>libMinHook.x64.lib;shlwapi.lib;ws2_32.lib;winusb.lib;libusb.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalOptions>/pdbaltpath:%_PDB% %(AdditionalOptions)</AdditionalOptions>
     </Link>
   </ItemDefinitionGroup>

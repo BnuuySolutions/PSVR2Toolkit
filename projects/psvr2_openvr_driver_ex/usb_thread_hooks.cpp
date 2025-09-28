@@ -5,6 +5,35 @@
 #include "vr_settings.h"
 
 #include <thread>
+#include <lusb0_usb.h>
+
+// due to conflicts, have to do this here...
+extern "C" {
+  typedef PVOID WINUSB_INTERFACE_HANDLE, *PWINUSB_INTERFACE_HANDLE;
+  typedef PVOID WINUSB_ISOCH_BUFFER_HANDLE, *PWINUSB_ISOCH_BUFFER_HANDLE;
+
+#pragma pack(1)
+
+  typedef struct _WINUSB_SETUP_PACKET {
+    UCHAR   RequestType;
+    UCHAR   Request;
+    USHORT  Value;
+    USHORT  Index;
+    USHORT  Length;
+  } WINUSB_SETUP_PACKET, *PWINUSB_SETUP_PACKET;
+
+#pragma pack()
+
+  BOOL __stdcall WinUsb_Initialize(HANDLE DeviceHandle, PWINUSB_INTERFACE_HANDLE InterfaceHandle);
+  BOOL __stdcall WinUsb_Free(WINUSB_INTERFACE_HANDLE InterfaceHandle);
+  BOOL __stdcall WinUsb_AbortPipe(WINUSB_INTERFACE_HANDLE InterfaceHandle, UCHAR PipeID);
+  BOOL __stdcall WinUsb_GetCurrentAlternateSetting(WINUSB_INTERFACE_HANDLE InterfaceHandle, PUCHAR SettingNumber);
+  BOOL __stdcall WinUsb_SetCurrentAlternateSetting(WINUSB_INTERFACE_HANDLE InterfaceHandle, UCHAR SettingNumber);
+  BOOL __stdcall WinUsb_GetDescriptor(WINUSB_INTERFACE_HANDLE InterfaceHandle, UCHAR DescriptorType, UCHAR Index, USHORT LanguageID, PUCHAR Buffer, ULONG BufferLength, PULONG LengthTransferred);
+  BOOL __stdcall WinUsb_GetPipePolicy(WINUSB_INTERFACE_HANDLE InterfaceHandle, UCHAR PipeID, ULONG PolicyType, PULONG ValueLength, PVOID Value);
+  BOOL __stdcall WinUsb_ReadPipe(WINUSB_INTERFACE_HANDLE InterfaceHandle, UCHAR PipeID, PUCHAR Buffer, ULONG BufferLength, PULONG LengthTransferred, LPOVERLAPPED Overlapped);
+  BOOL __stdcall WinUsb_ControlTransfer(WINUSB_INTERFACE_HANDLE InterfaceHandle, WINUSB_SETUP_PACKET SetupPacket, PUCHAR Buffer, ULONG BufferLength, PULONG LengthTransferred, LPOVERLAPPED Overlapped);
+}
 
 namespace psvr2_toolkit {
 
@@ -50,11 +79,10 @@ namespace psvr2_toolkit {
     void *pDeviceHandle;
   };
 
-  struct CaesarUsbThread_t {
-    Framework__Thread_t __base_Framework__Thread;
+  struct CaesarUsbThread_t : Framework__Thread_t {
     CaesarUsbThread__State state;
     char __unkData6[4];
-    Framework__Mutex_t mutex;
+    Framework__Mutex_t handlesMutex;
     CaesarUsbThread__Handles_t handles;
     char __unkData12[260];
     char driverInfo[128];
@@ -67,6 +95,20 @@ namespace psvr2_toolkit {
     uint32_t lastError;
   };
 
+  struct CaesarUsbThread_Vtbl_t : Framework__Thread_Vtbl_t {
+    void (*close)(CaesarUsbThread_t *thisptr);
+    void (*__unkFunc3)(CaesarUsbThread_t *thisptr, bool a2);
+    char (*getUsbInf)(CaesarUsbThread_t *thisptr);
+    char (*getReadPipeId)(CaesarUsbThread_t *thisptr);
+    int (*begin)(CaesarUsbThread_t *thisptr);
+    void (*__unkFunc7)(CaesarUsbThread_t *thisptr);
+    int (*poll)(CaesarUsbThread_t *thisptr);
+  };
+
+  void *(*Framework__Mutex__lock)(Framework__Mutex_t *thisptr, uint32_t timeout) = nullptr;
+  void *(*Framework__Mutex__unlock)(Framework__Mutex_t *thisptr) = nullptr;
+
+  int (*CaesarUsbThread__read)(void *thisptr, uint8_t pipeId, char *buffer, size_t length) = nullptr;
   int (*CaesarUsbThread__report)(void *thisptr, bool bIsSet, uint16_t reportId, void *buffer, uint16_t length, uint16_t value, uint16_t index, uint16_t subcmd);
 
   int (*CaesarUsbThreadImuStatus__poll)(void *) = nullptr;
@@ -76,17 +118,218 @@ namespace psvr2_toolkit {
     return result;
   }
 
-  void CaesarUsbThread__freeHook(CaesarUsbThread_t *thisptr, CaesarUsbThread__Handles_t *handles) {
-    if (handles->initialized) {
-      // TODO: Free LibUSB interface handle.
-      // We do not need to free the device (file) handle.
-      handles->initialized = 0;
+  // We need to replace device enumeration, it is not compatible with LibUSB.
+  int CaesarUsbThread__initializeHook(CaesarUsbThread_t *thisptr) {
+    // TODO: ShareManager
+    CaesarUsbThread_Vtbl_t *pVtbl = static_cast<CaesarUsbThread_Vtbl_t *>(thisptr->__vfptr);
+    char usbInf = pVtbl->getUsbInf(thisptr);
+    struct usb_device *actual_dev = nullptr;
+    for (struct usb_bus *bus = usb_get_busses(); bus; bus = bus->next) {
+      for (struct usb_device *dev = bus->devices; dev; dev = dev->next) {
+        if (dev->descriptor.idVendor == 0x054C &&
+            dev->descriptor.idProduct == 0x0CDE &&
+            dev->config->interface->altsetting->bInterfaceNumber == usbInf) {
+          actual_dev = dev;
+          break;
+        }
+      }
     }
+    Framework__Mutex__lock(&thisptr->handlesMutex, 0xFFFFFFFF);
+    thisptr->handles.pDeviceHandle = INVALID_HANDLE_VALUE; // We aren't using this, disables CloseHandle path in Sony code.
+    if (thisptr->__unkVar15) {
+      Framework__Mutex__unlock(&thisptr->handlesMutex);
+      return -1;
+    }
+    if (!WinUsb_Initialize(actual_dev, &thisptr->handles.pInterfaceHandle)) {
+      Framework__Mutex__unlock(&thisptr->handlesMutex);
+      return -1;
+    }
+    Framework__Mutex__unlock(&thisptr->handlesMutex);
+    // TODO: Driver info
+    thisptr->handles.initialized = 1;
+    return 0;
+  }
+
+  bool WinUsb_InitializeHook(HANDLE DeviceHandle, PWINUSB_INTERFACE_HANDLE InterfaceHandle) {
+    usb_dev_handle *handle = usb_open(static_cast<struct usb_device *>(DeviceHandle));
+    if (handle) {
+      *InterfaceHandle = handle;
+      return true;
+    }
+    *InterfaceHandle = INVALID_HANDLE_VALUE;
+    return false;
+  }
+
+  bool WinUsb_AbortPipeHook(WINUSB_INTERFACE_HANDLE InterfaceHandle, UCHAR PipeID) {
+    return true; // Return success, even though we're doing nothing. This is missing from LibUSB0.
+  }
+
+  bool WinUsb_GetCurrentAlternateSettingHook(WINUSB_INTERFACE_HANDLE InterfaceHandle, PUCHAR SettingNumber) {
+    *SettingNumber = 1;
+    return true; // Also missing from LibUSB0.
+  }
+
+  bool WinUsb_SetCurrentAlternateSettingHook(WINUSB_INTERFACE_HANDLE InterfaceHandle, UCHAR SettingNumber) {
+    return true; // Also missing from LibUSB0.
+  }
+
+  bool WinUsb_FreeHook(WINUSB_INTERFACE_HANDLE InterfaceHandle) {
+    if (InterfaceHandle != INVALID_HANDLE_VALUE) {
+      usb_close(static_cast<struct usb_dev_handle *>(InterfaceHandle));
+      return true;
+    }
+    return false;
+  }
+
+  bool WinUsb_GetDescriptorHook(
+    WINUSB_INTERFACE_HANDLE InterfaceHandle,
+    UCHAR DescriptorType,
+    UCHAR Index,
+    USHORT LanguageID,
+    PUCHAR Buffer,
+    ULONG BufferLength,
+    PULONG LengthTransferred
+  ) {
+    if (InterfaceHandle == INVALID_HANDLE_VALUE || !Buffer) {
+      return false;
+    }
+
+    int ret = usb_control_msg(
+      static_cast<struct usb_dev_handle *>(InterfaceHandle),
+      USB_ENDPOINT_IN,
+      USB_REQ_GET_DESCRIPTOR,
+      (DescriptorType << 8) | Index,
+      LanguageID,
+      (char *)Buffer,
+      (int)BufferLength,
+      1000
+    );
+
+    if (ret < 0) {
+      if (LengthTransferred) {
+        *LengthTransferred = 0;
+      }
+      return false;
+    }
+
+    if (LengthTransferred) {
+      *LengthTransferred = ret;
+    }
+
+    return true;
+  }
+
+  bool WinUsb_GetPipePolicyHook(
+    WINUSB_INTERFACE_HANDLE InterfaceHandle,
+    UCHAR PipeID,
+    ULONG PolicyType,
+    PULONG ValueLength,
+    PVOID Value
+  ) {
+    if (PolicyType == 8) {
+      *(int *)Value = 1024 * 1024; // hack
+    }
+    return true; // Also missing from LibUSB0.
+  }
+
+  bool WinUsb_ReadPipeHook(
+    WINUSB_INTERFACE_HANDLE InterfaceHandle,
+    UCHAR PipeID,
+    PUCHAR Buffer,
+    ULONG BufferLength,
+    PULONG LengthTransferred,
+    LPOVERLAPPED Overlapped
+  ) {
+    if (InterfaceHandle == INVALID_HANDLE_VALUE || !Buffer) {
+      return false;
+    }
+
+    int transferred = 0;
+    int timeout = 1000; // ms, adjust to your needs
+
+    // Choose bulk or interrupt depending on endpoint attributes
+    if ((PipeID & USB_ENDPOINT_TYPE_MASK) == USB_ENDPOINT_TYPE_INTERRUPT) {
+      transferred = usb_interrupt_read(
+        static_cast<struct usb_dev_handle *>(InterfaceHandle),
+        PipeID,
+        (char *)Buffer,
+        (int)BufferLength,
+        timeout
+      );
+    }
+    else {
+      transferred = usb_bulk_read(
+        static_cast<struct usb_dev_handle *>(InterfaceHandle),
+        PipeID,
+        (char *)Buffer,
+        (int)BufferLength,
+        timeout
+      );
+    }
+
+    if (transferred < 0) {
+      if (LengthTransferred) {
+        *LengthTransferred = 0;
+      }
+      return false;
+    }
+
+    if (LengthTransferred) {
+      *LengthTransferred = transferred;
+    }
+
+    return true;
+  }
+
+  bool WinUsb_ControlTransferHook(
+    usb_dev_handle *InterfaceHandle,
+    WINUSB_SETUP_PACKET SetupPacket,
+    PUCHAR Buffer,
+    ULONG BufferLength,
+    PULONG LengthTransferred,
+    LPOVERLAPPED Overlapped
+  ) {
+    if (!InterfaceHandle) {
+      return FALSE;
+    }
+
+    int timeout = 1000; // ms, adjust as needed
+
+    int ret = usb_control_msg(
+      InterfaceHandle,
+      SetupPacket.RequestType,
+      SetupPacket.Request,
+      SetupPacket.Value,
+      SetupPacket.Index,
+      (char *)Buffer,
+      (int)BufferLength,
+      timeout
+    );
+
+    if (ret < 0) {
+      if (LengthTransferred) {
+        *LengthTransferred = 0;
+      }
+      return FALSE;
+    }
+
+    if (LengthTransferred) {
+      *LengthTransferred = (ULONG)ret;
+    }
+
+    // libusb-0.1 does not support Overlapped I/O
+    (void)Overlapped; // suppress unused parameter warning
+
+    return TRUE;
   }
 
   void UsbThreadHooks::InstallHooks() {
     static HmdDriverLoader *pHmdDriverLoader = HmdDriverLoader::Instance();
 
+    Framework__Mutex__lock = decltype(Framework__Mutex__lock)(pHmdDriverLoader->GetBaseAddress() + 0x16B5F0);
+    Framework__Mutex__unlock = decltype(Framework__Mutex__unlock)(pHmdDriverLoader->GetBaseAddress() + 0x16B850);
+
+    CaesarUsbThread__read = decltype(CaesarUsbThread__read)(pHmdDriverLoader->GetBaseAddress() + 0x127D60);
     CaesarUsbThread__report = decltype(CaesarUsbThread__report)(pHmdDriverLoader->GetBaseAddress() + 0x1283F0);
 
     if (!VRSettings::GetBool(STEAMVR_SETTINGS_DISABLE_GAZE, SETTING_DISABLE_GAZE_DEFAULT_VALUE)) {
@@ -96,9 +339,25 @@ namespace psvr2_toolkit {
                            reinterpret_cast<void **>(&CaesarUsbThreadImuStatus__poll));
     }
 
+    // TODO FIX!!
+    usb_init(); /* initialize the library */
+    usb_find_busses(); /* find all busses */
+    usb_find_devices(); /* find all connected devices */
+
     // LibUSB stuff
-    HookLib::InstallHook(reinterpret_cast<void *>(pHmdDriverLoader->GetBaseAddress() + 0x122A70),
-                         reinterpret_cast<void *>(CaesarUsbThread__freeHook));
+    HookLib::InstallHook(reinterpret_cast<void *>(pHmdDriverLoader->GetBaseAddress() + 0x122AC0),
+                         reinterpret_cast<void *>(CaesarUsbThread__initializeHook));
+
+    // WinUSB hooks
+    HookLib::InstallHook(&WinUsb_Initialize, reinterpret_cast<void *>(WinUsb_InitializeHook));
+    HookLib::InstallHook(&WinUsb_AbortPipe, reinterpret_cast<void *>(WinUsb_AbortPipeHook));
+    HookLib::InstallHook(&WinUsb_GetCurrentAlternateSetting, reinterpret_cast<void *>(WinUsb_GetCurrentAlternateSettingHook));
+    HookLib::InstallHook(&WinUsb_SetCurrentAlternateSetting, reinterpret_cast<void *>(WinUsb_SetCurrentAlternateSettingHook));
+    HookLib::InstallHook(&WinUsb_Free, reinterpret_cast<void *>(WinUsb_FreeHook));
+    HookLib::InstallHook(&WinUsb_GetDescriptor, reinterpret_cast<void *>(WinUsb_GetDescriptorHook));
+    HookLib::InstallHook(&WinUsb_GetPipePolicy, reinterpret_cast<void *>(WinUsb_GetPipePolicyHook));
+    HookLib::InstallHook(&WinUsb_ReadPipe, reinterpret_cast<void *>(WinUsb_ReadPipeHook));
+    HookLib::InstallHook(&WinUsb_ControlTransfer, reinterpret_cast<void *>(WinUsb_ControlTransferHook));
   }
 
 } // psvr2_toolkit
