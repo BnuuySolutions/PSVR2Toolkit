@@ -3,6 +3,7 @@
 #include "hmd_driver_loader.h"
 #include "hook_lib.h"
 #include "vr_settings.h"
+#include "util.h"
 
 #include <thread>
 #include <lusb0_usb.h>
@@ -118,46 +119,81 @@ namespace psvr2_toolkit {
     return result;
   }
 
+  struct Init {
+    struct usb_device *dev;
+    char usbInf;
+  };
+
   // We need to replace device enumeration, it is not compatible with LibUSB.
   int CaesarUsbThread__initializeHook(CaesarUsbThread_t *thisptr) {
     // TODO: ShareManager
     CaesarUsbThread_Vtbl_t *pVtbl = static_cast<CaesarUsbThread_Vtbl_t *>(thisptr->__vfptr);
     char usbInf = pVtbl->getUsbInf(thisptr);
     struct usb_device *actual_dev = nullptr;
+    Util::DriverLog("Before Get Busses");
     for (struct usb_bus *bus = usb_get_busses(); bus; bus = bus->next) {
       for (struct usb_device *dev = bus->devices; dev; dev = dev->next) {
-        if (dev->descriptor.idVendor == 0x054C &&
-            dev->descriptor.idProduct == 0x0CDE &&
-            dev->config->interface->altsetting->bInterfaceNumber == usbInf) {
-          actual_dev = dev;
-          break;
+        for (int i = 0; i < dev->config->bNumInterfaces; i++) {
+          struct usb_interface *intf = &dev->config->interface[i];
+          for (int j = 0; j < intf->num_altsetting; j++) {
+            struct usb_interface_descriptor *desc = &intf->altsetting[j];
+            Util::DriverLog("idVendor = {}, idProduct = {}, bInterfaceNumber = {}",
+              dev->descriptor.idVendor,
+              dev->descriptor.idProduct,
+              desc->bInterfaceNumber);
+
+            if (dev->descriptor.idVendor == 0x054C &&
+              dev->descriptor.idProduct == 0x0CDE &&
+              desc->bInterfaceNumber == usbInf) {
+              Util::DriverLog("Found device");
+              Util::DriverLog("dev = {}", (uintptr_t)dev);
+              actual_dev = dev;
+              break;
+            }
+          }
         }
       }
     }
+    Util::DriverLog("Locking mutex");
     Framework__Mutex__lock(&thisptr->handlesMutex, 0xFFFFFFFF);
     thisptr->handles.pDeviceHandle = INVALID_HANDLE_VALUE; // We aren't using this, disables CloseHandle path in Sony code.
     if (thisptr->__unkVar15) {
+      Util::DriverLog("Unlocking mutex");
       Framework__Mutex__unlock(&thisptr->handlesMutex);
       return -1;
     }
-    if (!WinUsb_Initialize(actual_dev, &thisptr->handles.pInterfaceHandle)) {
+    Util::DriverLog("Before winusb initialize (HOOKED)");
+    Init init;
+    init.dev = actual_dev;
+    init.usbInf = usbInf;
+    if (!WinUsb_Initialize(&init, &thisptr->handles.pInterfaceHandle)) {
+      Util::DriverLog("Unlocking mutex");
       Framework__Mutex__unlock(&thisptr->handlesMutex);
       return -1;
     }
+    Util::DriverLog("Unlocking mutex");
     Framework__Mutex__unlock(&thisptr->handlesMutex);
     // TODO: Driver info
+    Util::DriverLog("handles init");
     thisptr->handles.initialized = 1;
     return 0;
   }
 
   bool WinUsb_InitializeHook(HANDLE DeviceHandle, PWINUSB_INTERFACE_HANDLE InterfaceHandle) {
-    usb_dev_handle *handle = usb_open(static_cast<struct usb_device *>(DeviceHandle));
-    if (handle) {
-      *InterfaceHandle = handle;
-      return true;
+    Init *init = (Init *)DeviceHandle;
+    Util::DriverLog("WinUsb_InitializeHook call... dev = {}, usbInf = {}", init->dev == nullptr ? "null" : "not null", (int)init->usbInf);
+    Util::DriverLog("WinUsb_InitializeHook dev = {}", (uintptr_t)init->dev);
+    Util::DriverLog("WinUsb_InitializeHook dev cast = {}", (uintptr_t)static_cast<struct usb_device *>(init->dev));
+    usb_dev_handle *handle = usb_open(static_cast<struct usb_device *>(init->dev));
+    if (usb_claim_interface(handle, init->usbInf) != 0) {
+      Util::DriverLog("Failed to claim interface {}", init->usbInf);
+      usb_close(handle);
+      *InterfaceHandle = INVALID_HANDLE_VALUE;
+      return false;
     }
-    *InterfaceHandle = INVALID_HANDLE_VALUE;
-    return false;
+    Util::DriverLog("Usb open success");
+    *InterfaceHandle = handle;
+    return true;
   }
 
   bool WinUsb_AbortPipeHook(WINUSB_INTERFACE_HANDLE InterfaceHandle, UCHAR PipeID) {
@@ -340,8 +376,11 @@ namespace psvr2_toolkit {
     }
 
     // TODO FIX!!
+    Util::DriverLog("Before Init");
     usb_init(); /* initialize the library */
+    Util::DriverLog("Before Find Busses");
     usb_find_busses(); /* find all busses */
+    Util::DriverLog("Before Find Devices");
     usb_find_devices(); /* find all connected devices */
 
     // LibUSB stuff
