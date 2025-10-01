@@ -1,5 +1,7 @@
 #pragma once
 
+#include "hmd_types.h"
+
 #include <openvr_driver.h>
 
 namespace psvr2_toolkit {
@@ -12,6 +14,19 @@ namespace psvr2_toolkit {
 
     void SetDriverHost(vr::IVRServerDriverHost* pDriverHost);
     void SetEventHandler(void (*pfnEventHandler)(vr::VREvent_t*)); // Required for intercepting polled events from the PS VR2 driver.
+
+    DeviceType GetDeviceType(vr::PropertyContainerHandle_t propertyContainer) const {
+      if (propertyContainer == hmdContainer) {
+        return DeviceType::HMD;
+      }
+      else if (propertyContainer == leftControllerContainer) {
+        return DeviceType::SenseControllerLeft;
+      }
+      else if (propertyContainer == rightControllerContainer) {
+        return DeviceType::SenseControllerRight;
+      }
+      return DeviceType::None;
+    }
 
     /** IVRServerDriverHost **/
 
@@ -36,6 +51,10 @@ namespace psvr2_toolkit {
 
     // Used internally for controller pose correction.
     vr::DriverPose_t GetPose(uint32_t unWhichDevice, const vr::DriverPose_t& originalPose);
+
+    vr::PropertyContainerHandle_t hmdContainer = vr::k_ulInvalidPropertyContainer;
+    vr::PropertyContainerHandle_t leftControllerContainer = vr::k_ulInvalidPropertyContainer;
+    vr::PropertyContainerHandle_t rightControllerContainer = vr::k_ulInvalidPropertyContainer;
   };
 
 } // psvr2_toolkit

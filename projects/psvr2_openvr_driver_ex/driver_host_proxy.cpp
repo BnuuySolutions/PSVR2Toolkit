@@ -45,7 +45,33 @@ namespace psvr2_toolkit {
       return false;
     }
 
-    return m_pDriverHost->TrackedDeviceAdded(pchDeviceSerialNumber, eDeviceClass, pDriver);
+    bool success = m_pDriverHost->TrackedDeviceAdded(pchDeviceSerialNumber, eDeviceClass, pDriver);
+
+    if (success)
+    {
+      switch (eDeviceClass)
+      {
+      case vr::ETrackedDeviceClass::TrackedDeviceClass_HMD:
+        if (hmdContainer == vr::k_ulInvalidPropertyContainer) {
+          hmdContainer = vr::VRProperties()->TrackedDeviceToPropertyContainer(k_unDeviceIndexHeadset);
+        }
+        break;
+      case vr::ETrackedDeviceClass::TrackedDeviceClass_Controller:
+        if (Util::StartsWith(pchDeviceSerialNumber, "playstation_vr2_sense_controller_left")) {
+          if (leftControllerContainer == vr::k_ulInvalidPropertyContainer) {
+            leftControllerContainer = vr::VRProperties()->TrackedDeviceToPropertyContainer(k_unDeviceIndexSenseControllerLeft);
+          }
+        }
+
+        else if (Util::StartsWith(pchDeviceSerialNumber, "playstation_vr2_sense_controller_right")) {
+          if (rightControllerContainer == vr::k_ulInvalidPropertyContainer) {
+            rightControllerContainer = vr::VRProperties()->TrackedDeviceToPropertyContainer(k_unDeviceIndexSenseControllerRight);
+          }
+        }
+      }
+    }
+
+    return success;
   }
 
   void DriverHostProxy::TrackedDevicePoseUpdated(uint32_t unWhichDevice, const vr::DriverPose_t& newPose, uint32_t unPoseStructSize) {

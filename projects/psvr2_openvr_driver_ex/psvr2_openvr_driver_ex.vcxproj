@@ -104,6 +104,7 @@
     <ClCompile Include="hmd_device_hooks.cpp" />
     <ClCompile Include="hmd_driver_factory.cpp" />
     <ClCompile Include="hmd_driver_loader.cpp" />
+    <ClCompile Include="hmd_types.h" />
     <ClCompile Include="ipc_server.cpp" />
     <ClCompile Include="libpad_hooks.cpp" />
     <ClCompile Include="sense_controller.cpp" />

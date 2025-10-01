@@ -264,6 +264,8 @@ void SenseThread()
 
 static void PollNextEvent(vr::VREvent_t* pEvent)
 {
+  static DriverHostProxy* pDriverHostProxy = DriverHostProxy::Instance();
+
   switch (pEvent->eventType)
   {
   case vr::EVREventType::VREvent_PropertyChanged:
@@ -295,7 +297,18 @@ static void PollNextEvent(vr::VREvent_t* pEvent)
   {
     vr::VREvent_HapticVibration_t hapticEvent = pEvent->data.hapticVibration;
 
-    int32_t role = vr::VRProperties()->GetInt32Property(hapticEvent.containerHandle, vr::Prop_ControllerRoleHint_Int32);
+    // hapticEvent.containerHandle
+    DeviceType deviceType = pDriverHostProxy->GetDeviceType(hapticEvent.containerHandle);
+    vr::ETrackedControllerRole role;
+    if (deviceType == DeviceType::SenseControllerLeft) {
+      role = vr::TrackedControllerRole_LeftHand;
+    }
+    else if (deviceType == DeviceType::SenseControllerRight) {
+      role = vr::TrackedControllerRole_RightHand;
+    }
+    else {
+      break;
+    }
 
     float senseHapticFreq = hapticEvent.fFrequency;
     uint8_t senseHapticAmp = 0;

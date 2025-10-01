@@ -68,6 +68,9 @@
     <ClCompile Include="sense_controller.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="hmd_types.h">
+      <Filter>Utilities</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="hmd_driver_loader.h">
