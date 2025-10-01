@@ -22,7 +22,7 @@ env:
   BUILD_CONFIGURATION: ReleaseCI
 
   # Directory for build artifacts
-  ARTIFACTS_DIR: artifacts
+  ARTIFACTS_DIR: ${{github.workspace}}/artifacts
 
 permissions:
   contents: read
