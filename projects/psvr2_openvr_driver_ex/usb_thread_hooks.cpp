@@ -7,6 +7,7 @@
 
 #include <thread>
 #include <libusb.h>
+#include <hidapi/hidapi.h>
 #include <map>
 #include <mutex>
 
@@ -44,10 +45,34 @@ extern "C" {
   WinUsb_GetPipePolicy_t o_WinUsb_GetPipePolicy = NULL;
   WinUsb_ReadPipe_t o_WinUsb_ReadPipe = NULL;
   WinUsb_ControlTransfer_t o_WinUsb_ControlTransfer = NULL;
+
+  // HID
+  // HidD_SetFeature
+  typedef BOOLEAN(WINAPI* HidD_SetFeature_t)(HANDLE HidDeviceObject, PVOID ReportBuffer, ULONG ReportBufferLength);
+  // HidD_GetFeature
+  typedef BOOLEAN(WINAPI* HidD_GetFeature_t)(HANDLE HidDeviceObject, PVOID ReportBuffer, ULONG ReportBufferLength);
+  // OpenFileW
+  typedef HANDLE(WINAPI* CreateFileW_t)(LPCWSTR lpFileName, DWORD dwDesiredAccess, DWORD dwShareMode, LPSECURITY_ATTRIBUTES lpSecurityAttributes, DWORD dwCreationDisposition, DWORD dwFlagsAndAttributes, HANDLE hTemplateFile);
+  // ReadFile
+  typedef BOOL(WINAPI* ReadFile_t)(HANDLE hFile, LPVOID lpBuffer, DWORD nNumberOfBytesToRead, LPDWORD lpNumberOfBytesRead, LPOVERLAPPED lpOverlapped);
+  // WriteFile
+  typedef BOOL(WINAPI* WriteFile_t)(HANDLE hFile, LPCVOID lpBuffer, DWORD nNumberOfBytesToWrite, LPDWORD lpNumberOfBytesWritten, LPOVERLAPPED lpOverlapped);
+  // WriteFileEx
+  typedef BOOL(WINAPI* WriteFileEx_t)(HANDLE hFile, LPCVOID lpBuffer, DWORD nNumberOfBytesToWrite, LPOVERLAPPED lpOverlapped, LPOVERLAPPED_COMPLETION_ROUTINE lpCompletionRoutine);
+  // CloseHandle
+  typedef BOOL(WINAPI* CloseHandle_t)(HANDLE hObject);
+
+  HidD_GetFeature_t o_HidD_GetFeature = NULL;
+  HidD_SetFeature_t o_HidD_SetFeature = NULL;
+  CreateFileW_t o_CreateFileW = NULL;
+  ReadFile_t o_ReadFile = NULL;
+  WriteFile_t o_WriteFile = NULL;
+  WriteFileEx_t o_WriteFileEx = NULL;
+  CloseHandle_t o_CloseHandle = NULL;
 }
 
 namespace psvr2_toolkit {
-#define PSVR2_VID 0x054c
+#define SONY_VID 0x054c
 #define PSVR2_PID 0x0cde
 
   // === Encapsulated USB Interface State ===
@@ -216,9 +241,9 @@ namespace psvr2_toolkit {
       libusb_free_device_list(device_list, 1);
 
       // Open the PSVR2 device if not already opened
-      g_handle = libusb_open_device_with_vid_pid(ctx, PSVR2_VID, PSVR2_PID);
+      g_handle = libusb_open_device_with_vid_pid(ctx, SONY_VID, PSVR2_PID);
       if (g_handle == NULL) {
-        Util::DriverLog("[libusb hook] Could not find/open PSVR2 device (VID=0x{}, PID=0x{}).\n", PSVR2_VID, PSVR2_PID);
+        Util::DriverLog("[libusb hook] Could not find/open PSVR2 device (VID=0x{}, PID=0x{}).\n", SONY_VID, PSVR2_PID);
         delete new_interface;
         Framework__Mutex__unlock(&thisptr->handlesMutex);
         return -1;
@@ -321,16 +346,25 @@ namespace psvr2_toolkit {
       return o_WinUsb_Free(InterfaceHandle); // Not our handle, pass it through
     }
 
-    Util::DriverLog("[WinUsb_FreeHook] Intercepted call for fake handle {}.\n", InterfaceHandle);
+    bool isEmpty;
 
-    delete interface_obj;
-    auto it = g_interface_map.find(InterfaceHandle);
-    g_interface_map.erase(it);
+    {
+      std::lock_guard<std::mutex> lock(g_usb_mutex);
+      Util::DriverLog("[WinUsb_FreeHook] Intercepted call for fake handle {}.\n", InterfaceHandle);
 
-    if (g_interface_map.empty()) {
+      delete interface_obj;
+      auto it = g_interface_map.find(InterfaceHandle);
+      g_interface_map.erase(it);
+
+      isEmpty = g_interface_map.empty();
+    }
+
+    if (isEmpty) {
       // No more interfaces in use, close the device handle
       if (g_handle) {
         libusb_close(g_handle);
+
+        std::lock_guard<std::mutex> lock(g_usb_mutex);
         g_handle = NULL;
         Util::DriverLog("[WinUsb_FreeHook] Closed PSVR2 device handle.\n");
       }
@@ -460,6 +494,189 @@ namespace psvr2_toolkit {
     return TRUE;
   }
 
+  // Map handles to HIDAPI
+  std::mutex g_hid_mutex;
+  std::map<HANDLE, hid_device*> g_hid_map;
+
+  // HID hooks
+  BOOLEAN HidD_GetFeatureHook(HANDLE HidDeviceObject, PVOID ReportBuffer, ULONG ReportBufferLength) {
+    {
+      hid_device* hid_handle = nullptr;
+      {
+        std::scoped_lock lock(g_hid_mutex);
+        auto it = g_hid_map.find(HidDeviceObject);
+        if (it != g_hid_map.end())
+          hid_handle = it->second;
+      }
+
+      if (hid_handle) {
+        int res = hid_get_feature_report(hid_handle, (unsigned char*)ReportBuffer, ReportBufferLength);
+        if (res < 0) {
+          Util::DriverLog("[HIDAPI hook] HidD_GetFeature failed on HID handle: {}", reinterpret_cast<uintptr_t>(hid_handle));
+          return FALSE;
+        }
+        return TRUE;
+      }
+    }
+
+    return o_HidD_GetFeature(HidDeviceObject, ReportBuffer, ReportBufferLength);
+  }
+  BOOLEAN HidD_SetFeatureHook(HANDLE HidDeviceObject, PVOID ReportBuffer, ULONG ReportBufferLength) {
+    {
+      hid_device* hid_handle = nullptr;
+      {
+        std::scoped_lock lock(g_hid_mutex);
+        auto it = g_hid_map.find(HidDeviceObject);
+        if (it != g_hid_map.end())
+          hid_handle = it->second;
+      }
+
+      if (hid_handle) {
+        int res = hid_send_feature_report(hid_handle, (const unsigned char*)ReportBuffer, ReportBufferLength);
+        if (res < 0) {
+          Util::DriverLog("[HIDAPI hook] HidD_SetFeature failed on HID handle: {}", reinterpret_cast<uintptr_t>(hid_handle));
+          return FALSE;
+        }
+        return TRUE;
+      }
+    }
+    return o_HidD_SetFeature(HidDeviceObject, ReportBuffer, ReportBufferLength);
+  }
+  HANDLE CreateFileWHook(LPCWSTR lpFileName, DWORD dwDesiredAccess, DWORD dwShareMode, LPSECURITY_ATTRIBUTES lpSecurityAttributes, DWORD dwCreationDisposition, DWORD dwFlagsAndAttributes, HANDLE hTemplateFile) {
+    // If the path has a Sony vid, we should also open a hidapi handle for our other hooks.
+    HANDLE handle = o_CreateFileW(lpFileName, dwDesiredAccess, dwShareMode, lpSecurityAttributes, dwCreationDisposition, dwFlagsAndAttributes, hTemplateFile);
+
+    if (handle != INVALID_HANDLE_VALUE) {
+      std::wstring path_str(lpFileName);
+      size_t vid_pos = path_str.find(L"_vid&");
+      size_t pid_pos = path_str.find(L"_pid&");
+      if (vid_pos != std::wstring::npos) {
+        unsigned int vid = 0, pid = 0;
+        try {
+          // Looks like this: _vid&0002054c_pid&0e46
+
+          // Parse VID
+          if (vid_pos + 9 <= path_str.length()) {
+            std::wstring vid_str = path_str.substr(vid_pos + 5 + 4, 4);
+            vid = std::stoul(vid_str, nullptr, 16);
+          }
+          // Parse PID
+          if (pid_pos != std::wstring::npos && pid_pos + 9 <= path_str.length()) {
+            std::wstring pid_str = path_str.substr(pid_pos + 5, 4);
+            pid = std::stoul(pid_str, nullptr, 16);
+          }
+        }
+        catch (...) {
+          Util::DriverLog("[HIDAPI hook] Failed to parse VID/PID from path.");
+          vid = 0;
+          pid = 0;
+        }
+        if (vid == SONY_VID && (pid == 0x0e45 || pid == 0x0e46)) {
+          hid_device* hid_handle = hid_open(vid, pid, NULL);
+          if (hid_handle) {
+            std::lock_guard<std::mutex> lock(g_hid_mutex);
+            g_hid_map[handle] = hid_handle;
+            Util::DriverLog("[HIDAPI hook] Opened HID handle for VID=0x{}, PID=0x{} on CreateFileW.", vid, pid);
+          }
+          else {
+            Util::DriverLog("[HIDAPI hook] Failed to open HID handle for VID=0x{}, PID=0x{} on CreateFileW.", vid, pid);
+          }
+        }
+      }
+    }
+
+    return handle;
+  }
+  BOOL ReadFileHook(HANDLE hFile, LPVOID lpBuffer, DWORD nNumberOfBytesToRead, LPDWORD lpNumberOfBytesRead, LPOVERLAPPED lpOverlapped) {
+    {
+      hid_device* hid_handle = nullptr;
+      {
+        std::scoped_lock lock(g_hid_mutex);
+        auto it = g_hid_map.find(hFile);
+        if (it != g_hid_map.end())
+          hid_handle = it->second;
+      }
+
+      if (hid_handle) {
+        int res = hid_read(hid_handle, (unsigned char*)lpBuffer, nNumberOfBytesToRead);
+        if (res < 0) {
+          Util::DriverLog("[HIDAPI hook] ReadFile failed on HID handle: {}", reinterpret_cast<uintptr_t>(hid_handle));
+          if (lpNumberOfBytesRead) *lpNumberOfBytesRead = 0;
+          return FALSE;
+        }
+        if (lpNumberOfBytesRead) *lpNumberOfBytesRead = res;
+        return TRUE;
+      }
+    }
+    return o_ReadFile(hFile, lpBuffer, nNumberOfBytesToRead, lpNumberOfBytesRead, lpOverlapped);
+  }
+  BOOL WriteFileHook(HANDLE hFile, LPCVOID lpBuffer, DWORD nNumberOfBytesToWrite, LPDWORD lpNumberOfBytesWritten, LPOVERLAPPED lpOverlapped) {
+    {
+      hid_device* hid_handle = nullptr;
+      {
+        std::scoped_lock lock(g_hid_mutex);
+        auto it = g_hid_map.find(hFile);
+        if (it != g_hid_map.end())
+          hid_handle = it->second;
+      }
+
+      if (hid_handle) {
+        int res = hid_write(hid_handle, (const unsigned char*)lpBuffer, nNumberOfBytesToWrite);
+        if (res < 0) {
+          Util::DriverLog("[HIDAPI hook] WriteFile failed on HID handle: {}", reinterpret_cast<uintptr_t>(hid_handle));
+          if (lpNumberOfBytesWritten) *lpNumberOfBytesWritten = 0;
+          return FALSE;
+        }
+        if (lpNumberOfBytesWritten) *lpNumberOfBytesWritten = res;
+        return TRUE;
+      }
+    }
+
+    return o_WriteFile(hFile, lpBuffer, nNumberOfBytesToWrite, lpNumberOfBytesWritten, lpOverlapped);
+  }
+  BOOL WriteFileExHook(HANDLE hFile, LPCVOID lpBuffer, DWORD nNumberOfBytesToWrite, LPOVERLAPPED lpOverlapped, LPOVERLAPPED_COMPLETION_ROUTINE lpCompletionRoutine) {
+    {
+      hid_device* hid_handle = nullptr;
+      {
+        std::scoped_lock lock(g_hid_mutex);
+        auto it = g_hid_map.find(hFile);
+        if (it != g_hid_map.end())
+          hid_handle = it->second;
+      }
+
+      if (hid_handle) {
+        int res = hid_write(hid_handle, (const unsigned char*)lpBuffer, nNumberOfBytesToWrite);
+        if (res < 0) {
+          Util::DriverLog("[HIDAPI hook] WriteFileEx failed on HID handle: {}", reinterpret_cast<uintptr_t>(hid_handle));
+          return FALSE;
+        }
+
+        lpCompletionRoutine(0, res, lpOverlapped);
+        return TRUE;
+      }
+    }
+    return o_WriteFileEx(hFile, lpBuffer, nNumberOfBytesToWrite, lpOverlapped, lpCompletionRoutine);
+  }
+
+  BOOL CloseHandleHook(HANDLE hObject) {
+    {
+      hid_device* hid_handle = nullptr;
+      {
+        std::scoped_lock lock(g_hid_mutex);
+        auto it = g_hid_map.find(hObject);
+        if (it != g_hid_map.end()) {
+          hid_handle = it->second;
+          g_hid_map.erase(it);
+        }
+      }
+      if (hid_handle) {
+        hid_close(hid_handle);
+        Util::DriverLog("[HIDAPI hook] Closed HID handle: {}", reinterpret_cast<uintptr_t>(hid_handle));
+      }
+    }
+    return o_CloseHandle(hObject);
+  }
+
   void UsbThreadHooks::InstallHooks() {
     static HmdDriverLoader* pHmdDriverLoader = HmdDriverLoader::Instance();
 
@@ -489,6 +706,14 @@ namespace psvr2_toolkit {
     o_WinUsb_ReadPipe = (WinUsb_ReadPipe_t)GetProcAddress(GetModuleHandleW(L"winusb.dll"), "WinUsb_ReadPipe");
     o_WinUsb_ControlTransfer = (WinUsb_ControlTransfer_t)GetProcAddress(GetModuleHandleW(L"winusb.dll"), "WinUsb_ControlTransfer");
 
+    o_HidD_GetFeature = (HidD_GetFeature_t)GetProcAddress(GetModuleHandleW(L"hid.dll"), "HidD_GetFeature");
+    o_HidD_SetFeature = (HidD_SetFeature_t)GetProcAddress(GetModuleHandleW(L"hid.dll"), "HidD_SetFeature");
+    o_CreateFileW = (CreateFileW_t)GetProcAddress(GetModuleHandleW(L"kernel32.dll"), "CreateFileW");
+    o_ReadFile = (ReadFile_t)GetProcAddress(GetModuleHandleW(L"kernel32.dll"), "ReadFile");
+    o_WriteFile = (WriteFile_t)GetProcAddress(GetModuleHandleW(L"kernel32.dll"), "WriteFile");
+    o_WriteFileEx = (WriteFileEx_t)GetProcAddress(GetModuleHandleW(L"kernel32.dll"), "WriteFileEx");
+    o_CloseHandle = (CloseHandle_t)GetProcAddress(GetModuleHandleW(L"kernel32.dll"), "CloseHandle");
+
     // WinUSB hooks
     HookLib::InstallHook(o_WinUsb_AbortPipe, reinterpret_cast<void*>(WinUsb_AbortPipeHook), (void**)&o_WinUsb_AbortPipe);
     HookLib::InstallHook(o_WinUsb_GetCurrentAlternateSetting, reinterpret_cast<void*>(WinUsb_GetCurrentAlternateSettingHook), (void**)&o_WinUsb_GetCurrentAlternateSetting);
@@ -498,6 +723,15 @@ namespace psvr2_toolkit {
     HookLib::InstallHook(o_WinUsb_GetPipePolicy, reinterpret_cast<void*>(WinUsb_GetPipePolicyHook), (void**)&o_WinUsb_GetPipePolicy);
     HookLib::InstallHook(o_WinUsb_ReadPipe, reinterpret_cast<void*>(WinUsb_ReadPipeHook), (void**)&o_WinUsb_ReadPipe);
     HookLib::InstallHook(o_WinUsb_ControlTransfer, reinterpret_cast<void*>(WinUsb_ControlTransferHook), (void**)&o_WinUsb_ControlTransfer);
+
+    // HID hooks
+    HookLib::InstallHook(o_HidD_GetFeature, reinterpret_cast<void*>(HidD_GetFeatureHook), (void**)&o_HidD_GetFeature);
+    HookLib::InstallHook(o_HidD_SetFeature, reinterpret_cast<void*>(HidD_SetFeatureHook), (void**)&o_HidD_SetFeature);
+    HookLib::InstallHook(o_CreateFileW, reinterpret_cast<void*>(CreateFileWHook), (void**)&o_CreateFileW);
+    HookLib::InstallHook(o_ReadFile, reinterpret_cast<void*>(ReadFileHook), (void**)&o_ReadFile);
+    HookLib::InstallHook(o_WriteFile, reinterpret_cast<void*>(WriteFileHook), (void**)&o_WriteFile);
+    HookLib::InstallHook(o_WriteFileEx, reinterpret_cast<void*>(WriteFileExHook), (void**)&o_WriteFileEx);
+    HookLib::InstallHook(o_CloseHandle, reinterpret_cast<void*>(CloseHandleHook), (void**)&o_CloseHandle);
     
   }
 
