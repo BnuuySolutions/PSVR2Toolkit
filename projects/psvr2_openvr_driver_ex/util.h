@@ -58,7 +58,6 @@ namespace psvr2_toolkit {
       std::string message = std::vformat(std::string_view(format), std::make_format_args(args...));
       vr::VRDriverLog()->Log(message.c_str());
     }
-
   };
 
 } // psvr2_toolkit

@@ -7,12 +7,14 @@
 #include "hmd_driver_loader.h"
 #include "hook_lib.h"
 #include "ipc_server.h"
+#include "libpad_hooks.h"
 #include "trigger_effect_manager.h"
 #include "usb_thread_hooks.h"
 #include "util.h"
 #include "vr_settings.h"
 
 #include <windows.h>
+#include "sense_controller.h"
 
 using namespace psvr2_toolkit::ipc;
 
@@ -53,11 +55,16 @@ namespace psvr2_toolkit {
 
     static DriverContextProxy *pDriverContextProxy = DriverContextProxy::Instance();
     pDriverContextProxy->SetDriverContext(pDriverContext);
+
     return m_pDeviceProvider->Init(pDriverContextProxy);
   }
 
   void DeviceProviderProxy::Cleanup() {
     IpcServer::Instance()->Stop();
+
+    if (VRSettings::GetBool(STEAMVR_SETTINGS_USE_ENHANCED_HAPTICS, SETTING_USE_TOOLKIT_SYNC_DEFAULT_VALUE)) {
+        SenseController::Destroy();
+    }
 
     m_pDeviceProvider->Cleanup();
   }
@@ -128,12 +135,16 @@ namespace psvr2_toolkit {
 
     CaesarManagerHooks::InstallHooks();
     HmdDeviceHooks::InstallHooks();
+    LibpadHooks::InstallHooks();
     UsbThreadHooks::InstallHooks();
   }
 
   void DeviceProviderProxy::InitSystems() {
     IpcServer::Instance()->Initialize();
     TriggerEffectManager::Instance()->Initialize();
+    if (VRSettings::GetBool(STEAMVR_SETTINGS_USE_ENHANCED_HAPTICS, SETTING_USE_TOOLKIT_SYNC_DEFAULT_VALUE)) {
+        SenseController::Initialize();
+    }
   }
 
 } // psvr2_toolkit
