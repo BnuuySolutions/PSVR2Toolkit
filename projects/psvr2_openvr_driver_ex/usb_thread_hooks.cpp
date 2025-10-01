@@ -542,45 +542,31 @@ namespace psvr2_toolkit {
     }
     return o_HidD_SetFeature(HidDeviceObject, ReportBuffer, ReportBufferLength);
   }
+
+  thread_local bool in_hid_open = false;
+
   HANDLE CreateFileWHook(LPCWSTR lpFileName, DWORD dwDesiredAccess, DWORD dwShareMode, LPSECURITY_ATTRIBUTES lpSecurityAttributes, DWORD dwCreationDisposition, DWORD dwFlagsAndAttributes, HANDLE hTemplateFile) {
     // If the path has a Sony vid, we should also open a hidapi handle for our other hooks.
     HANDLE handle = o_CreateFileW(lpFileName, dwDesiredAccess, dwShareMode, lpSecurityAttributes, dwCreationDisposition, dwFlagsAndAttributes, hTemplateFile);
 
-    if (handle != INVALID_HANDLE_VALUE) {
+    if (handle != INVALID_HANDLE_VALUE && !in_hid_open) {
       std::wstring path_str(lpFileName);
-      size_t vid_pos = path_str.find(L"_vid&");
-      size_t pid_pos = path_str.find(L"_pid&");
-      if (vid_pos != std::wstring::npos) {
-        unsigned int vid = 0, pid = 0;
-        try {
-          // Looks like this: _vid&0002054c_pid&0e46
-
-          // Parse VID
-          if (vid_pos + 9 <= path_str.length()) {
-            std::wstring vid_str = path_str.substr(vid_pos + 5 + 4, 4);
-            vid = std::stoul(vid_str, nullptr, 16);
-          }
-          // Parse PID
-          if (pid_pos != std::wstring::npos && pid_pos + 9 <= path_str.length()) {
-            std::wstring pid_str = path_str.substr(pid_pos + 5, 4);
-            pid = std::stoul(pid_str, nullptr, 16);
-          }
+      size_t vid_pos = path_str.find(L"054c");
+      size_t pid_l_pos = path_str.find(L"0e45");
+      size_t pid_r_pos = path_str.find(L"0e46");
+      if (vid_pos != std::wstring::npos && (pid_l_pos != std::wstring::npos || pid_r_pos != std::wstring::npos)) {
+        unsigned short vid = 0x054c;
+        unsigned short pid = (pid_l_pos != std::wstring::npos) ? 0x0e45 : 0x0e46;
+        in_hid_open = true;
+        hid_device* hid_handle = hid_open(vid, pid, NULL);
+        in_hid_open = false;
+        if (hid_handle) {
+          std::lock_guard<std::mutex> lock(g_hid_mutex);
+          g_hid_map[handle] = hid_handle;
+          Util::DriverLog("[HIDAPI hook] Opened HID handle for VID=0x{}, PID=0x{} on CreateFileW.", vid, pid);
         }
-        catch (...) {
-          Util::DriverLog("[HIDAPI hook] Failed to parse VID/PID from path.");
-          vid = 0;
-          pid = 0;
-        }
-        if (vid == SONY_VID && (pid == 0x0e45 || pid == 0x0e46)) {
-          hid_device* hid_handle = hid_open(vid, pid, NULL);
-          if (hid_handle) {
-            std::lock_guard<std::mutex> lock(g_hid_mutex);
-            g_hid_map[handle] = hid_handle;
-            Util::DriverLog("[HIDAPI hook] Opened HID handle for VID=0x{}, PID=0x{} on CreateFileW.", vid, pid);
-          }
-          else {
-            Util::DriverLog("[HIDAPI hook] Failed to open HID handle for VID=0x{}, PID=0x{} on CreateFileW.", vid, pid);
-          }
+        else {
+          Util::DriverLog("[HIDAPI hook] Failed to open HID handle for VID=0x{}, PID=0x{} on CreateFileW.", vid, pid);
         }
       }
     }
@@ -599,6 +585,7 @@ namespace psvr2_toolkit {
 
       if (hid_handle) {
         int res = hid_read(hid_handle, (unsigned char*)lpBuffer, nNumberOfBytesToRead);
+
         if (res < 0) {
           Util::DriverLog("[HIDAPI hook] ReadFile failed on HID handle: {}", reinterpret_cast<uintptr_t>(hid_handle));
           if (lpNumberOfBytesRead) *lpNumberOfBytesRead = 0;
