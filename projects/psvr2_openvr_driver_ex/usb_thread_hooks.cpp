@@ -19,11 +19,11 @@ namespace psvr2_toolkit {
 
   uint64_t(*CaesarUsbThreadLeddet__poll)(void* thisptr) = nullptr;
   uint64_t CaesarUsbThreadLeddet__pollHook(void* thisptr) {
-      uint64_t result = CaesarUsbThreadLeddet__poll(thisptr);
+    uint64_t result = CaesarUsbThreadLeddet__poll(thisptr);
 
 	  memcpy(&currentLDPayload, reinterpret_cast<uint8_t*>(thisptr) + 0x230, sizeof(LDPayload));
 
-      return result;
+    return result;
   }
 
   void UsbThreadHooks::InstallHooks() {
@@ -39,8 +39,8 @@ namespace psvr2_toolkit {
     }
 
     if (VRSettings::GetBool(STEAMVR_SETTINGS_USE_TOOLKIT_SYNC, SETTING_USE_TOOLKIT_SYNC_DEFAULT_VALUE)) {
-	  // CaesarUsbThreadLeddet::poll
-	  HookLib::InstallHook(reinterpret_cast<void*>(pHmdDriverLoader->GetBaseAddress() + 0x126B80),
+	    // CaesarUsbThreadLeddet::poll
+	    HookLib::InstallHook(reinterpret_cast<void*>(pHmdDriverLoader->GetBaseAddress() + 0x126B80),
 		                   reinterpret_cast<void*>(CaesarUsbThreadLeddet__pollHook),
 		                   reinterpret_cast<void**>(&CaesarUsbThreadLeddet__poll));
     }
