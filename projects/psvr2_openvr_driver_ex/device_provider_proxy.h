@@ -25,10 +25,14 @@ namespace psvr2_toolkit {
   private:
     static DeviceProviderProxy *m_pInstance;
 
+    bool m_initOnce;
+
     vr::IServerTrackedDeviceProvider *m_pDeviceProvider;
 
-    void InstallHooks();
-    void InitializeSystems();
+    void InitOnce();
+
+    void InitPatches();
+    void InitSystems();
   };
 
 } // psvr2_toolkit

@@ -40,7 +40,7 @@ namespace psvr2_toolkit {
       WSADATA wsaData = {};
       int result = WSAStartup(MAKEWORD(2, 2), &wsaData);
       if (result != 0) {
-        Util::DriverLog("[IPC_SERVER] WSAStartup failed. Result = %d", result);
+        Util::DriverLog("[IPC_SERVER] WSAStartup failed. Result = {}", result);
         return;
       }
 
@@ -55,7 +55,7 @@ namespace psvr2_toolkit {
 
       m_socket = socket(AF_INET, SOCK_STREAM, 0);
       if (m_socket == INVALID_SOCKET) {
-        Util::DriverLog("[IPC_SERVER] Creating socket failed. LastError = %d", WSAGetLastError());
+        Util::DriverLog("[IPC_SERVER] Creating socket failed. LastError = {}", WSAGetLastError());
         return;
       }
 
@@ -64,13 +64,13 @@ namespace psvr2_toolkit {
       m_serverAddr.sin_port = htons(IPC_SERVER_PORT);
 
       if (bind(m_socket, reinterpret_cast<SOCKADDR * >(&m_serverAddr), sizeof(m_serverAddr)) == SOCKET_ERROR) {
-        Util::DriverLog("[IPC_SERVER] Bind failed. LastError = %d", WSAGetLastError());
+        Util::DriverLog("[IPC_SERVER] Bind failed. LastError = {}", WSAGetLastError());
         closesocket(m_socket);
         return;
       }
 
       if (listen(m_socket, SOMAXCONN) == SOCKET_ERROR) {
-        Util::DriverLog("[IPC_SERVER] Listen failed. LastError = %d", WSAGetLastError());
+        Util::DriverLog("[IPC_SERVER] Listen failed. LastError = {}", WSAGetLastError());
         closesocket(m_socket);
         return;
       }
@@ -111,7 +111,7 @@ namespace psvr2_toolkit {
         if (clientSocket == INVALID_SOCKET) {
           int error = WSAGetLastError();
           if (m_running) {
-              Util::DriverLog("[IPC_SERVER] Accept failed. LastError = %d", error);
+              Util::DriverLog("[IPC_SERVER] Accept failed. LastError = {}", error);
           }
           else {
             Util::DriverLog("[IPC_SERVER] Server socket closed. Exiting receive loop.");
@@ -133,16 +133,16 @@ namespace psvr2_toolkit {
         int dwBufferSize = recv(clientSocket, pBuffer, sizeof(pBuffer), 0);
         if (dwBufferSize <= 0) {
           if (dwBufferSize == 0) {
-            Util::DriverLog("[IPC_SERVER] Client on port %d disconnected.", clientPort);
+            Util::DriverLog("[IPC_SERVER] Client on port {} disconnected.", clientPort);
           } else {
-            Util::DriverLog("[IPC_SERVER] Receive failed for client on port %d. LastError = %d", clientPort, WSAGetLastError());
+            Util::DriverLog("[IPC_SERVER] Receive failed for client on port {}. LastError = {}", clientPort, WSAGetLastError());
           }
 
           break;
         }
 
         if (dwBufferSize < sizeof(CommandHeader_t)) {
-          Util::DriverLog("[IPC_SERVER] Received invalid command header size from client on port %d.", clientPort);
+          Util::DriverLog("[IPC_SERVER] Received invalid command header size from client on port {}.", clientPort);
           continue;
         }
 

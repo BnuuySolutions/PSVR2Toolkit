@@ -113,6 +113,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="caesar_manager_hooks.h" />
+    <ClInclude Include="config.h" />
     <ClInclude Include="device_provider_proxy.h" />
     <ClInclude Include="driver_context_proxy.h" />
     <ClInclude Include="hmd2_gaze.h" />

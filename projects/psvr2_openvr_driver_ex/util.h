@@ -1,10 +1,15 @@
 #pragma once
 
+#include "config.h"
+
 #include <windows.h>
 #include <tlhelp32.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <openvr_driver.h>
+
+#include <format>
+#include <iostream>
 
 namespace psvr2_toolkit {
 
@@ -12,6 +17,18 @@ namespace psvr2_toolkit {
   public:
     static bool StartsWith(const char *a, const char *b) {
       return strncmp(a, b, strlen(b)) == 0;
+    }
+
+    static bool IsRunningOnWine() {
+#if !MOCK_IS_RUNNING_ON_WINE
+      HMODULE hModule = GetModuleHandleW(L"ntdll.dll");
+      if (!hModule) {
+        return false;
+      }
+      return GetProcAddress(hModule, "wine_get_version") != nullptr;
+#else
+      return true;
+#endif
     }
 
     static bool IsProcessRunning(DWORD dwProcessId) {
@@ -36,22 +53,10 @@ namespace psvr2_toolkit {
       return false;
     }
 
-    static void DriverLogVarArgs(const char* pMsgFormat, va_list args)
-    {
-      char buf[1024] = {};
-      vsnprintf_s(buf, sizeof(buf), pMsgFormat, args);
-
-      vr::VRDriverLog()->Log(buf);
-    }
-
-    static void DriverLog(const char* pMsgFormat, ...)
-    {
-      va_list args;
-      va_start(args, pMsgFormat);
-
-      DriverLogVarArgs(pMsgFormat, args);
-
-      va_end(args);
+    template <typename... Args>
+    static void DriverLog(const char *format, const Args&... args) {
+      std::string message = std::vformat(std::string_view(format), std::make_format_args(args...));
+      vr::VRDriverLog()->Log(message.c_str());
     }
   };
 

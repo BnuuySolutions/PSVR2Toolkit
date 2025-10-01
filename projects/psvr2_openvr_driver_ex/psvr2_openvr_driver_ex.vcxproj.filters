@@ -136,5 +136,8 @@
     <ClInclude Include="write_file_async.h">
       <Filter>Utilities</Filter>
     </ClInclude>
+    <ClInclude Include="config.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

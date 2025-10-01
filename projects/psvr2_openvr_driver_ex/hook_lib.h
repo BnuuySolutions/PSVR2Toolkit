@@ -2,6 +2,12 @@
 
 #include <minhook.h>
 
+#define INSTALL_STUB(pTarget) psvr2_toolkit::HookLib::InstallStub(pTarget)
+#define INSTALL_STUB_ORIGINAL(pTarget, ppOriginal) psvr2_toolkit::HookLib::InstallStub(pTarget, ppOriginal)
+
+#define INSTALL_STUB_RET0(pTarget) psvr2_toolkit::HookLib::InstallStubRet0(pTarget)
+#define INSTALL_STUB_RET0_ORIGINAL(pTarget, ppOriginal) psvr2_toolkit::HookLib::InstallStubRet0(pTarget, ppOriginal)
+
 namespace psvr2_toolkit {
 
   // Provides a thin wrapper around MinHook.
