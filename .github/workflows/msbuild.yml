@@ -48,7 +48,7 @@ jobs:
       run: msbuild /m /p:Configuration=${{env.BUILD_CONFIGURATION}} /p:OutDir=${{env.ARTIFACTS_DIR}} ${{env.SOLUTION_FILE_PATH}}
 
     - name: Upload artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: psvr2-toolkit-build
         path: ${{env.ARTIFACTS_DIR}}
