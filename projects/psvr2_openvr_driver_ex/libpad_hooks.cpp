@@ -201,7 +201,7 @@ namespace psvr2_toolkit {
 
     HidDeviceDescriptor* (*libpad_CreateHidDevice)(HidDeviceDescriptor* device, const wchar_t* name, int deviceType) = nullptr;
     HidDeviceDescriptor* libpad_CreateHidDeviceHook(HidDeviceDescriptor* device, const wchar_t* name, int deviceType) {
-        Util::DriverLog("libpad_CreateHidDeviceHook called for device: %ls, type: %d", name, deviceType);
+        Util::DriverLog("libpad_CreateHidDeviceHook called for type: {}", deviceType);
 
 		HidDeviceDescriptor* result = libpad_CreateHidDevice(device, name, deviceType);
 
@@ -219,7 +219,7 @@ namespace psvr2_toolkit {
 
     void (*libpad_Disconnect)(int device) = nullptr;
     void libpad_DisconnectHook(int device) {
-        Util::DriverLog("libpad_DisconnectHook called for device handle: %d", device);
+        Util::DriverLog("libpad_DisconnectHook called for device handle: {}", device);
 
         try {
             SenseController& controller = SenseController::GetControllerByPadHandle(device);
@@ -227,7 +227,7 @@ namespace psvr2_toolkit {
         }
         catch (const std::runtime_error&) {
             // No controller with the given pad handle.
-		}
+		    }
 
         libpad_Disconnect(device);
     }
@@ -235,13 +235,13 @@ namespace psvr2_toolkit {
     int (*libpad_SendOutputReport)(int device, const unsigned char* buffer, unsigned short size) = nullptr;
     int libpad_SendOutputReportHook(int device, const unsigned char* buffer, unsigned short size) {
         if (size != sizeof(SenseControllerPCModePacket_t)) {
-			Util::DriverLog("libpad_SendOutputReportHook called with unexpected size: %d", size);
-			return libpad_SendOutputReport(device, buffer, size);
-		}
+			      Util::DriverLog("libpad_SendOutputReportHook called with unexpected size: {}", size);
+			      return libpad_SendOutputReport(device, buffer, size);
+		    }
 
         try {
             SenseController& controller = SenseController::GetControllerByPadHandle(device);
-			controller.SetTrackingControllerSettings(reinterpret_cast<const SenseControllerPCModePacket_t*>(buffer));
+			      controller.SetTrackingControllerSettings(reinterpret_cast<const SenseControllerPCModePacket_t*>(buffer));
         }
         catch (const std::runtime_error&) {
             // No controller with the given pad handle.

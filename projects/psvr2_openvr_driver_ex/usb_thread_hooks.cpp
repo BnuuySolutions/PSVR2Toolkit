@@ -169,6 +169,17 @@ namespace psvr2_toolkit {
     return result;
   }
 
+  LDPayload currentLDPayload;
+
+  uint64_t(*CaesarUsbThreadLeddet__poll)(void* thisptr) = nullptr;
+  uint64_t CaesarUsbThreadLeddet__pollHook(void* thisptr) {
+    uint64_t result = CaesarUsbThreadLeddet__poll(thisptr);
+
+    memcpy(&currentLDPayload, reinterpret_cast<uint8_t*>(thisptr) + 0x230, sizeof(LDPayload));
+
+    return result;
+  }
+
   // We need to replace device enumeration, it is not compatible with LibUSB.
   int CaesarUsbThread__initializeHook(CaesarUsbThread_t* thisptr) {
     // TODO: ShareManager
@@ -679,6 +690,14 @@ namespace psvr2_toolkit {
                            reinterpret_cast<void*>(CaesarUsbThreadImuStatus__pollHook),
                            reinterpret_cast<void**>(&CaesarUsbThreadImuStatus__poll));
     }
+
+    if (VRSettings::GetBool(STEAMVR_SETTINGS_USE_TOOLKIT_SYNC, SETTING_USE_TOOLKIT_SYNC_DEFAULT_VALUE)) {
+      // CaesarUsbThreadLeddet::poll
+      HookLib::InstallHook(reinterpret_cast<void*>(pHmdDriverLoader->GetBaseAddress() + 0x126B80),
+        reinterpret_cast<void*>(CaesarUsbThreadLeddet__pollHook),
+        reinterpret_cast<void**>(&CaesarUsbThreadLeddet__poll));
+    }
+
 
     // LibUSB stuff
     HookLib::InstallHook(reinterpret_cast<void*>(pHmdDriverLoader->GetBaseAddress() + 0x122AC0),
