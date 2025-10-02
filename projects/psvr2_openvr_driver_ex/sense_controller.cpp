@@ -144,6 +144,16 @@ void SenseController::SendToDevice() {
       this->phaseJump = false;
       hapticPosition = hapticPosition > k_unSenseHalfSamplePosition ? 0 : k_unSenseHalfSamplePosition;
 
+      bool isStartingAtUp = hapticPosition == 0;
+
+      int8_t amp = static_cast<int8_t>(std::min(this->hapticAmp, static_cast<uint32_t>(k_unSenseMaxHapticAmplitude)));
+
+      for (int i = 0; i < 6; i++)
+        buffer.hapticPCM[i] = ClampedAdd(buffer.hapticPCM[i], isStartingAtUp ? amp : -amp);
+
+      for (int i = 6; i < 12; i++)
+        buffer.hapticPCM[i] = ClampedAdd(buffer.hapticPCM[i], isStartingAtUp ? -amp : amp);
+
       // Back up a bit that so the actuator can move down in 6 samples, then all the way up.
       hapticPosition -= 6;
     }
@@ -170,12 +180,6 @@ void SenseController::SendToDevice() {
 
         this->hapticSamplesLeft -= 1;
       }
-    }
-
-    if (this->hapticSamplesLeft == 0)
-    {
-      // Set position to the peak of a rise or fall to make sure the next haptic has a good start.
-      hapticPosition = hapticPosition > k_unSenseHalfSamplePosition ? 0 : k_unSenseHalfSamplePosition;
     }
 
     buffer.settings.timeStampMicrosecondsLastSend = static_cast<uint32_t>(GetHostTimestamp());
