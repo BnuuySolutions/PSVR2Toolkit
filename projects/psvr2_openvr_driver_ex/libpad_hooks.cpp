@@ -374,6 +374,17 @@ namespace psvr2_toolkit {
       resetCalibration();
     }
 
+    SenseController& currentSenseController = SenseController::GetControllerByIsLeft(currentController == 0 ? true : false);
+
+    if (currentController != -1 && currentSenseController.GetHandle() == NULL)
+    {
+      // Controller is not connected anymmore.
+      resetCalibration();
+      currentController = -1;
+
+      Util::DriverLog("[{}] Controller disconnected, stopping latency calibration.", currentController == 0 ? 'L' : 'R');
+    }
+
     // Ensure there are enough samples before starting the calibration
     // We only want one controller to run the calibration if it's uncalibrated.
     if (samples > 300 && currentController == -1 && latencyOffset == -1)
