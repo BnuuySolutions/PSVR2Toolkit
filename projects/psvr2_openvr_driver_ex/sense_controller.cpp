@@ -53,7 +53,7 @@ void SenseController::AppendPCM(const std::vector<int8_t>& newPCMData) {
 void SenseController::SetTrackingControllerSettings(const SenseControllerPCModePacket_t* data) {
   std::scoped_lock<std::mutex> lock(controllerMutex);
 
-  if ((data->settings.unkData1[0] & 0b00000100) > 0)
+  if (data->settings.adaptiveTriggerSetEnable)
   {
     memcpy(&this->adaptiveTriggerData, &data->settings.adaptiveTriggerData, sizeof(SenseAdaptiveTriggerCommand_t));
   }
@@ -114,71 +114,82 @@ void SenseController::SendToDevice() {
     memcpy(&buffer.settings, &this->driverTrackingData.settings, sizeof(SenseControllerSettings_t));
 
     // Disallow normal haptics, we are using PCM haptics.
-    buffer.settings.unkData1[0] &= 0b11111101;
+    buffer.settings.rumbleEmulation = 0;
 
     // Always enable adaptive triggers
-    buffer.settings.unkData1[0] |= 0b00000100;
+    buffer.settings.adaptiveTriggerSetEnable = 1;
+
+    // Always enable intensity reduction and increase
+    buffer.settings.intensityReductionSetEnable = 1;
+    buffer.settings.intensityIncreaseSetEnable = 1;
 
     // Always enable LED setting change
-    buffer.settings.unkData1[1] |= 0b00000100;
+    buffer.settings.statusLEDSetEnable = 1;
+
+    // Rumble intensity will be ignored. (would require rumbleEmulation)
+    buffer.settings.rumbleIntensity = 0;
 
     // Adaptive trigger data
     memcpy(&buffer.settings.adaptiveTriggerData, &this->adaptiveTriggerData, sizeof(SenseAdaptiveTriggerCommand_t));
 
     buffer.settings.ledEnable = g_StatusLED ? 0x01 : 0x00;
-    buffer.packetNum = this->hapticPacketIncrement++;
 
-    auto& pcmData = this->pcmData;
+    // 0x7 is technically 12.5% intensity, but we want to match driver behavior and treat it as off.
+    if (buffer.settings.hapticsIntensityReduction != 0x7) {
+      buffer.packetNum = this->hapticPacketIncrement++;
 
-    // Copy the PCM data to the buffer. We need to make sure we don't go out of bounds.
-    size_t bytesToCopy = std::min(pcmData.size() - this->samplesRead, static_cast<size_t>(32));
-    if (bytesToCopy != 0)
-    {
-      memcpy_s(&buffer.hapticPCM, sizeof(buffer.hapticPCM), pcmData.data() + this->samplesRead, bytesToCopy);
-      this->samplesRead += bytesToCopy;
-    }
+      auto& pcmData = this->pcmData;
 
-    // We basically want to make a thud
-    if (this->phaseJump)
-    {
-      this->phaseJump = false;
-      hapticPosition = hapticPosition > k_unSenseHalfSamplePosition ? 0 : k_unSenseHalfSamplePosition;
-
-      bool isStartingAtUp = hapticPosition == 0;
-
-      int8_t amp = static_cast<int8_t>(std::min(this->hapticAmp, static_cast<uint32_t>(k_unSenseMaxHapticAmplitude)));
-
-      for (int i = 0; i < 6; i++)
-        buffer.hapticPCM[i] = ClampedAdd(buffer.hapticPCM[i], isStartingAtUp ? amp : -amp);
-
-      for (int i = 6; i < 12; i++)
-        buffer.hapticPCM[i] = ClampedAdd(buffer.hapticPCM[i], isStartingAtUp ? -amp : amp);
-
-      // Back up a bit that so the actuator can move down in 6 samples, then all the way up.
-      hapticPosition -= 6;
-    }
-
-    // Calculate the haptic overdrive based on frequency. We want overdrive to range from 25.0 to 1.0.
-    // Basically, this makes a square wave from the cosine wave. Lower frequencies will have a higher overdrive.
-    // We also overdrive for frequencies above 500 Hz.
-
-    double overdrive = 25.0;
-
-    // Make sure we don't divide by zero
-    if (this->hapticFreq != 0.0)
-    {
-      overdrive = Clamp(1000.0 / this->hapticFreq, 10.0 + 1.0, 35.0) - 10.0 + (this->hapticFreq - 500.0);
-    }
-
-    // In addition to copying the PCM data, we also want to add the generated haptic data to the buffer.
-    for (int i = 0; i < sizeof(buffer.hapticPCM); i++)
-    {
-      if (this->hapticSamplesLeft != 0)
+      // Copy the PCM data to the buffer. We need to make sure we don't go out of bounds.
+      size_t bytesToCopy = std::min(pcmData.size() - this->samplesRead, static_cast<size_t>(32));
+      if (bytesToCopy != 0)
       {
-        buffer.hapticPCM[i] = ClampedAdd(buffer.hapticPCM[i], CosineToByte(hapticPosition, k_unSenseMaxSamplePosition, this->hapticAmp, overdrive));
-        hapticPosition = (hapticPosition + static_cast<int32_t>(this->hapticFreq * k_unSenseSubsamples)) % k_unSenseMaxSamplePosition;
+        memcpy_s(&buffer.hapticPCM, sizeof(buffer.hapticPCM), pcmData.data() + this->samplesRead, bytesToCopy);
+        this->samplesRead += bytesToCopy;
+      }
 
-        this->hapticSamplesLeft -= 1;
+      // We basically want to make a thud
+      if (this->phaseJump)
+      {
+        this->phaseJump = false;
+        hapticPosition = hapticPosition > k_unSenseHalfSamplePosition ? 0 : k_unSenseHalfSamplePosition;
+
+        bool isStartingAtUp = hapticPosition == 0;
+
+        int8_t amp = static_cast<int8_t>(std::min(this->hapticAmp, static_cast<uint32_t>(k_unSenseMaxHapticAmplitude)));
+
+        for (int i = 0; i < 6; i++)
+          buffer.hapticPCM[i] = ClampedAdd(buffer.hapticPCM[i], isStartingAtUp ? amp : -amp);
+
+        for (int i = 6; i < 12; i++)
+          buffer.hapticPCM[i] = ClampedAdd(buffer.hapticPCM[i], isStartingAtUp ? -amp : amp);
+
+        // Back up a bit that so the actuator can move down in 6 samples, then all the way up.
+        hapticPosition -= 6;
+      }
+
+      // Calculate the haptic overdrive based on frequency. We want overdrive to range from 25.0 to 1.0.
+      // Basically, this makes a square wave from the cosine wave. Lower frequencies will have a higher overdrive.
+      // We also overdrive for frequencies above 500 Hz.
+
+      double overdrive = 25.0;
+
+      // Make sure we don't divide by zero
+      if (this->hapticFreq != 0.0)
+      {
+        overdrive = Clamp(1000.0 / this->hapticFreq, 10.0 + 1.0, 35.0) - 10.0 + (this->hapticFreq - 500.0);
+      }
+
+      // In addition to copying the PCM data, we also want to add the generated haptic data to the buffer.
+      for (int i = 0; i < sizeof(buffer.hapticPCM); i++)
+      {
+        if (this->hapticSamplesLeft != 0)
+        {
+          buffer.hapticPCM[i] = ClampedAdd(buffer.hapticPCM[i], CosineToByte(hapticPosition, k_unSenseMaxSamplePosition, this->hapticAmp, overdrive));
+          hapticPosition = (hapticPosition + static_cast<int32_t>(this->hapticFreq * k_unSenseSubsamples)) % k_unSenseMaxSamplePosition;
+
+          this->hapticSamplesLeft -= 1;
+        }
       }
     }
 
@@ -201,6 +212,20 @@ void SenseController::SendToDevice() {
 
     this->SetHandle(NULL, -1);
     };
+
+  // Print buffer as hexstring
+  {
+    std::wstringstream hexStream;
+    const uint8_t* raw = reinterpret_cast<const uint8_t*>(&buffer);
+    hexStream << L"SenseController TX: ";
+    for (size_t i = 0; i < 78; i++)
+    {
+      hexStream << std::setw(2) << std::setfill(L'0') << std::hex << std::uppercase << static_cast<int>(raw[i]);
+      if (i != 77) hexStream << L' ';
+    }
+    hexStream << L"\r\n";
+    OutputDebugStringW(hexStream.str().c_str());
+  }
 
   if (!asyncWriter.Write(this->handle, &buffer, 78, 5000, timeoutLambda))
   {

@@ -45,11 +45,34 @@ struct SenseLED_t {
 }; static_assert(sizeof(SenseLED_t) == 15, "Size of SenseLED_t is not 15 bytes!");
 
 struct SenseControllerSettings_t {
-  uint8_t unkData1[4];
+  uint8_t unkSettingsBit0 : 1;
+  uint8_t rumbleEmulation : 1;
+  uint8_t adaptiveTriggerSetEnable : 1;
+  uint8_t intensityIncreaseSetEnable : 1; // Required to allow going from off to some level of intensity.
+  uint8_t intensityReductionSetEnable : 1;
+  uint8_t unkSettingsBit5 : 1;
+  uint8_t unkSettingsBit6 : 1;
+  uint8_t unkSettingsBit7 : 1;
+
+  uint8_t unkSettingsBit8 : 1;
+  uint8_t unkSettingsBit9 : 1;
+  uint8_t statusLEDSetEnable : 1;
+  uint8_t unkSettingsBit11 : 1;
+  uint8_t unkSettingsBit12 : 1;
+  uint8_t unkSettingsBit13 : 1;
+  uint8_t unkSettingsBit14 : 1;
+  uint8_t unkSettingsBit15 : 1;
+
+  uint8_t rumbleIntensity;
+  uint8_t unkData1; // Sony driver sometimes sets this to 0x82 for a report. Not sure what it does.
   SenseAdaptiveTriggerCommand_t adaptiveTriggerData;
   uint32_t timeStampMicrosecondsLastSend;
   SenseLED_t ledData;
-  uint8_t hapticMode;
+
+  // From 0x0 (no reduction) to 0x7 (max reduction). Decreases in 12.5% increments.
+  uint8_t hapticsIntensityReduction : 4;
+  uint8_t triggerIntensityReduction : 4;
+
   bool ledEnable;
   uint8_t unkData3;
   uint8_t unkData4;
