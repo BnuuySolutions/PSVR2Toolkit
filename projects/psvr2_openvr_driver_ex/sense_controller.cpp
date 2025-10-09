@@ -211,21 +211,7 @@ void SenseController::SendToDevice() {
     CloseHandle(this->handle);
 
     this->SetHandle(NULL, -1);
-    };
-
-  // Print buffer as hexstring
-  {
-    std::wstringstream hexStream;
-    const uint8_t* raw = reinterpret_cast<const uint8_t*>(&buffer);
-    hexStream << L"SenseController TX: ";
-    for (size_t i = 0; i < 78; i++)
-    {
-      hexStream << std::setw(2) << std::setfill(L'0') << std::hex << std::uppercase << static_cast<int>(raw[i]);
-      if (i != 77) hexStream << L' ';
-    }
-    hexStream << L"\r\n";
-    OutputDebugStringW(hexStream.str().c_str());
-  }
+  };
 
   if (!asyncWriter.Write(this->handle, &buffer, 78, 5000, timeoutLambda))
   {
