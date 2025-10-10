@@ -131,8 +131,20 @@ namespace psvr2_toolkit {
 
   uintptr_t packetRecievedReturnAddress = 0;
 
-  int ledSyncPart = -1;
-#define IN_LATENCY_CALIBRATION (ledSyncPart != -1)
+  enum class CalibrationState {
+    Idle = -1,
+    Start,
+    FindInitialOnPoint,
+    BinarySearchLeftEdge,
+    BinarySearchRightEdge,
+    ConfirmLeftEdgeOuter,
+    ConfirmLeftEdgeInner,
+    ConfirmRightEdgeOuter,
+    ConfirmRightEdgeInner,
+    Finalize
+  };
+
+  CalibrationState calibrationState = CalibrationState::Idle;
 
   inline int32_t GetWraparoundDifference(uint32_t newTimestamp, uint32_t oldTimestamp)
   {
@@ -160,7 +172,6 @@ namespace psvr2_toolkit {
     }
   }
 
-  uint32_t(*libpad_hostToDevice)(LibpadTimeSync* timeSync, uint32_t host, uint32_t* outDevice) = nullptr;
   uint32_t libpad_hostToDeviceHook(LibpadTimeSync* timeSync, uint32_t host, uint32_t* outDevice) {
     SenseController& senseController = SenseController::GetControllerByIsLeft(timeSync->isLeft);
 
@@ -172,7 +183,6 @@ namespace psvr2_toolkit {
     return 0;
   }
 
-  uint32_t(*libpad_deviceToHost)(LibpadTimeSync* timeSync, uint32_t device, ProcessedControllerState* outHost) = nullptr;
   uint32_t libpad_deviceToHostHook(LibpadTimeSync* timeSync, uint32_t device, ProcessedControllerState* outHost) {
     SenseController& senseController = SenseController::GetControllerByIsLeft(timeSync->isLeft);
 
@@ -258,7 +268,7 @@ namespace psvr2_toolkit {
     static std::mutex ledCommandMutex;
     std::scoped_lock lock(ledCommandMutex);
 
-    if (IN_LATENCY_CALIBRATION)
+    if (calibrationState != CalibrationState::Idle)
     {
       // Don't allow the driver to issue LED commands while calibrating.
       return;
@@ -348,22 +358,24 @@ namespace psvr2_toolkit {
 
     static int currentController = -1;
     static int thresholdLedCount = 0;
-    static uint64_t syncStartTime = GetHostTimestamp();
-    static uint64_t lastSync = GetHostTimestamp();
+    static uint64_t syncStartTime = 0;
+    static uint64_t lastSync = 0;
 
-    static int previousLatencyOffset = 0;
-    static int leftEdgeLowerBound = 0;
-    static int rightEdgeUpperBound = 16666;
+    static int searchLowerBound = 0;
+    static int searchUpperBound = 16666; // One vsync period
+    static int leftEdge = 0;
+    static int rightEdge = 0;
+
+    SenseController& currentSenseController = SenseController::GetControllerByIsLeft(currentController == 0 ? true : false);
 
     auto resetCalibration = [&]() {
-      senseController.SetLatencyOffset(-1);
-      ledSyncPart = 0;
+      currentSenseController.SetLatencyOffset(-1);
+      calibrationState = CalibrationState::Start;
       syncStartTime = GetHostTimestamp();
-      leftEdgeLowerBound = 0;
-      rightEdgeUpperBound = 16666;
-      previousLatencyOffset = 0;
-      Util::DriverLog("[{}] Latency calibration has been reset.", controllerChar);
-      };
+      searchLowerBound = 0;
+      searchUpperBound = 16666;
+      Util::DriverLog("[{}] Latency calibration has been reset.", currentController == 0 ? 'L' : 'R');
+    };
 
     // Bottom cameras only
     int currentLedCount = currentLDPayload.cameras[0].num_leds
@@ -372,9 +384,14 @@ namespace psvr2_toolkit {
     // TODO: calibration should be triggered via IPC
     if (GetAsyncKeyState(VK_F9) & 0x8000) {
       resetCalibration();
-    }
+      
+      // Reset both controllers
+      SenseController::GetLeftController().SetLatencyOffset(-1);
+      SenseController::GetRightController().SetLatencyOffset(-1);
 
-    SenseController& currentSenseController = SenseController::GetControllerByIsLeft(currentController == 0 ? true : false);
+      // Pick another controller.
+      currentController = -1;
+    }
 
     if (currentController != -1 && currentSenseController.GetHandle() == NULL)
     {
@@ -391,178 +408,205 @@ namespace psvr2_toolkit {
     {
       // Start calibration on this controller.
       currentController = controller;
-      ledSyncPart = 0;
+      calibrationState = CalibrationState::Start;
       senseController.SetLatencyOffset(0);
       syncStartTime = GetHostTimestamp();
     }
     else if (currentController == -1)
     {
-      ledSyncPart = -1;
+      calibrationState = CalibrationState::Idle;
     }
 
     // Before we start calibration and turn the LEDs on, we need to:
     // - Check that we need calibration.
     // - Ensure we have waited at least 1/5 of a second since calibration start to ensure controllers were off for long enough.
     // - Ensure this is the controller that is doing the calibration.
-    if (IN_LATENCY_CALIBRATION
+    if (calibrationState != CalibrationState::Idle
       && GetHostTimestamp() - syncStartTime > 200000
       && currentController == controller) {
       // Force to PRESCAN phase while calibrating.
       ledSync->phase = PRESCAN;
       ledSync->period = k_prescanPhasePeriod;
 
-      uint32_t fullWindow = (ledSync->oneSubGridTime * static_cast<int32_t>(ledSync->period)) + ledSync->camExposure;
+      int32_t fullWindow = (ledSync->oneSubGridTime * static_cast<int32_t>(ledSync->period)) + ledSync->camExposure;
 
       if (GetHostTimestamp() - lastSync > 50000)
       {
-        switch (ledSyncPart)
+        int newLatencyOffset = 0;
+
+        switch (calibrationState)
         {
-        case 0:
-          // We want to see an increase in the number of LEDs tracked. (right edge)
-          if (currentLedCount > thresholdLedCount) {
-            rightEdgeUpperBound = latencyOffset;
-            ledSyncPart++;
-            // Fall through to next part.
-          }
-          else
-          {
-            previousLatencyOffset = latencyOffset;
-            senseController.SetLatencyOffset(latencyOffset + (fullWindow / 2));
-            break;
-          }
-          [[fallthrough]];
-        case 1:
-          // We want to see a decrease in the number of LEDs tracked. (left edge)
-          if (currentLedCount <= thresholdLedCount) {
-            leftEdgeLowerBound = latencyOffset;
-            ledSyncPart++;
-            // Fall through to next part.
-          }
-          else
-          {
-            previousLatencyOffset = latencyOffset;
-            senseController.SetLatencyOffset(latencyOffset - (fullWindow / 8));
-            break;
-          }
-          [[fallthrough]];
-        case 2:
-          // We want to see an increase in the number of LEDs tracked. (right edge)
-          if (currentLedCount > thresholdLedCount) {
-            rightEdgeUpperBound = latencyOffset;
-            ledSyncPart++;
-            // Fall through to next part.
-          }
-          else
-          {
-            previousLatencyOffset = latencyOffset;
-            senseController.SetLatencyOffset(latencyOffset + (fullWindow / 16));
-            break;
-          }
-          [[fallthrough]];
-        case 3:
-          // We want to see a decrease in the number of LEDs tracked. (left edge)
-          if (currentLedCount <= thresholdLedCount) {
-            leftEdgeLowerBound = latencyOffset;
-            ledSyncPart++;
-            // Fall through to next part.
-          }
-          else
-          {
-            previousLatencyOffset = latencyOffset;
-            senseController.SetLatencyOffset(latencyOffset - (fullWindow / 64));
-            break;
-          }
-          [[fallthrough]];
-        case 4:
-          // We want to see a increase in the number of LEDs tracked. (right edge)
-          if (currentLedCount > thresholdLedCount) {
-            rightEdgeUpperBound = latencyOffset;
-            ledSyncPart++;
-
-            // Shift to left edge.
-            senseController.SetLatencyOffset(latencyOffset - (fullWindow / 64));
-          }
-          else
-          {
-            previousLatencyOffset = latencyOffset;
-            senseController.SetLatencyOffset(latencyOffset + (fullWindow / 256));
-          }
+        case CalibrationState::Start:
+          thresholdLedCount = currentLedCount + 6;
+          calibrationState = CalibrationState::FindInitialOnPoint;
           break;
-        case 5:
-          // Confirm that we're on the left edge.
-          if (currentLedCount <= thresholdLedCount) {
-            leftEdgeLowerBound = latencyOffset;
-            ledSyncPart++;
 
-            senseController.SetLatencyOffset(latencyOffset + (fullWindow / 64));
+        case CalibrationState::FindInitialOnPoint:
+        {
+          newLatencyOffset = latencyOffset + fullWindow;
+
+          if (currentLedCount > thresholdLedCount) { // LEDs are on, we found a point
+            searchUpperBound = latencyOffset;
+            searchLowerBound = latencyOffset - fullWindow;
+            Util::DriverLog("[{}] Found initial on point at {}. Searching for left edge.", controllerChar, latencyOffset);
+            calibrationState = CalibrationState::BinarySearchLeftEdge;
+
           }
-          // If not, we may not be calibrated correctly.
-          else
-          {
-            resetCalibration();
-          }
-          break;
-        case 6:
-          if (currentLedCount > thresholdLedCount) {
-            ledSyncPart = -1;
-
-            // It should be in between the two values we checked to ensure there was a difference.
-            latencyOffset += fullWindow / 128;
-
-            // Go to the center of this cycle, and then we now have our correct latency offset.
-            latencyOffset += fullWindow / 2;
-
-            senseController.SetLatencyOffset(latencyOffset);
-
-            Util::DriverLog("[{}] Final latency offset: {} microseconds", controllerChar, latencyOffset);
-
-            // Fully reinitialize both controllers.
-            for (size_t i = 0; i < 2; i++)
+          else { // LEDs are off
+            senseController.SetLatencyOffset(newLatencyOffset);
+            searchLowerBound = newLatencyOffset;
+            if (searchUpperBound - searchLowerBound < fullWindow / 2)
             {
-              SenseController& senseController = SenseController::GetControllerByIsLeft(i == 0 ? true : false);
+              Util::DriverLog("[{}] Could not find an initial on point.", controllerChar);
+              resetCalibration();
+            }
 
-              LibpadTimeSync* controllerTimeSync;
-              LibpadLedSync* controllerLedSync;
+            break;
+          }
 
-              senseController.GetLibpadSyncs(controllerTimeSync, controllerLedSync);
+          [[fallthrough]];
+        }
 
-              if (controllerTimeSync == nullptr || controllerLedSync == nullptr) {
-                continue;
-              }
+        case CalibrationState::BinarySearchLeftEdge:
+        {
+          if (currentLedCount > thresholdLedCount) { // LEDs are on
+            searchUpperBound = latencyOffset;
+          }
+          else { // LEDs are off
+            searchLowerBound = latencyOffset;
+          }
 
-              LedCommand command = {};
-              command.type = CommandType::SET_SYNC_PHASE;
-              command.payload.syncPhase.phase = PRESCAN;
-              command.payload.syncPhase.period = k_prescanPhasePeriod;
-              memset(command.payload.syncPhase.leds, 0xFF, sizeof(command.payload.syncPhase.leds));
+          newLatencyOffset = (searchLowerBound + searchUpperBound) / 2;
 
-              libpad_SetSyncLedCommand(
-                controllerTimeSync,
-                controllerLedSync,
-                &command, sizeof(command.type) + sizeof(command.payload.syncPhase) - sizeof(command.payload.syncPhase.frameCycle),
-                senseController.isLeft);
+          if (searchUpperBound - searchLowerBound < 25) {
+            leftEdge = newLatencyOffset;
+            Util::DriverLog("[{}] Found left edge at {}", controllerChar, leftEdge);
+            searchLowerBound = leftEdge + (fullWindow * 0.9);
+            searchUpperBound = leftEdge + (fullWindow * 1.1);
+          }
+          else {
+            senseController.SetLatencyOffset(newLatencyOffset);
+            break;
+          }
 
-              SenseController::g_ShouldResetLEDTrackingInTicks = 20;
+          [[fallthrough]];
+        }
+
+        case CalibrationState::BinarySearchRightEdge:
+        {
+          if (calibrationState == CalibrationState::BinarySearchRightEdge) {
+            if (currentLedCount > thresholdLedCount) { // LEDs are on
+              searchLowerBound = latencyOffset;
+            }
+            else { // LEDs are off
+              searchUpperBound = latencyOffset;
             }
           }
-          else
-          {
+          else {
+            // We just fell through. Use the bounds from the last step.
+            calibrationState = CalibrationState::BinarySearchRightEdge;
+          }
+
+          newLatencyOffset = (searchLowerBound + searchUpperBound) / 2;
+
+          if (searchUpperBound - searchLowerBound < 25) {
+            rightEdge = newLatencyOffset;
+            Util::DriverLog("[{}] Found right edge at {}", controllerChar, rightEdge);
+            calibrationState = CalibrationState::ConfirmLeftEdgeOuter;
+            senseController.SetLatencyOffset(leftEdge - 50);
+          }
+          else {
+            senseController.SetLatencyOffset(newLatencyOffset);
+          }
+
+          break;
+        }
+
+        case CalibrationState::ConfirmLeftEdgeOuter:
+          if (currentLedCount > thresholdLedCount) { // Should be off
+            Util::DriverLog("[{}] Left edge confirmation failed (outer).", controllerChar);
             resetCalibration();
+            break;
+          }
+          Util::DriverLog("[{}] Left edge confirmation passed (outer).", controllerChar);
+          calibrationState = CalibrationState::ConfirmLeftEdgeInner;
+          senseController.SetLatencyOffset(leftEdge + 50);
+          break;
+        
+        case CalibrationState::ConfirmLeftEdgeInner:
+          if (currentLedCount <= thresholdLedCount) { // Should be on
+            Util::DriverLog("[{}] Left edge confirmation failed (inner).", controllerChar);
+            resetCalibration();
+            break;
+          }
+          Util::DriverLog("[{}] Left edge confirmation passed (inner).", controllerChar);
+          calibrationState = CalibrationState::ConfirmRightEdgeOuter;
+          senseController.SetLatencyOffset(rightEdge + 50);
+          break;
+
+        case CalibrationState::ConfirmRightEdgeOuter:
+          if (currentLedCount > thresholdLedCount) { // Should be off
+            Util::DriverLog("[{}] Right edge confirmation failed (outer).", controllerChar);
+            resetCalibration();
+            break;
+          }
+          Util::DriverLog("[{}] Right edge confirmation passed (outer).", controllerChar);
+          senseController.SetLatencyOffset(rightEdge - 50);
+          calibrationState = CalibrationState::ConfirmRightEdgeInner;
+          break;
+
+        case CalibrationState::ConfirmRightEdgeInner:
+          if (currentLedCount <= thresholdLedCount) { // Should be on
+            Util::DriverLog("[{}] Right edge confirmation failed (inner).", controllerChar);
+            resetCalibration();
+            break;
+          }
+          Util::DriverLog("[{}] Right edge confirmation passed (inner).", controllerChar);
+          calibrationState = CalibrationState::Finalize;
+          [[fallthrough]];
+
+        case CalibrationState::Finalize:
+          calibrationState = CalibrationState::Idle;
+          currentController = -1;
+
+          int32_t finalOffset = leftEdge + (rightEdge - leftEdge) / 2;
+
+          senseController.SetLatencyOffset(finalOffset);
+
+          Util::DriverLog("[{}] Final latency offset: {} microseconds. LED on time: actual: {} expected: {}", controllerChar, finalOffset, rightEdge - leftEdge, fullWindow);
+
+          // Fully reinitialize both controllers.
+          for (size_t i = 0; i < 2; i++)
+          {
+            SenseController& senseController = SenseController::GetControllerByIsLeft(i == 0 ? true : false);
+
+            LibpadTimeSync* controllerTimeSync;
+            LibpadLedSync* controllerLedSync;
+
+            senseController.GetLibpadSyncs(controllerTimeSync, controllerLedSync);
+
+            if (controllerTimeSync == nullptr || controllerLedSync == nullptr) {
+              continue;
+            }
+
+            LedCommand command = {};
+            command.type = CommandType::SET_SYNC_PHASE;
+            command.payload.syncPhase.phase = PRESCAN;
+            command.payload.syncPhase.period = k_prescanPhasePeriod;
+            memset(command.payload.syncPhase.leds, 0xFF, sizeof(command.payload.syncPhase.leds));
+
+            libpad_SetSyncLedCommand(
+              controllerTimeSync,
+              controllerLedSync,
+              &command, sizeof(command.type) + sizeof(command.payload.syncPhase) - sizeof(command.payload.syncPhase.frameCycle),
+              senseController.isLeft);
+
+            SenseController::g_ShouldResetLEDTrackingInTicks = 20;
           }
           break;
-        default:
-          break;
         }
 
-        latencyOffset = senseController.GetLatencyOffset();
-
-        // Reset if the offset goes outside the bounds.
-        if (ledSyncPart >= 0 && ledSyncPart < 5 && (latencyOffset < leftEdgeLowerBound || latencyOffset > rightEdgeUpperBound)) {
-          Util::DriverLog("[{}] Latency offset ({}) went out of bounds [{}, {}].", controllerChar, latencyOffset, leftEdgeLowerBound, rightEdgeUpperBound);
-          resetCalibration();
-        }
-
-        if (IN_LATENCY_CALIBRATION)
+        if (calibrationState != CalibrationState::Idle)
         {
           LedCommand command = {};
           command.type = CommandType::SET_SYNC_PHASE;
@@ -576,13 +620,13 @@ namespace psvr2_toolkit {
             &command, sizeof(command.type) + sizeof(command.payload.syncPhase) - sizeof(command.payload.syncPhase.frameCycle),
             timeSync->isLeft);
 
-          Util::DriverLog("[{}] Latency Offset is currently at {} microseconds. Current LED count: {} Threshold: {} Step: {}", controllerChar, latencyOffset, currentLedCount, thresholdLedCount, ledSyncPart);
+          Util::DriverLog("[{}] Latency Offset is currently at {} microseconds. Current LED count: {} Threshold: {} Step: {}", controllerChar, senseController.GetLatencyOffset(), currentLedCount, thresholdLedCount, (int)calibrationState);
 
           lastSync = GetHostTimestamp();
         }
       }
     }
-    else if (IN_LATENCY_CALIBRATION) {
+    else if (calibrationState != CalibrationState::Idle) {
       // Ensure LEDs are off before we start calibration,
       // or if we're not the controller doing calibration.
       ledSync->phase = LED_ALL_OFF;
@@ -592,7 +636,10 @@ namespace psvr2_toolkit {
       {
         // Set threshold LED count. The blob tracking may pick up other sources.
         // Also add a small margin of error.
-        thresholdLedCount = currentLedCount + 6;
+        if (calibrationState == CalibrationState::Start)
+        {
+          thresholdLedCount = currentLedCount + 6;
+        }
       }
     }
     else if (currentController == controller && GetHostTimestamp() - lastSync < 250000)
@@ -652,13 +699,11 @@ namespace psvr2_toolkit {
 
       // libpad function for uint32_t libpad_hostToDevice(LibpadTimeSync* timeSync, uint32_t host, uint32_t* outDevice) @ 0x1C09E0
       HookLib::InstallHook(reinterpret_cast<void*>(pHmdDriverLoader->GetBaseAddress() + 0x1C09E0),
-        reinterpret_cast<void*>(libpad_hostToDeviceHook),
-        reinterpret_cast<void**>(&libpad_hostToDevice));
+        reinterpret_cast<void*>(libpad_hostToDeviceHook));
 
       // libpad function for uint32_t libpad_deviceToHost(LibpadTimeSync* timeSync, uint32_t device, ProcessedControllerState* outHost) @ 0x1C1520
       HookLib::InstallHook(reinterpret_cast<void*>(pHmdDriverLoader->GetBaseAddress() + 0x1C1520),
-        reinterpret_cast<void*>(libpad_deviceToHostHook),
-        reinterpret_cast<void**>(&libpad_hostToDevice));
+        reinterpret_cast<void*>(libpad_deviceToHostHook));
 
       // libpad function for void libpad_SetSyncLedCommand(LibpadTimeSync* timeSync, LibpadLedSync* ledSync, LedCommand* ledCommand, uint8_t commandSize, bool isLeft) @ 0x1C1880
       HookLib::InstallHook(reinterpret_cast<void*>(pHmdDriverLoader->GetBaseAddress() + 0x1C1880),
