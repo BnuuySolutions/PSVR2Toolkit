@@ -4,13 +4,14 @@
 
 namespace psvr2_toolkit {
 
-  DriverContextProxy *DriverContextProxy::m_pInstance = nullptr;
+  DriverContextProxy* DriverContextProxy::m_pInstance = nullptr;
 
   DriverContextProxy::DriverContextProxy()
     : m_pDriverContext(nullptr)
-  {}
+  {
+  }
 
-  DriverContextProxy *DriverContextProxy::Instance() {
+  DriverContextProxy* DriverContextProxy::Instance() {
     if (!m_pInstance) {
       m_pInstance = new DriverContextProxy;
     }
@@ -18,17 +19,17 @@ namespace psvr2_toolkit {
     return m_pInstance;
   }
 
-  void DriverContextProxy::SetDriverContext(vr::IVRDriverContext *pDriverContext) {
+  void DriverContextProxy::SetDriverContext(vr::IVRDriverContext* pDriverContext) {
     m_pDriverContext = pDriverContext;
   }
 
-  void *DriverContextProxy::GetGenericInterface(const char *pchInterfaceVersion, vr::EVRInitError *peError) {
-    void *result = m_pDriverContext->GetGenericInterface(pchInterfaceVersion, peError);
+  void* DriverContextProxy::GetGenericInterface(const char* pchInterfaceVersion, vr::EVRInitError* peError) {
+    void* result = m_pDriverContext->GetGenericInterface(pchInterfaceVersion, peError);
 
     // Depends on our OpenVR driver SDK version matching the one inside the PS VR2 driver.
     if (strcmp(vr::IVRServerDriverHost_Version, pchInterfaceVersion) == 0) {
-      static DriverHostProxy *pDriverHostProxy = DriverHostProxy::Instance();
-      pDriverHostProxy->SetDriverHost(static_cast<vr::IVRServerDriverHost *>(result));
+      static DriverHostProxy* pDriverHostProxy = DriverHostProxy::Instance();
+      pDriverHostProxy->SetDriverHost(static_cast<vr::IVRServerDriverHost*>(result));
       return pDriverHostProxy;
     }
 
