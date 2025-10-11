@@ -71,7 +71,10 @@ namespace psvr2_toolkit {
     uint8_t  phase;
     uint8_t  period;
     uint8_t  leds[4];
-    uint32_t frameCycle;
+    union {
+      uint32_t frameCycle;
+      int32_t offset;
+    };
   };
 
   struct SetLedsPayload {
@@ -83,12 +86,12 @@ namespace psvr2_toolkit {
   };
 
   struct AdjustBaseTimePayload {
-    uint32_t offset;
+    int32_t offset;
   };
 
   struct AdjustTimeAndCyclePayload {
     float    adjustmentFactor;
-    uint32_t offset;
+    int32_t offset;
   };
 
   struct SystemControlPayload {
@@ -293,19 +296,32 @@ namespace psvr2_toolkit {
         ledCommand->payload.syncPhase.period = k_stablePhasePeriod;
 
         // Ensure we correctly line up with the center due to the difference in period
-        ledCommand->payload.syncPhase.frameCycle = (ledSync->oneSubGridTime * (k_bgPhasePeriod - k_stablePhasePeriod));
+        ledCommand->payload.syncPhase.offset = (ledSync->oneSubGridTime * (k_bgPhasePeriod - k_stablePhasePeriod));
 
         break;
       }
 
-      Util::DriverLog("SET_SYNC_PHASE: phase={}, period={}, frameCycle={}, leds=[{},{},{},{}] {}",
-        ledCommand->payload.syncPhase.phase,
-        ledCommand->payload.syncPhase.period,
-        ledCommand->payload.syncPhase.frameCycle,
-        ledCommand->payload.syncPhase.leds[0],
-        ledCommand->payload.syncPhase.leds[1],
-        ledCommand->payload.syncPhase.leds[2],
-        ledCommand->payload.syncPhase.leds[3], commandSize);
+      if (ledCommand->payload.syncPhase.phase == LedPhase::PRESCAN) {
+        Util::DriverLog("SET_SYNC_PHASE: phase={}, period={}, frameCycle={}, leds=[{},{},{},{}] {}",
+          ledCommand->payload.syncPhase.phase,
+          ledCommand->payload.syncPhase.period,
+          ledCommand->payload.syncPhase.frameCycle,
+          ledCommand->payload.syncPhase.leds[0],
+          ledCommand->payload.syncPhase.leds[1],
+          ledCommand->payload.syncPhase.leds[2],
+          ledCommand->payload.syncPhase.leds[3], commandSize);
+      }
+      else {
+        Util::DriverLog("SET_SYNC_PHASE: phase={}, period={}, offset={}, leds=[{},{},{},{}] {}",
+          ledCommand->payload.syncPhase.phase,
+          ledCommand->payload.syncPhase.period,
+          ledCommand->payload.syncPhase.offset,
+          ledCommand->payload.syncPhase.leds[0],
+          ledCommand->payload.syncPhase.leds[1],
+          ledCommand->payload.syncPhase.leds[2],
+          ledCommand->payload.syncPhase.leds[3], commandSize);
+      }
+      
       break;
     case CommandType::SET_LEDS_IMMEDIATE:
       Util::DriverLog("SET_LEDS_IMMEDIATE: leds=[{},{},{},{}]",
@@ -362,7 +378,7 @@ namespace psvr2_toolkit {
     static uint64_t lastSync = 0;
 
     static int searchLowerBound = 0;
-    static int searchUpperBound = 16666; // One vsync period
+    static int searchUpperBound = 16666; // One camera frame period
     static int leftEdge = 0;
     static int rightEdge = 0;
 
@@ -642,10 +658,10 @@ namespace psvr2_toolkit {
         }
       }
     }
-    else if (currentController == controller && GetHostTimestamp() - lastSync < 250000)
+    else if (currentController == controller && GetHostTimestamp() - lastSync < 500000)
     {
-      // If we haven't tracked in the last 2 seconds, reset the calibration.
-      if (!isTracking && static_cast<int64_t>(GetHostTimestamp() - lastTrackedTimestamp) > 2000000) {
+      // If we haven't tracked in the last half of a second, reset the calibration.
+      if (!isTracking && static_cast<int64_t>(GetHostTimestamp() - lastTrackedTimestamp) > 500000) {
         Util::DriverLog("[{}] Reset latency calibration due to controller not tracking. {}", controllerChar, static_cast<int64_t>(GetHostTimestamp() - lastTrackedTimestamp));
         resetCalibration();
       }
