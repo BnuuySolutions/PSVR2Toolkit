@@ -52,7 +52,7 @@ namespace psvr2_toolkit {
   struct HidDeviceDescriptor
   {
     uint32_t unknown1[2];
-    int padHandle;
+    int32_t padHandle;
     uint32_t unknown2;
     HANDLE controllerFileHandle;
   };
@@ -113,17 +113,17 @@ namespace psvr2_toolkit {
   };
 #pragma pack(pop)
 
-  const int k_libpadDeviceTypeSenseLeft = 3;
-  const int k_libpadDeviceTypeSenseRight = 4;
+  const int32_t k_libpadDeviceTypeSenseLeft = 3;
+  const int32_t k_libpadDeviceTypeSenseRight = 4;
 
-  const int k_driverDeviceTypeHmd = 0;
-  const int k_driverDeviceTypeSenseLeft = 2;
-  const int k_driverDeviceTypeSenseRight = 1;
+  const int32_t k_driverDeviceTypeHmd = 0;
+  const int32_t k_driverDeviceTypeSenseLeft = 2;
+  const int32_t k_driverDeviceTypeSenseRight = 1;
 
-  const int k_prescanPhasePeriod = 32;
-  const int k_broadPhasePeriod = 32;
-  const int k_bgPhasePeriod = 20;
-  const int k_stablePhasePeriod = 9;
+  const int32_t k_prescanPhasePeriod = 32;
+  const int32_t k_broadPhasePeriod = 32;
+  const int32_t k_bgPhasePeriod = 20;
+  const int32_t k_stablePhasePeriod = 9;
 
   // The device time that's passed in is already divided by 3.
   // This is so that all calcuations work within this bound.
@@ -214,8 +214,8 @@ namespace psvr2_toolkit {
     return 0;
   }
 
-  HidDeviceDescriptor* (*libpad_CreateHidDevice)(HidDeviceDescriptor* device, const wchar_t* name, int deviceType) = nullptr;
-  HidDeviceDescriptor* libpad_CreateHidDeviceHook(HidDeviceDescriptor* device, const wchar_t* name, int deviceType) {
+  HidDeviceDescriptor* (*libpad_CreateHidDevice)(HidDeviceDescriptor* device, const wchar_t* name, int32_t deviceType) = nullptr;
+  HidDeviceDescriptor* libpad_CreateHidDeviceHook(HidDeviceDescriptor* device, const wchar_t* name, int32_t deviceType) {
     Util::DriverLog("libpad_CreateHidDeviceHook called for device: {}, type: {}", Util::WideStringToUTF8(name), deviceType);
 
     HidDeviceDescriptor* result = libpad_CreateHidDevice(device, name, deviceType);
@@ -232,8 +232,8 @@ namespace psvr2_toolkit {
     return result;
   }
 
-  void (*libpad_Disconnect)(int device) = nullptr;
-  void libpad_DisconnectHook(int device) {
+  void (*libpad_Disconnect)(int32_t device) = nullptr;
+  void libpad_DisconnectHook(int32_t device) {
     Util::DriverLog("libpad_DisconnectHook called for device handle: {}", device);
 
     try {
@@ -247,8 +247,8 @@ namespace psvr2_toolkit {
     libpad_Disconnect(device);
   }
 
-  int (*libpad_SendOutputReport)(int device, const unsigned char* buffer, unsigned short size) = nullptr;
-  int libpad_SendOutputReportHook(int device, const unsigned char* buffer, unsigned short size) {
+  int32_t (*libpad_SendOutputReport)(int32_t device, const unsigned char* buffer, unsigned short size) = nullptr;
+  int32_t libpad_SendOutputReportHook(int32_t device, const unsigned char* buffer, unsigned short size) {
     if (size != sizeof(SenseControllerPCModePacket_t)) {
       Util::DriverLog("libpad_SendOutputReportHook called with unexpected size: {}", size);
       return libpad_SendOutputReport(device, buffer, size);
@@ -360,7 +360,7 @@ namespace psvr2_toolkit {
     static std::mutex ledSyncMutex;
     std::scoped_lock lock(ledSyncMutex);
 
-    int controller = timeSync->isLeft ? 0 : 1;
+    int32_t controller = timeSync->isLeft ? 0 : 1;
     char controllerChar = timeSync->isLeft ? 'L' : 'R';
     uint64_t lastTrackedTimestamp;
 
@@ -372,15 +372,15 @@ namespace psvr2_toolkit {
     size_t samples = senseController.GetTimestampOffsetSampleCount();
     bool isTracking = senseController.GetTrackingState(lastTrackedTimestamp);
 
-    static int currentController = -1;
-    static int thresholdLedCount = 0;
+    static int32_t currentController = -1;
+    static int32_t thresholdLedCount = 0;
     static uint64_t syncStartTime = 0;
     static uint64_t lastSync = 0;
 
-    static int searchLowerBound = 0;
-    static int searchUpperBound = 16666; // One camera frame period
-    static int leftEdge = 0;
-    static int rightEdge = 0;
+    static int32_t searchLowerBound = 0;
+    static int32_t searchUpperBound = 16666; // One camera frame period
+    static int32_t leftEdge = 0;
+    static int32_t rightEdge = 0;
 
     SenseController& currentSenseController = SenseController::GetControllerByIsLeft(currentController == 0 ? true : false);
 
@@ -394,7 +394,7 @@ namespace psvr2_toolkit {
     };
 
     // Bottom cameras only
-    int currentLedCount = currentLDPayload.cameras[0].num_leds
+    int32_t currentLedCount = currentLDPayload.cameras[0].num_leds
       + currentLDPayload.cameras[1].num_leds;
 
     // TODO: calibration should be triggered via IPC
@@ -448,7 +448,7 @@ namespace psvr2_toolkit {
 
       if (GetHostTimestamp() - lastSync > 50000)
       {
-        int newLatencyOffset = 0;
+        int32_t newLatencyOffset = 0;
 
         switch (calibrationState)
         {
@@ -464,7 +464,7 @@ namespace psvr2_toolkit {
           if (currentLedCount > thresholdLedCount) { // LEDs are on, we found a point
             searchUpperBound = latencyOffset;
             searchLowerBound = latencyOffset - fullWindow;
-            Util::DriverLog("[{}] Found initial on point at {}. Searching for left edge.", controllerChar, latencyOffset);
+            Util::DriverLog("[{}] Found initial on point32_t at {}. Searching for left edge.", controllerChar, latencyOffset);
             calibrationState = CalibrationState::BinarySearchLeftEdge;
 
           }
@@ -497,8 +497,8 @@ namespace psvr2_toolkit {
           if (searchUpperBound - searchLowerBound < 25) {
             leftEdge = newLatencyOffset;
             Util::DriverLog("[{}] Found left edge at {}", controllerChar, leftEdge);
-            searchLowerBound = leftEdge + (fullWindow * 0.9);
-            searchUpperBound = leftEdge + (fullWindow * 1.1);
+            searchLowerBound = leftEdge + static_cast<int32_t>(fullWindow * 0.9);
+            searchUpperBound = leftEdge + static_cast<int32_t>(fullWindow * 1.1);
           }
           else {
             senseController.SetLatencyOffset(newLatencyOffset);
@@ -678,13 +678,13 @@ namespace psvr2_toolkit {
     libpad_SetSyncLedBaseTime(timeSync, ledSync);
   }
 
-  void (*logDeviceTrackingState)(void* session, int deviceType, uint64_t timestamp,
+  void (*logDeviceTrackingState)(void* session, int32_t deviceType, uint64_t timestamp,
     void* previousPose, void* previousMeta, void* currentPose, void* currentMeta) = nullptr;
-  void logDeviceTrackingStateHook(void* session, int deviceType, uint64_t timestamp,
+  void logDeviceTrackingStateHook(void* session, int32_t deviceType, uint64_t timestamp,
     void* previousPose, void* previousMeta, void* currentPose, void* currentMeta) {
     char* trackingFlag = reinterpret_cast<char*>(currentMeta) + 0x8;
 
-    int controller = -1;
+    int32_t controller = -1;
 
     if (deviceType == k_driverDeviceTypeSenseLeft) {
       controller = 0;
@@ -732,24 +732,24 @@ namespace psvr2_toolkit {
         reinterpret_cast<void**>(&libpad_SetSyncLedBaseTime));
 
       // TODO: this should be moved out
-      // driver function for void logDeviceTrackingState(void* session, int deviceType, uint64_t timestamp, void* previousPose, void* previousMeta, void* currentPose, void* currentMeta) @ 0x161520
+      // driver function for void logDeviceTrackingState(void* session, int32_t deviceType, uint64_t timestamp, void* previousPose, void* previousMeta, void* currentPose, void* currentMeta) @ 0x161520
       HookLib::InstallHook(reinterpret_cast<void*>(pHmdDriverLoader->GetBaseAddress() + 0x161520),
         reinterpret_cast<void*>(logDeviceTrackingStateHook),
         reinterpret_cast<void**>(&logDeviceTrackingState));
     }
 
     if (VRSettings::GetBool(STEAMVR_SETTINGS_USE_ENHANCED_HAPTICS, SETTING_USE_TOOLKIT_SYNC_DEFAULT_VALUE)) {
-      // libpad function for int CreateHidDevice(HidDeviceDescriptor* device, wchar_t name, int deviceType) @ 0x1CE210
+      // libpad function for int32_t CreateHidDevice(HidDeviceDescriptor* device, wchar_t name, int32_t deviceType) @ 0x1CE210
       HookLib::InstallHook(reinterpret_cast<void*>(pHmdDriverLoader->GetBaseAddress() + 0x1CE210),
         reinterpret_cast<void*>(libpad_CreateHidDeviceHook),
         reinterpret_cast<void**>(&libpad_CreateHidDevice));
 
-      // libpad function for void libpad_Disconnect(int device) @ 0x1C7E90
+      // libpad function for void libpad_Disconnect(int32_t device) @ 0x1C7E90
       HookLib::InstallHook(reinterpret_cast<void*>(pHmdDriverLoader->GetBaseAddress() + 0x1C7E90),
         reinterpret_cast<void*>(libpad_DisconnectHook),
         reinterpret_cast<void**>(&libpad_Disconnect));
 
-      // libpad function for int libpad_SendOutputReport(int handle, uchar * buffer, ushort size) @ 0x1CBA20
+      // libpad function for int32_t libpad_SendOutputReport(int32_t handle, uchar * buffer, ushort size) @ 0x1CBA20
       HookLib::InstallHook(reinterpret_cast<void*>(pHmdDriverLoader->GetBaseAddress() + 0x1CBA20),
         reinterpret_cast<void*>(libpad_SendOutputReportHook),
         reinterpret_cast<void**>(&libpad_SendOutputReport));
