@@ -71,6 +71,9 @@
     <ClCompile Include="hmd_types.h">
       <Filter>Utilities</Filter>
     </ClCompile>
+    <ClCompile Include="eyelid_estimator.cpp">
+      <Filter>Gaze</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="hmd_driver_loader.h">
@@ -141,6 +144,9 @@
     </ClInclude>
     <ClInclude Include="config.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="eyelid_estimator.h">
+      <Filter>Gaze</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

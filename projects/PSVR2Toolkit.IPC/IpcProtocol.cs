@@ -69,10 +69,40 @@ namespace PSVR2Toolkit.CAPI {
         public bool blink;
     };
 
+    [StructLayout(LayoutKind.Sequential, Pack = 1)]
+    public struct GazeEyeResult2 {
+        [MarshalAs(UnmanagedType.I1)]
+        public bool isGazeOriginValid;
+        public GazeVector3 gazeOriginMm;
+
+        [MarshalAs(UnmanagedType.I1)]
+        public bool isGazeDirValid;
+        public GazeVector3 gazeDirNorm;
+
+        [MarshalAs(UnmanagedType.I1)]
+        public bool isPupilDiaValid;
+        public float pupilDiaMm;
+
+        [MarshalAs(UnmanagedType.I1)]
+        public bool isBlinkValid;
+        [MarshalAs(UnmanagedType.I1)]
+        public bool blink;
+
+        [MarshalAs(UnmanagedType.I1)]
+        public bool isOpenEnabled;
+        public float open;
+    };
+
     [StructLayout(LayoutKind.Sequential)]
     public struct CommandDataServerGazeDataResult {
         public GazeEyeResult leftEye;
         public GazeEyeResult rightEye;
+    };
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct CommandDataServerGazeDataResult2 {
+        public GazeEyeResult2 leftEye;
+        public GazeEyeResult2 rightEye;
     };
 
     [StructLayout(LayoutKind.Sequential)]

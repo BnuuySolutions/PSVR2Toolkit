@@ -181,6 +181,7 @@
     <ClCompile Include="device_provider_proxy.cpp" />
     <ClCompile Include="driver_context_proxy.cpp" />
     <ClCompile Include="driver_host_proxy.cpp" />
+    <ClCompile Include="eyelid_estimator.cpp" />
     <ClCompile Include="hmd_device_hooks.cpp" />
     <ClCompile Include="hmd_driver_factory.cpp" />
     <ClCompile Include="hmd_driver_loader.cpp" />
@@ -197,6 +198,7 @@
     <ClInclude Include="config.h" />
     <ClInclude Include="device_provider_proxy.h" />
     <ClInclude Include="driver_context_proxy.h" />
+    <ClInclude Include="eyelid_estimator.h" />
     <ClInclude Include="hmd2_gaze.h" />
     <ClInclude Include="hook_lib.h" />
     <ClInclude Include="driver_host_proxy.h" />

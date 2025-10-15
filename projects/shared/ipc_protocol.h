@@ -7,7 +7,7 @@
 namespace psvr2_toolkit {
   namespace ipc {
 
-    static constexpr uint16_t k_unIpcVersion = 1;
+    static constexpr uint16_t k_unIpcVersion = 2;
     static constexpr uint32_t k_unTriggerEffectControlPoint = 10;
 
     enum ECommandType : uint16_t {
@@ -18,7 +18,7 @@ namespace psvr2_toolkit {
       Command_ServerHandshakeResult, // CommandDataServerHandshakeResult_t
 
       Command_ClientRequestGazeData, // No command data.
-      Command_ServerGazeDataResult, // CommandDataServerGazeDataResult_t
+      Command_ServerGazeDataResult, // CommandDataServerGazeDataResult2_t (or if IPC version is 1, CommandDataServerGazeDataResult_t)
 
       Command_ClientTriggerEffectOff, // CommandDataClientTriggerEffectOff_t
       Command_ClientTriggerEffectFeedback, // CommandDataClientTriggerEffectFeedback_t
@@ -71,11 +71,35 @@ namespace psvr2_toolkit {
       bool blink;
     };
 
+    struct GazeEyeResult2 {
+      bool isGazeOriginValid;
+      GazeVector3 gazeOriginMm;
+
+      bool isGazeDirValid;
+      GazeVector3 gazeDirNorm;
+
+      bool isPupilDiaValid;
+      float pupilDiaMm;
+
+      bool isBlinkValid;
+      bool blink;
+
+      bool isOpenEnabled;
+      float open;
+    };
+
     struct CommandDataServerGazeDataResult_t {
       // TODO: Include timestamp, etc.
 
       GazeEyeResult leftEye;
       GazeEyeResult rightEye;
+    };
+
+    struct CommandDataServerGazeDataResult2_t {
+      // TODO: Include timestamp, etc.
+
+      GazeEyeResult2 leftEye;
+      GazeEyeResult2 rightEye;
     };
     #pragma pack(pop)
 

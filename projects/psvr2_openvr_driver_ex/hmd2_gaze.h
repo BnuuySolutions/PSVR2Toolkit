@@ -25,11 +25,11 @@ typedef struct {
   Hmd2Bool isPupilDiaValid;
   float pupilDiaMm;
 
-  // No clue what this extra stuff is.
-  Hmd2Bool unk06;
-  Hmd2Vector2 unk07;
-  Hmd2Bool unk08;
-  Hmd2Vector2 unk09;
+  Hmd2Bool isPupilPosInSensorValid;
+  Hmd2Vector2 pupilPosInSensor;
+
+  Hmd2Bool isPosGuideValid;
+  Hmd2Vector2 posGuide;
 
   Hmd2Bool isBlinkValid;
   Hmd2Bool blink;
