@@ -10,6 +10,9 @@
 #include <map>
 #include <mutex>
 
+#define PSVR2_VID 0x054c
+#define PSVR2_PID 0x0cde
+
 // due to conflicts, have to do this here...
 extern "C" {
   typedef PVOID WINUSB_INTERFACE_HANDLE, * PWINUSB_INTERFACE_HANDLE;
@@ -47,17 +50,13 @@ extern "C" {
 }
 
 namespace psvr2_toolkit {
-#define PSVR2_VID 0x054c
-#define PSVR2_PID 0x0cde
-
-  // === Encapsulated USB Interface State ===
   class LibusbInterface {
   public:
     libusb_device_handle* libusb_handle = NULL;
     int interface_number = -1;
+    std::atomic<UCHAR> abort_pipe = -1;
   };
 
-  // === Global State Management ===
   std::mutex g_usb_mutex;
   std::map<WINUSB_INTERFACE_HANDLE, LibusbInterface*> g_interface_map;
 
@@ -145,8 +144,11 @@ namespace psvr2_toolkit {
   }
 
   // We need to replace device enumeration, it is not compatible with LibUSB.
+  int (*CaesarUsbThread__initialize)(CaesarUsbThread_t*) = nullptr;
   int CaesarUsbThread__initializeHook(CaesarUsbThread_t* thisptr) {
     // TODO: ShareManager
+    // Run original to fix app crash due to info not being filled in
+    CaesarUsbThread__initialize(thisptr);
 
     std::lock_guard<std::mutex> lock(g_usb_mutex);
     CaesarUsbThread_Vtbl_t* pVtbl = static_cast<CaesarUsbThread_Vtbl_t*>(thisptr->__vfptr);
@@ -197,7 +199,7 @@ namespace psvr2_toolkit {
         }
 
         // Print all connected USB devices for debugging
-        Util::DriverLog("[libusb hook] Found device: VID=0x{}, PID=0x{}\n", desc.idVendor, desc.idProduct);
+        Util::DriverLog("[libusb hook] Found device: VID={}, PID={}\n", desc.idVendor, desc.idProduct);
         // Print all interfaces for this device
         libusb_config_descriptor* config;
         if (libusb_get_config_descriptor(device, 0, &config) < 0) {
@@ -207,7 +209,7 @@ namespace psvr2_toolkit {
         for (int j = 0; j < config->bNumInterfaces; j++) {
           for (int k = 0; k < config->interface[j].num_altsetting; k++) {
             const libusb_interface_descriptor& iface = config->interface[j].altsetting[k];
-            Util::DriverLog("  Interface {}, AltSetting {}, Class 0x%02x, SubClass 0x%02x, Protocol 0x%02x\n",
+            Util::DriverLog("  Interface {}, AltSetting {}, Class {}, SubClass {}, Protocol {}\n",
               iface.bInterfaceNumber, iface.bAlternateSetting, iface.bInterfaceClass, iface.bInterfaceSubClass, iface.bInterfaceProtocol);
           }
         }
@@ -218,7 +220,7 @@ namespace psvr2_toolkit {
       // Open the PSVR2 device if not already opened
       g_handle = libusb_open_device_with_vid_pid(ctx, PSVR2_VID, PSVR2_PID);
       if (g_handle == NULL) {
-        Util::DriverLog("[libusb hook] Could not find/open PSVR2 device (VID=0x{}, PID=0x{}).\n", PSVR2_VID, PSVR2_PID);
+        Util::DriverLog("[libusb hook] Could not find/open PSVR2 device (VID={}, PID={}).\n", PSVR2_VID, PSVR2_PID);
         delete new_interface;
         Framework__Mutex__unlock(&thisptr->handlesMutex);
         return -1;
@@ -258,7 +260,20 @@ namespace psvr2_toolkit {
   }
 
   bool WinUsb_AbortPipeHook(WINUSB_INTERFACE_HANDLE InterfaceHandle, UCHAR PipeID) {
-    return true; // Return success, even though we're doing nothing. This is missing from LibUSB.
+    LibusbInterface* interface_obj = nullptr;
+    {
+      std::lock_guard<std::mutex> lock(g_usb_mutex);
+      auto it = g_interface_map.find(InterfaceHandle);
+      if (it != g_interface_map.end())
+        interface_obj = it->second;
+    }
+
+    if (interface_obj == nullptr) {
+      return o_WinUsb_AbortPipe(InterfaceHandle, PipeID);
+    }
+
+    interface_obj->abort_pipe = PipeID;
+    return true; // Return success, we don't really have a way to fail here.
   }
 
   bool WinUsb_GetCurrentAlternateSettingHook(WINUSB_INTERFACE_HANDLE InterfaceHandle, PUCHAR SettingNumber) {
@@ -299,8 +314,7 @@ namespace psvr2_toolkit {
     }
 
     int res = libusb_set_interface_alt_setting(interface_obj->libusb_handle, interface_obj->interface_number, SettingNumber);
-    if (res < 0)
-    {
+    if (res < 0) {
       Util::DriverLog("[WinUsb_SetCurrentAlternateSettingHook] SetCurrentAlternateSetting failed on interface {}: %s\n", interface_obj->interface_number, libusb_error_name(res));
       return FALSE;
     }
@@ -361,8 +375,7 @@ namespace psvr2_toolkit {
     }
 
     int res = libusb_get_descriptor(interface_obj->libusb_handle, DescriptorType, Index, Buffer, BufferLength);
-    if (res < 0)
-    {
+    if (res < 0) {
       Util::DriverLog("[WinUsb_GetDescriptorHook] GetDescriptor failed on interface {}: %s\n", interface_obj->interface_number, libusb_error_name(res));
       if (LengthTransferred) *LengthTransferred = 0;
       return FALSE;
@@ -378,8 +391,20 @@ namespace psvr2_toolkit {
     PULONG ValueLength,
     PVOID Value
   ) {
+    LibusbInterface* interface_obj = nullptr;
+    {
+      std::lock_guard<std::mutex> lock(g_usb_mutex);
+      auto it = g_interface_map.find(InterfaceHandle);
+      if (it != g_interface_map.end())
+        interface_obj = it->second;
+    }
+
+    if (interface_obj == nullptr) {
+      return o_WinUsb_GetPipePolicy(InterfaceHandle, PipeID, PolicyType, ValueLength, Value);
+    }
+
     if (PolicyType == 8) {
-      *(int*)Value = 1024 * 1024; // hack
+      *(int*)Value = 1024 * 1024; // We'll still set this, but the driver only just logs this value.
     }
     return true; // Also missing from LibUSB.
   }
@@ -404,13 +429,24 @@ namespace psvr2_toolkit {
       return o_WinUsb_ReadPipe(InterfaceHandle, PipeID, Buffer, BufferLength, LengthTransferred, Overlapped);
     }
 
+    // Reset pipe abort
+    interface_obj->abort_pipe = -1;
+
     int transferred = 0;
-    int res = libusb_bulk_transfer(interface_obj->libusb_handle, PipeID, Buffer, BufferLength, &transferred, 0);
-    if (res < 0)
-    {
-      Util::DriverLog("[WinUsb_ReadPipeHook] ReadPipe failed on interface {}, PipeID 0x%02x: %s\n", interface_obj->interface_number, PipeID, libusb_error_name(res));
-      if (LengthTransferred) *LengthTransferred = 0;
-      return FALSE;
+    int res = LIBUSB_ERROR_TIMEOUT;
+    while (res == LIBUSB_ERROR_TIMEOUT) {
+      if (interface_obj->abort_pipe.load() == PipeID) {
+        SetLastError(ERROR_OPERATION_ABORTED);
+        if (LengthTransferred) *LengthTransferred = 0;
+        return FALSE;
+      }
+
+      res = libusb_bulk_transfer(interface_obj->libusb_handle, PipeID, Buffer, BufferLength, &transferred, 5000);
+      if (res < 0 && res != LIBUSB_ERROR_TIMEOUT) {
+        Util::DriverLog("[WinUsb_ReadPipeHook] ReadPipe failed on interface {}, PipeID {}: {}\n", interface_obj->interface_number, PipeID, libusb_error_name(res));
+        if (LengthTransferred) *LengthTransferred = 0;
+        return FALSE;
+      }
     }
     if (LengthTransferred) *LengthTransferred = transferred;
     return TRUE;
@@ -445,8 +481,7 @@ namespace psvr2_toolkit {
       static_cast<uint16_t>(BufferLength),
       5000);
 
-    if (res < 0)
-    {
+    if (res < 0) {
       Util::DriverLog("[WinUsb_ControlTransferHook] ControlTransfer failed on interface {}: %s\n", interface_obj->interface_number, libusb_error_name(res));
       if (LengthTransferred) *LengthTransferred = 0;
       return FALSE;
@@ -454,7 +489,7 @@ namespace psvr2_toolkit {
 
     *LengthTransferred = res;
 
-    // Don't support Overlapped I/O for now.
+    // Don't support Overlapped I/O for now. Not used by the driver.
     (void)Overlapped; // suppress unused parameter warning
 
     return TRUE;
@@ -478,7 +513,8 @@ namespace psvr2_toolkit {
 
     // LibUSB stuff
     HookLib::InstallHook(reinterpret_cast<void*>(pHmdDriverLoader->GetBaseAddress() + 0x122AC0),
-                         reinterpret_cast<void*>(CaesarUsbThread__initializeHook));
+                         reinterpret_cast<void*>(CaesarUsbThread__initializeHook),
+                         reinterpret_cast<void**>(&CaesarUsbThread__initialize));
 
     o_WinUsb_AbortPipe = (WinUsb_AbortPipe_t)GetProcAddress(GetModuleHandleW(L"winusb.dll"), "WinUsb_AbortPipe");
     o_WinUsb_GetCurrentAlternateSetting = (WinUsb_GetCurrentAlternateSetting_t)GetProcAddress(GetModuleHandleW(L"winusb.dll"), "WinUsb_GetCurrentAlternateSetting");
