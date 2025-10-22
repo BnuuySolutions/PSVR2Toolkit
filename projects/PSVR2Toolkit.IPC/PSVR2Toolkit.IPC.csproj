@@ -3,6 +3,7 @@
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
     <LangVersion>11</LangVersion>
+    <Configurations>Debug;Release;ReleaseCI;DebugCI</Configurations>
   </PropertyGroup>
 
 </Project>

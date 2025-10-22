@@ -2,6 +2,7 @@
 
 #include "hmd_driver_loader.h"
 #include "hmd_device_hooks.h"
+#include "eyelid_estimator.h"
 #include "hmd2_gaze.h"
 #include "ipc_server.h"
 
@@ -28,6 +29,9 @@ void *(*CaesarUsbThread__dtor_CaesarUsbThread)(void *thisptr, char a2) = nullptr
 int (*CaesarUsbThread__read)(void *thisptr, uint8_t pipeId, char *buffer, size_t length) = nullptr;
 
 CaesarUsbThreadGaze *CaesarUsbThreadGaze::m_pInstance = nullptr;
+
+psvr2_toolkit::EyelidEstimator leftEyelidEstimator;
+psvr2_toolkit::EyelidEstimator rightEyelidEstimator;
 
 void *j_CaesarUsbThreadGaze__dtor_CaesarUsbThreadGaze(CaesarUsbThreadGaze *thisptr, char a2) {
   thisptr->dtor_CaesarUsbThreadGaze();
@@ -133,7 +137,9 @@ int CaesarUsbThreadGaze::poll() {
   if (buffer[0] == GAZE_MAGIC_0 && buffer[1] == GAZE_MAGIC_1_STATE) {
     Hmd2GazeState *pGazeState = reinterpret_cast<Hmd2GazeState *>(buffer);
     HmdDeviceHooks::UpdateGaze(pGazeState, sizeof(Hmd2GazeState));
-    pIpcServer->UpdateGazeState(pGazeState);
+    float leftEyelidOpenness = leftEyelidEstimator.Estimate(pGazeState->leftEye);
+    float rightEyelidOpenness = rightEyelidEstimator.Estimate(pGazeState->rightEye);
+    pIpcServer->UpdateGazeState(pGazeState, leftEyelidOpenness, rightEyelidOpenness);
   }
 
   return 0;

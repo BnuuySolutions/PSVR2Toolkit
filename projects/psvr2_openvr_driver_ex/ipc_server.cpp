@@ -46,6 +46,7 @@ namespace psvr2_toolkit {
 
       m_initialized = true;
       m_doGaze = !VRSettings::GetBool(STEAMVR_SETTINGS_DISABLE_GAZE, SETTING_DISABLE_GAZE_DEFAULT_VALUE);
+      m_doOpenness = VRSettings::GetBool(STEAMVR_SETTINGS_ENABLE_EYELID_ESTIMATION, SETTING_ENABLE_EYELID_ESTIMATION_DEFAULT_VALUE);
     }
 
     void IpcServer::Start() {
@@ -89,13 +90,15 @@ namespace psvr2_toolkit {
       m_receiveThread.join();
     }
 
-    void IpcServer::UpdateGazeState(Hmd2GazeState *pGazeState) {
+    void IpcServer::UpdateGazeState(Hmd2GazeState *pGazeState, float leftEyelidOpenness, float rightEyelidOpenness) {
       if (!m_pGazeState) {
         m_pGazeState = reinterpret_cast<Hmd2GazeState *>(malloc(sizeof(Hmd2GazeState)));
       }
       if (m_pGazeState) {
         memcpy(m_pGazeState, pGazeState, sizeof(Hmd2GazeState)); // Realistically, we should have a mutex here. Sadly, we do not have the time.
       }
+      m_leftEyelidOpenness = leftEyelidOpenness;
+      m_rightEyelidOpenness = rightEyelidOpenness;
     }
 
     void IpcServer::ReceiveLoop() {
@@ -170,7 +173,7 @@ namespace psvr2_toolkit {
         case Command_ClientRequestHandshake: {
           CommandDataServerHandshakeResult_t response;
           response.result = HandshakeResult_Failed;
-          response.ipcVersion = k_unIpcVersion;
+          response.ipcVersion = k_unIpcVersion; // Communicate the IPC version the server supports.
 
           if (pHeader->dataLen == sizeof(CommandDataClientRequestHandshake_t) && !m_connections.contains(clientPort)) {
             CommandDataClientRequestHandshake_t *pRequest = reinterpret_cast<CommandDataClientRequestHandshake_t *>(pData);
@@ -195,49 +198,103 @@ namespace psvr2_toolkit {
           if (pHeader->dataLen == 0 && m_connections.contains(clientPort)) {
 
             if (m_doGaze && m_pGazeState) {
-              CommandDataServerGazeDataResult_t response = {
-                .leftEye = {
-                  .isGazeOriginValid = m_pGazeState->leftEye.isGazeOriginValid == Hmd2Bool::HMD2_BOOL_TRUE,
-                  .gazeOriginMm = {
-                    .x = m_pGazeState->leftEye.gazeOriginMm.x,
-                    .y = m_pGazeState->leftEye.gazeOriginMm.y,
-                    .z = m_pGazeState->leftEye.gazeOriginMm.z,
+              // Handle old client IPC version requests here.
+              if (m_connections[clientPort].ipcVersion == 1) {
+                CommandDataServerGazeDataResult_t response = {
+                  .leftEye = {
+                    .isGazeOriginValid = m_pGazeState->leftEye.isGazeOriginValid == Hmd2Bool::HMD2_BOOL_TRUE,
+                    .gazeOriginMm = {
+                      .x = m_pGazeState->leftEye.gazeOriginMm.x,
+                      .y = m_pGazeState->leftEye.gazeOriginMm.y,
+                      .z = m_pGazeState->leftEye.gazeOriginMm.z,
+                    },
+                    .isGazeDirValid = m_pGazeState->leftEye.isGazeDirValid == Hmd2Bool::HMD2_BOOL_TRUE,
+                    .gazeDirNorm {
+                      .x = m_pGazeState->leftEye.gazeDirNorm.x,
+                      .y = m_pGazeState->leftEye.gazeDirNorm.y,
+                      .z = m_pGazeState->leftEye.gazeDirNorm.z,
+                    },
+                    .isPupilDiaValid = m_pGazeState->leftEye.isPupilDiaValid == Hmd2Bool::HMD2_BOOL_TRUE,
+                    .pupilDiaMm = m_pGazeState->leftEye.pupilDiaMm,
+                    .isBlinkValid = m_pGazeState->leftEye.isBlinkValid == Hmd2Bool::HMD2_BOOL_TRUE,
+                    .blink = m_pGazeState->leftEye.blink == Hmd2Bool::HMD2_BOOL_TRUE,
                   },
-                  .isGazeDirValid = m_pGazeState->leftEye.isGazeDirValid == Hmd2Bool::HMD2_BOOL_TRUE,
-                  .gazeDirNorm {
-                    .x = m_pGazeState->leftEye.gazeDirNorm.x,
-                    .y = m_pGazeState->leftEye.gazeDirNorm.y,
-                    .z = m_pGazeState->leftEye.gazeDirNorm.z,
+
+                  .rightEye = {
+                    .isGazeOriginValid = m_pGazeState->rightEye.isGazeOriginValid == Hmd2Bool::HMD2_BOOL_TRUE,
+                    .gazeOriginMm = {
+                      .x = m_pGazeState->rightEye.gazeOriginMm.x,
+                      .y = m_pGazeState->rightEye.gazeOriginMm.y,
+                      .z = m_pGazeState->rightEye.gazeOriginMm.z,
+                    },
+                    .isGazeDirValid = m_pGazeState->rightEye.isGazeDirValid == Hmd2Bool::HMD2_BOOL_TRUE,
+                    .gazeDirNorm {
+                      .x = m_pGazeState->rightEye.gazeDirNorm.x,
+                      .y = m_pGazeState->rightEye.gazeDirNorm.y,
+                      .z = m_pGazeState->rightEye.gazeDirNorm.z,
+                    },
+                    .isPupilDiaValid = m_pGazeState->rightEye.isPupilDiaValid == Hmd2Bool::HMD2_BOOL_TRUE,
+                    .pupilDiaMm = m_pGazeState->rightEye.pupilDiaMm,
+                    .isBlinkValid = m_pGazeState->rightEye.isBlinkValid == Hmd2Bool::HMD2_BOOL_TRUE,
+                    .blink = m_pGazeState->rightEye.blink == Hmd2Bool::HMD2_BOOL_TRUE,
+                  }
+                };
+                SendIpcCommand(clientSocket, Command_ServerGazeDataResult, &response, sizeof(response));
+              } else {
+                CommandDataServerGazeDataResult2_t response = {
+                  .leftEye = {
+                    .isGazeOriginValid = m_pGazeState->leftEye.isGazeOriginValid == Hmd2Bool::HMD2_BOOL_TRUE,
+                    .gazeOriginMm = {
+                      .x = m_pGazeState->leftEye.gazeOriginMm.x,
+                      .y = m_pGazeState->leftEye.gazeOriginMm.y,
+                      .z = m_pGazeState->leftEye.gazeOriginMm.z,
+                    },
+                    .isGazeDirValid = m_pGazeState->leftEye.isGazeDirValid == Hmd2Bool::HMD2_BOOL_TRUE,
+                    .gazeDirNorm {
+                      .x = m_pGazeState->leftEye.gazeDirNorm.x,
+                      .y = m_pGazeState->leftEye.gazeDirNorm.y,
+                      .z = m_pGazeState->leftEye.gazeDirNorm.z,
+                    },
+                    .isPupilDiaValid = m_pGazeState->leftEye.isPupilDiaValid == Hmd2Bool::HMD2_BOOL_TRUE,
+                    .pupilDiaMm = m_pGazeState->leftEye.pupilDiaMm,
+                    .isBlinkValid = m_pGazeState->leftEye.isBlinkValid == Hmd2Bool::HMD2_BOOL_TRUE,
+                    .blink = m_pGazeState->leftEye.blink == Hmd2Bool::HMD2_BOOL_TRUE,
+                    .isOpenEnabled = m_doOpenness,
+                    .open = m_doOpenness ? m_leftEyelidOpenness : 0.0f,
                   },
-                  .isPupilDiaValid = m_pGazeState->leftEye.isPupilDiaValid == Hmd2Bool::HMD2_BOOL_TRUE,
-                  .pupilDiaMm = m_pGazeState->leftEye.pupilDiaMm,
-                  .isBlinkValid = m_pGazeState->leftEye.isBlinkValid == Hmd2Bool::HMD2_BOOL_TRUE,
-                  .blink = m_pGazeState->leftEye.blink == Hmd2Bool::HMD2_BOOL_TRUE,
-                },
-                
-                .rightEye = {
-                  .isGazeOriginValid = m_pGazeState->rightEye.isGazeOriginValid == Hmd2Bool::HMD2_BOOL_TRUE,
-                  .gazeOriginMm = {
-                    .x = m_pGazeState->rightEye.gazeOriginMm.x,
-                    .y = m_pGazeState->rightEye.gazeOriginMm.y,
-                    .z = m_pGazeState->rightEye.gazeOriginMm.z,
-                  },
-                  .isGazeDirValid = m_pGazeState->rightEye.isGazeDirValid == Hmd2Bool::HMD2_BOOL_TRUE,
-                  .gazeDirNorm {
-                    .x = m_pGazeState->rightEye.gazeDirNorm.x,
-                    .y = m_pGazeState->rightEye.gazeDirNorm.y,
-                    .z = m_pGazeState->rightEye.gazeDirNorm.z,
-                  },
-                  .isPupilDiaValid = m_pGazeState->rightEye.isPupilDiaValid == Hmd2Bool::HMD2_BOOL_TRUE,
-                  .pupilDiaMm = m_pGazeState->rightEye.pupilDiaMm,
-                  .isBlinkValid = m_pGazeState->rightEye.isBlinkValid == Hmd2Bool::HMD2_BOOL_TRUE,
-                  .blink = m_pGazeState->rightEye.blink == Hmd2Bool::HMD2_BOOL_TRUE,
-                }
-              };
-              SendIpcCommand(clientSocket, Command_ServerGazeDataResult, &response, sizeof(response));
+
+                  .rightEye = {
+                    .isGazeOriginValid = m_pGazeState->rightEye.isGazeOriginValid == Hmd2Bool::HMD2_BOOL_TRUE,
+                    .gazeOriginMm = {
+                      .x = m_pGazeState->rightEye.gazeOriginMm.x,
+                      .y = m_pGazeState->rightEye.gazeOriginMm.y,
+                      .z = m_pGazeState->rightEye.gazeOriginMm.z,
+                    },
+                    .isGazeDirValid = m_pGazeState->rightEye.isGazeDirValid == Hmd2Bool::HMD2_BOOL_TRUE,
+                    .gazeDirNorm {
+                      .x = m_pGazeState->rightEye.gazeDirNorm.x,
+                      .y = m_pGazeState->rightEye.gazeDirNorm.y,
+                      .z = m_pGazeState->rightEye.gazeDirNorm.z,
+                    },
+                    .isPupilDiaValid = m_pGazeState->rightEye.isPupilDiaValid == Hmd2Bool::HMD2_BOOL_TRUE,
+                    .pupilDiaMm = m_pGazeState->rightEye.pupilDiaMm,
+                    .isBlinkValid = m_pGazeState->rightEye.isBlinkValid == Hmd2Bool::HMD2_BOOL_TRUE,
+                    .blink = m_pGazeState->rightEye.blink == Hmd2Bool::HMD2_BOOL_TRUE,
+                    .isOpenEnabled = m_doOpenness,
+                    .open = m_doOpenness ? m_rightEyelidOpenness : 0.0f,
+                  }
+                };
+                SendIpcCommand(clientSocket, Command_ServerGazeDataResult, &response, sizeof(response));
+              }
             } else {
+              // Handle old client IPC version requests here, as well.
+              if (m_connections[clientPort].ipcVersion == 1) {
                 CommandDataServerGazeDataResult_t response = {};
                 SendIpcCommand(clientSocket, Command_ServerGazeDataResult, &response, sizeof(response));
+              } else {
+                CommandDataServerGazeDataResult2_t response = {};
+                SendIpcCommand(clientSocket, Command_ServerGazeDataResult, &response, sizeof(response));
+              }
             }
             
           }

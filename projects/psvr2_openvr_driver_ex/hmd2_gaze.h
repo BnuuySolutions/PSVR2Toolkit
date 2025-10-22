@@ -25,38 +25,38 @@ typedef struct {
   Hmd2Bool isPupilDiaValid;
   float pupilDiaMm;
 
-  // No clue what this extra stuff is.
-  Hmd2Bool unk06;
-  Hmd2Vector2 unk07;
-  Hmd2Bool unk08;
-  Hmd2Vector2 unk09;
+  Hmd2Bool isPupilPosInSensorValid;
+  Hmd2Vector2 pupilPosInSensor;
+
+  Hmd2Bool isPosGuideValid;
+  Hmd2Vector2 posGuide;
 
   Hmd2Bool isBlinkValid;
   Hmd2Bool blink;
 } Hmd2GazeEye;
 
 struct Hmd2GazeCombined {
-    Hmd2Bool isGazeOriginValid;
-    Hmd2Vector3 gazeOriginMm;
+  Hmd2Bool isGazeOriginValid;
+  Hmd2Vector3 gazeOriginMm;
 
-    Hmd2Bool isGazeDirValid;
-    Hmd2Vector3 gazeDirNorm;
+  Hmd2Bool isGazeDirValid;
+  Hmd2Vector3 gazeDirNorm;
 
-    Hmd2Bool isValid;
-    uint32_t timestamp;
+  Hmd2Bool isValid;
+  uint32_t timestamp;
 
-    Hmd2Bool unk06;
-    float unk07;
+  Hmd2Bool unk06;
+  float unk07;
 
-    Hmd2Bool unk08;
+  Hmd2Bool unk08;
 
-    // All gazes seem to be repeated here?
-    // No obvious differences here.
-    Hmd2Vector3 leftGazeDirNormal;
-    Hmd2Vector3 rightGazeDirNormal;
-    Hmd2Vector3 combinedGazeDirNormal;
+  // All gazes seem to be repeated here?
+  // No obvious differences here.
+  Hmd2Vector3 leftGazeDirNormal;
+  Hmd2Vector3 rightGazeDirNormal;
+  Hmd2Vector3 combinedGazeDirNormal;
 
-    float unk09;
+  float unk09;
 };
 
 struct Hmd2GazeState {
