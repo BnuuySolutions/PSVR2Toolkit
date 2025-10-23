@@ -161,19 +161,13 @@ namespace psvr2_toolkit {
       return -1;
     }
 
-    byte interface_number = pVtbl->getUsbInf(thisptr);
-    Util::DriverLog("[Hook] Driver is requesting to open interface number: {}\n", interface_number);
+    uint8_t interface_number = pVtbl->getUsbInf(thisptr);
+    Util::DriverLog("[Hook] Driver is requesting to open interface number: {:#x}\n", interface_number);
 
-    // Create our custom interface object to wrap the real handle
-    LibusbInterface* new_interface = new LibusbInterface();
-    new_interface->interface_number = interface_number;
-
-    // Find the correct vid, pid, and then the correct interface
     static libusb_context* ctx = NULL;
     if (ctx == NULL) {
       if (libusb_init(&ctx) < 0) {
         Util::DriverLog("[libusb hook] Failed to initialize libusb context.\n");
-        delete new_interface;
         Framework__Mutex__unlock(&thisptr->handlesMutex);
         return -1;
       }
@@ -185,7 +179,6 @@ namespace psvr2_toolkit {
       if (cnt < 0) {
         Util::DriverLog("[libusb hook] Failed to get device list.\n");
         libusb_exit(ctx);
-        delete new_interface;
         Framework__Mutex__unlock(&thisptr->handlesMutex);
         return -1;
       }
@@ -199,7 +192,7 @@ namespace psvr2_toolkit {
         }
 
         // Print all connected USB devices for debugging
-        Util::DriverLog("[libusb hook] Found device: VID={}, PID={}\n", desc.idVendor, desc.idProduct);
+        Util::DriverLog("[libusb hook] Found device: VID={:#x}, PID={:#x}\n", desc.idVendor, desc.idProduct);
         // Print all interfaces for this device
         libusb_config_descriptor* config;
         if (libusb_get_config_descriptor(device, 0, &config) < 0) {
@@ -209,7 +202,7 @@ namespace psvr2_toolkit {
         for (int j = 0; j < config->bNumInterfaces; j++) {
           for (int k = 0; k < config->interface[j].num_altsetting; k++) {
             const libusb_interface_descriptor& iface = config->interface[j].altsetting[k];
-            Util::DriverLog("  Interface {}, AltSetting {}, Class {}, SubClass {}, Protocol {}\n",
+            Util::DriverLog("  Interface {:#x}, AltSetting {}, Class {}, SubClass {}, Protocol {}\n",
               iface.bInterfaceNumber, iface.bAlternateSetting, iface.bInterfaceClass, iface.bInterfaceSubClass, iface.bInterfaceProtocol);
           }
         }
@@ -220,8 +213,7 @@ namespace psvr2_toolkit {
       // Open the PSVR2 device if not already opened
       g_handle = libusb_open_device_with_vid_pid(ctx, PSVR2_VID, PSVR2_PID);
       if (g_handle == NULL) {
-        Util::DriverLog("[libusb hook] Could not find/open PSVR2 device (VID={}, PID={}).\n", PSVR2_VID, PSVR2_PID);
-        delete new_interface;
+        Util::DriverLog("[libusb hook] Could not find/open PSVR2 device (VID={:#x}, PID={:#x}).\n", PSVR2_VID, PSVR2_PID);
         Framework__Mutex__unlock(&thisptr->handlesMutex);
         return -1;
       }
@@ -232,29 +224,30 @@ namespace psvr2_toolkit {
 
     // Claim the requested interface
     if (libusb_claim_interface(g_handle, interface_number) < 0) {
-      Util::DriverLog("[libusb hook] Failed to claim interface {}.\n", interface_number);
+      Util::DriverLog("[libusb hook] Failed to claim interface {:#x}.\n", interface_number);
       libusb_close(g_handle);
       g_handle = NULL;
-      delete new_interface;
       Framework__Mutex__unlock(&thisptr->handlesMutex);
       return -1;
     }
     else {
-      Util::DriverLog("[libusb hook] Successfully claimed interface {}.\n", interface_number);
+      Util::DriverLog("[libusb hook] Successfully claimed interface {:#x}.\n", interface_number);
     }
 
-    new_interface->libusb_handle = g_handle; // Reuse the single device handle
+    // Create our custom interface object to wrap the real handle
+    LibusbInterface* newInterface = new LibusbInterface();
+    newInterface->interface_number = interface_number;
+    newInterface->libusb_handle = g_handle; // Reuse the single device handle
 
     // The "fake" handle is a pointer to our struct, which abstracts away the real handle.
-    WINUSB_INTERFACE_HANDLE fake_handle = (WINUSB_INTERFACE_HANDLE)new_interface;
-    g_interface_map[fake_handle] = new_interface;
-
+    WINUSB_INTERFACE_HANDLE fake_handle = (WINUSB_INTERFACE_HANDLE)newInterface;
+    g_interface_map[fake_handle] = newInterface;
     
     thisptr->handles.pInterfaceHandle = fake_handle;
     thisptr->handles.initialized = 1;
     Framework__Mutex__unlock(&thisptr->handlesMutex);
 
-    Util::DriverLog("[Hook] Initialization complete. Fake handle {} created on interface {}.\n", fake_handle, interface_number);
+    Util::DriverLog("[Hook] Initialization complete. Fake handle {:#x} created on interface {:#x}.\n", fake_handle, interface_number);
     
     return 0;
   }
@@ -292,7 +285,7 @@ namespace psvr2_toolkit {
     libusb_device* dev = libusb_get_device(interface_obj->libusb_handle);
     libusb_config_descriptor* config;
     if (libusb_get_active_config_descriptor(dev, &config) < 0) {
-      Util::DriverLog("[libusb hook] GetCurrentAlternateSetting failed to get config descriptor on interface {}.\n", interface_obj->interface_number);
+      Util::DriverLog("[WinUsb_GetCurrentAlternateSettingHook] failed to get config descriptor on interface {:#x}.\n", interface_obj->interface_number);
       return FALSE;
     }
     *SettingNumber = config->interface[0].altsetting[0].bAlternateSetting;
@@ -315,7 +308,7 @@ namespace psvr2_toolkit {
 
     int res = libusb_set_interface_alt_setting(interface_obj->libusb_handle, interface_obj->interface_number, SettingNumber);
     if (res < 0) {
-      Util::DriverLog("[WinUsb_SetCurrentAlternateSettingHook] SetCurrentAlternateSetting failed on interface {}: %s\n", interface_obj->interface_number, libusb_error_name(res));
+      Util::DriverLog("[WinUsb_SetCurrentAlternateSettingHook] failed on interface {:#x}: {}\n", interface_obj->interface_number, libusb_error_name(res));
       return FALSE;
     }
     return TRUE;
@@ -331,22 +324,25 @@ namespace psvr2_toolkit {
     }
 
     if (interface_obj == nullptr) {
-      Util::DriverLog("[WinUsb_FreeHook] Passing through call for real handle {}.\n", InterfaceHandle);
+      Util::DriverLog("[WinUsb_FreeHook] Passing through call for real handle {:#x}.\n", InterfaceHandle);
       return o_WinUsb_Free(InterfaceHandle); // Not our handle, pass it through
     }
 
-    Util::DriverLog("[WinUsb_FreeHook] Intercepted call for fake handle {}.\n", InterfaceHandle);
+    Util::DriverLog("[WinUsb_FreeHook] Intercepted call for fake handle {:#x}.\n", InterfaceHandle);
 
-    delete interface_obj;
-    auto it = g_interface_map.find(InterfaceHandle);
-    g_interface_map.erase(it);
+    {
+      std::lock_guard<std::mutex> lock(g_usb_mutex);
+      delete interface_obj;
+      auto it = g_interface_map.find(InterfaceHandle);
+      g_interface_map.erase(it);
 
-    if (g_interface_map.empty()) {
-      // No more interfaces in use, close the device handle
-      if (g_handle) {
-        libusb_close(g_handle);
-        g_handle = NULL;
-        Util::DriverLog("[WinUsb_FreeHook] Closed PSVR2 device handle.\n");
+      if (g_interface_map.empty()) {
+        // No more interfaces in use, close the device handle
+        if (g_handle) {
+          libusb_close(g_handle);
+          g_handle = NULL;
+          Util::DriverLog("[WinUsb_FreeHook] Closed PSVR2 device handle.\n");
+        }
       }
     }
 
@@ -376,7 +372,7 @@ namespace psvr2_toolkit {
 
     int res = libusb_get_descriptor(interface_obj->libusb_handle, DescriptorType, Index, Buffer, BufferLength);
     if (res < 0) {
-      Util::DriverLog("[WinUsb_GetDescriptorHook] GetDescriptor failed on interface {}: %s\n", interface_obj->interface_number, libusb_error_name(res));
+      Util::DriverLog("[WinUsb_GetDescriptorHook] failed on interface {:#x}: {}\n", interface_obj->interface_number, libusb_error_name(res));
       if (LengthTransferred) *LengthTransferred = 0;
       return FALSE;
     }
@@ -443,7 +439,7 @@ namespace psvr2_toolkit {
 
       res = libusb_bulk_transfer(interface_obj->libusb_handle, PipeID, Buffer, BufferLength, &transferred, 5000);
       if (res < 0 && res != LIBUSB_ERROR_TIMEOUT) {
-        Util::DriverLog("[WinUsb_ReadPipeHook] ReadPipe failed on interface {}, PipeID {}: {}\n", interface_obj->interface_number, PipeID, libusb_error_name(res));
+        Util::DriverLog("[WinUsb_ReadPipeHook] failed on interface {:#x}, PipeID {:#x}: {}\n", interface_obj->interface_number, PipeID, libusb_error_name(res));
         if (LengthTransferred) *LengthTransferred = 0;
         return FALSE;
       }
@@ -482,7 +478,7 @@ namespace psvr2_toolkit {
       5000);
 
     if (res < 0) {
-      Util::DriverLog("[WinUsb_ControlTransferHook] ControlTransfer failed on interface {}: %s\n", interface_obj->interface_number, libusb_error_name(res));
+      Util::DriverLog("[WinUsb_ControlTransferHook] failed on interface {:#x}: {}\n", interface_obj->interface_number, libusb_error_name(res));
       if (LengthTransferred) *LengthTransferred = 0;
       return FALSE;
     }
@@ -511,30 +507,37 @@ namespace psvr2_toolkit {
                            reinterpret_cast<void**>(&CaesarUsbThreadImuStatus__poll));
     }
 
-    // LibUSB stuff
-    HookLib::InstallHook(reinterpret_cast<void*>(pHmdDriverLoader->GetBaseAddress() + 0x122AC0),
-                         reinterpret_cast<void*>(CaesarUsbThread__initializeHook),
-                         reinterpret_cast<void**>(&CaesarUsbThread__initialize));
+    if (VRSettings::GetBool(STEAMVR_SETTINGS_ENABLE_LIBUSB, SETTING_ENABLE_LIBUSB_DEFAULT_VALUE) || Util::IsRunningOnWine()) {
+      HMODULE winusbHandle = GetModuleHandleW(L"winusb.dll");
 
-    o_WinUsb_AbortPipe = (WinUsb_AbortPipe_t)GetProcAddress(GetModuleHandleW(L"winusb.dll"), "WinUsb_AbortPipe");
-    o_WinUsb_GetCurrentAlternateSetting = (WinUsb_GetCurrentAlternateSetting_t)GetProcAddress(GetModuleHandleW(L"winusb.dll"), "WinUsb_GetCurrentAlternateSetting");
-    o_WinUsb_SetCurrentAlternateSetting = (WinUsb_SetCurrentAlternateSetting_t)GetProcAddress(GetModuleHandleW(L"winusb.dll"), "WinUsb_SetCurrentAlternateSetting");
-    o_WinUsb_Free = (WinUsb_Free_t)GetProcAddress(GetModuleHandleW(L"winusb.dll"), "WinUsb_Free");
-    o_WinUsb_GetDescriptor = (WinUsb_GetDescriptor_t)GetProcAddress(GetModuleHandleW(L"winusb.dll"), "WinUsb_GetDescriptor");
-    o_WinUsb_GetPipePolicy = (WinUsb_GetPipePolicy_t)GetProcAddress(GetModuleHandleW(L"winusb.dll"), "WinUsb_GetPipePolicy");
-    o_WinUsb_ReadPipe = (WinUsb_ReadPipe_t)GetProcAddress(GetModuleHandleW(L"winusb.dll"), "WinUsb_ReadPipe");
-    o_WinUsb_ControlTransfer = (WinUsb_ControlTransfer_t)GetProcAddress(GetModuleHandleW(L"winusb.dll"), "WinUsb_ControlTransfer");
+      if (winusbHandle == NULL) {
+        Util::DriverLog("[UsbThreadHooks] winusb.dll not loaded, cannot install hooks.\n");
+        return;
+      }
 
-    // WinUSB hooks
-    HookLib::InstallHook(o_WinUsb_AbortPipe, reinterpret_cast<void*>(WinUsb_AbortPipeHook), (void**)&o_WinUsb_AbortPipe);
-    HookLib::InstallHook(o_WinUsb_GetCurrentAlternateSetting, reinterpret_cast<void*>(WinUsb_GetCurrentAlternateSettingHook), (void**)&o_WinUsb_GetCurrentAlternateSetting);
-    HookLib::InstallHook(o_WinUsb_SetCurrentAlternateSetting, reinterpret_cast<void*>(WinUsb_SetCurrentAlternateSettingHook), (void**)&o_WinUsb_SetCurrentAlternateSetting);
-    HookLib::InstallHook(o_WinUsb_Free, reinterpret_cast<void*>(WinUsb_FreeHook), (void**)&o_WinUsb_Free);
-    HookLib::InstallHook(o_WinUsb_GetDescriptor, reinterpret_cast<void*>(WinUsb_GetDescriptorHook), (void**)&o_WinUsb_GetDescriptor);
-    HookLib::InstallHook(o_WinUsb_GetPipePolicy, reinterpret_cast<void*>(WinUsb_GetPipePolicyHook), (void**)&o_WinUsb_GetPipePolicy);
-    HookLib::InstallHook(o_WinUsb_ReadPipe, reinterpret_cast<void*>(WinUsb_ReadPipeHook), (void**)&o_WinUsb_ReadPipe);
-    HookLib::InstallHook(o_WinUsb_ControlTransfer, reinterpret_cast<void*>(WinUsb_ControlTransferHook), (void**)&o_WinUsb_ControlTransfer);
-    
+      // LibUSB stuff
+      HookLib::InstallHook(reinterpret_cast<void*>(pHmdDriverLoader->GetBaseAddress() + 0x122AC0),
+                           reinterpret_cast<void*>(CaesarUsbThread__initializeHook),
+                           reinterpret_cast<void**>(&CaesarUsbThread__initialize));
+
+      o_WinUsb_AbortPipe = (WinUsb_AbortPipe_t)GetProcAddress(winusbHandle, "WinUsb_AbortPipe");
+      o_WinUsb_GetCurrentAlternateSetting = (WinUsb_GetCurrentAlternateSetting_t)GetProcAddress(winusbHandle, "WinUsb_GetCurrentAlternateSetting");
+      o_WinUsb_SetCurrentAlternateSetting = (WinUsb_SetCurrentAlternateSetting_t)GetProcAddress(winusbHandle, "WinUsb_SetCurrentAlternateSetting");
+      o_WinUsb_Free = (WinUsb_Free_t)GetProcAddress(winusbHandle, "WinUsb_Free");
+      o_WinUsb_GetDescriptor = (WinUsb_GetDescriptor_t)GetProcAddress(winusbHandle, "WinUsb_GetDescriptor");
+      o_WinUsb_GetPipePolicy = (WinUsb_GetPipePolicy_t)GetProcAddress(winusbHandle, "WinUsb_GetPipePolicy");
+      o_WinUsb_ReadPipe = (WinUsb_ReadPipe_t)GetProcAddress(winusbHandle, "WinUsb_ReadPipe");
+      o_WinUsb_ControlTransfer = (WinUsb_ControlTransfer_t)GetProcAddress(winusbHandle, "WinUsb_ControlTransfer");
+
+      HookLib::InstallHook(o_WinUsb_AbortPipe, reinterpret_cast<void*>(WinUsb_AbortPipeHook), (void**)&o_WinUsb_AbortPipe);
+      HookLib::InstallHook(o_WinUsb_GetCurrentAlternateSetting, reinterpret_cast<void*>(WinUsb_GetCurrentAlternateSettingHook), (void**)&o_WinUsb_GetCurrentAlternateSetting);
+      HookLib::InstallHook(o_WinUsb_SetCurrentAlternateSetting, reinterpret_cast<void*>(WinUsb_SetCurrentAlternateSettingHook), (void**)&o_WinUsb_SetCurrentAlternateSetting);
+      HookLib::InstallHook(o_WinUsb_Free, reinterpret_cast<void*>(WinUsb_FreeHook), (void**)&o_WinUsb_Free);
+      HookLib::InstallHook(o_WinUsb_GetDescriptor, reinterpret_cast<void*>(WinUsb_GetDescriptorHook), (void**)&o_WinUsb_GetDescriptor);
+      HookLib::InstallHook(o_WinUsb_GetPipePolicy, reinterpret_cast<void*>(WinUsb_GetPipePolicyHook), (void**)&o_WinUsb_GetPipePolicy);
+      HookLib::InstallHook(o_WinUsb_ReadPipe, reinterpret_cast<void*>(WinUsb_ReadPipeHook), (void**)&o_WinUsb_ReadPipe);
+      HookLib::InstallHook(o_WinUsb_ControlTransfer, reinterpret_cast<void*>(WinUsb_ControlTransferHook), (void**)&o_WinUsb_ControlTransfer);
+    }
   }
 
 } // psvr2_toolkit
