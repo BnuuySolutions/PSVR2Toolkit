@@ -193,6 +193,7 @@ namespace psvr2_toolkit {
 
         // Print all connected USB devices for debugging
         Util::DriverLog("[libusb hook] Found device: VID={:#x}, PID={:#x}\n", desc.idVendor, desc.idProduct);
+
         // Print all interfaces for this device
         libusb_config_descriptor* config;
         if (libusb_get_config_descriptor(device, 0, &config) < 0) {
@@ -247,7 +248,7 @@ namespace psvr2_toolkit {
     thisptr->handles.initialized = 1;
     Framework__Mutex__unlock(&thisptr->handlesMutex);
 
-    Util::DriverLog("[Hook] Initialization complete. Fake handle {:#x} created on interface {:#x}.\n", fake_handle, interface_number);
+    Util::DriverLog("[Hook] Initialization complete. Fake handle {:#x} created on interface {:#x}.\n", reinterpret_cast<uintptr_t>(fake_handle), interface_number);
     
     return 0;
   }
@@ -324,11 +325,11 @@ namespace psvr2_toolkit {
     }
 
     if (interface_obj == nullptr) {
-      Util::DriverLog("[WinUsb_FreeHook] Passing through call for real handle {:#x}.\n", InterfaceHandle);
+      Util::DriverLog("[WinUsb_FreeHook] Passing through call for real handle {:#x}.\n", reinterpret_cast<uintptr_t>(InterfaceHandle));
       return o_WinUsb_Free(InterfaceHandle); // Not our handle, pass it through
     }
 
-    Util::DriverLog("[WinUsb_FreeHook] Intercepted call for fake handle {:#x}.\n", InterfaceHandle);
+    Util::DriverLog("[WinUsb_FreeHook] Intercepted call for fake handle {:#x}.\n", reinterpret_cast<uintptr_t>(InterfaceHandle));
 
     {
       std::lock_guard<std::mutex> lock(g_usb_mutex);
