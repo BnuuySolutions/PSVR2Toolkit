@@ -144,11 +144,8 @@ namespace psvr2_toolkit {
   }
 
   // We need to replace device enumeration, it is not compatible with LibUSB.
-  int (*CaesarUsbThread__initialize)(CaesarUsbThread_t*) = nullptr;
   int CaesarUsbThread__initializeHook(CaesarUsbThread_t* thisptr) {
     // TODO: ShareManager
-    // Run original to fix app crash due to info not being filled in
-    CaesarUsbThread__initialize(thisptr);
 
     std::lock_guard<std::mutex> lock(g_usb_mutex);
     CaesarUsbThread_Vtbl_t* pVtbl = static_cast<CaesarUsbThread_Vtbl_t*>(thisptr->__vfptr);
@@ -518,8 +515,7 @@ namespace psvr2_toolkit {
 
       // LibUSB stuff
       HookLib::InstallHook(reinterpret_cast<void*>(pHmdDriverLoader->GetBaseAddress() + 0x122AC0),
-                           reinterpret_cast<void*>(CaesarUsbThread__initializeHook),
-                           reinterpret_cast<void**>(&CaesarUsbThread__initialize));
+                           reinterpret_cast<void*>(CaesarUsbThread__initializeHook));
 
       o_WinUsb_AbortPipe = (WinUsb_AbortPipe_t)GetProcAddress(winusbHandle, "WinUsb_AbortPipe");
       o_WinUsb_GetCurrentAlternateSetting = (WinUsb_GetCurrentAlternateSetting_t)GetProcAddress(winusbHandle, "WinUsb_GetCurrentAlternateSetting");
