@@ -146,8 +146,6 @@ namespace psvr2_toolkit {
   // We need to replace device enumeration, it is not compatible with LibUSB.
   int CaesarUsbThread__initializeHook(CaesarUsbThread_t* thisptr) {
     // TODO: ShareManager
-
-    std::lock_guard<std::mutex> lock(g_usb_mutex);
     CaesarUsbThread_Vtbl_t* pVtbl = static_cast<CaesarUsbThread_Vtbl_t*>(thisptr->__vfptr);
 
     Framework__Mutex__lock(&thisptr->handlesMutex, 0xFFFFFFFF);
@@ -208,6 +206,8 @@ namespace psvr2_toolkit {
       }
       libusb_free_device_list(device_list, 1);
 
+      std::lock_guard<std::mutex> lock(g_usb_mutex);
+
       // Open the PSVR2 device if not already opened
       g_handle = libusb_open_device_with_vid_pid(ctx, PSVR2_VID, PSVR2_PID);
       if (g_handle == NULL) {
@@ -225,6 +225,7 @@ namespace psvr2_toolkit {
 
     // Claim the requested interface
     if (libusb_claim_interface(g_handle, interface_number) < 0) {
+      std::lock_guard<std::mutex> lock(g_usb_mutex);
       Util::DriverLog("[libusb hook] Failed to claim interface {:#x}.\n", interface_number);
       libusb_close(g_handle);
       g_handle = NULL;
@@ -250,6 +251,7 @@ namespace psvr2_toolkit {
     );
 
     if (res < 0) {
+      std::lock_guard<std::mutex> lock(g_usb_mutex);
       Util::DriverLog("[libusb hook] Failed to get current alternate setting on interface {:#x}: {}\n", interface_number, libusb_error_name(res));
       libusb_release_interface(g_handle, interface_number);
       libusb_close(g_handle);
@@ -260,6 +262,7 @@ namespace psvr2_toolkit {
 
     // Set to alternate setting 0 if it is not
     if (SettingNumber != 0 && libusb_set_interface_alt_setting(g_handle, interface_number, 0) < 0) {
+      std::lock_guard<std::mutex> lock(g_usb_mutex);
       Util::DriverLog("[libusb hook] Failed to set alternate setting 0 on interface {:#x}.\n", interface_number);
       libusb_release_interface(g_handle, interface_number);
       libusb_close(g_handle);
@@ -275,7 +278,10 @@ namespace psvr2_toolkit {
 
     // The "fake" handle is a pointer to our struct, which abstracts away the real handle.
     WINUSB_INTERFACE_HANDLE fake_handle = (WINUSB_INTERFACE_HANDLE)newInterface;
-    g_interface_map[fake_handle] = newInterface;
+    {
+      std::lock_guard<std::mutex> lock(g_usb_mutex);
+      g_interface_map[fake_handle] = newInterface;
+    }
     
     thisptr->handles.pInterfaceHandle = fake_handle;
     thisptr->handles.initialized = 1;
