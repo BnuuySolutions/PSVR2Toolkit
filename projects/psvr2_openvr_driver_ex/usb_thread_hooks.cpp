@@ -218,6 +218,9 @@ namespace psvr2_toolkit {
       else {
         Util::DriverLog("[libusb hook] Successfully opened PSVR2 device.\n");
       }
+
+      // Reset any previous state
+      libusb_reset_device(g_handle);
     }
 
     // Claim the requested interface
@@ -230,6 +233,39 @@ namespace psvr2_toolkit {
     }
     else {
       Util::DriverLog("[libusb hook] Successfully claimed interface {:#x}.\n", interface_number);
+    }
+
+    UCHAR SettingNumber = 0;
+
+    // Get current alternate setting
+    int res = libusb_control_transfer(
+      g_handle,
+      LIBUSB_ENDPOINT_IN | LIBUSB_REQUEST_TYPE_STANDARD | LIBUSB_RECIPIENT_INTERFACE,
+      LIBUSB_REQUEST_GET_INTERFACE,
+      0,
+      interface_number,
+      &SettingNumber,
+      1,
+      1000
+    );
+
+    if (res < 0) {
+      Util::DriverLog("[libusb hook] Failed to get current alternate setting on interface {:#x}: {}\n", interface_number, libusb_error_name(res));
+      libusb_release_interface(g_handle, interface_number);
+      libusb_close(g_handle);
+      g_handle = NULL;
+      Framework__Mutex__unlock(&thisptr->handlesMutex);
+      return -1;
+    }
+
+    // Set to alternate setting 0 if it is not
+    if (SettingNumber != 0 && libusb_set_interface_alt_setting(g_handle, interface_number, 0) < 0) {
+      Util::DriverLog("[libusb hook] Failed to set alternate setting 0 on interface {:#x}.\n", interface_number);
+      libusb_release_interface(g_handle, interface_number);
+      libusb_close(g_handle);
+      g_handle = NULL;
+      Framework__Mutex__unlock(&thisptr->handlesMutex);
+      return -1;
     }
 
     // Create our custom interface object to wrap the real handle
@@ -280,14 +316,24 @@ namespace psvr2_toolkit {
       return o_WinUsb_GetCurrentAlternateSetting(InterfaceHandle, SettingNumber);
     }
 
-    libusb_device* dev = libusb_get_device(interface_obj->libusb_handle);
-    libusb_config_descriptor* config;
-    if (libusb_get_active_config_descriptor(dev, &config) < 0) {
-      Util::DriverLog("[WinUsb_GetCurrentAlternateSettingHook] failed to get config descriptor on interface {:#x}.\n", interface_obj->interface_number);
+    int res = libusb_control_transfer(
+      interface_obj->libusb_handle,
+      LIBUSB_ENDPOINT_IN | LIBUSB_REQUEST_TYPE_STANDARD | LIBUSB_RECIPIENT_INTERFACE,
+      LIBUSB_REQUEST_GET_INTERFACE,
+      0,
+      interface_obj->interface_number,
+      SettingNumber,
+      1,
+      1000
+    );
+
+    Util::DriverLog("[WinUsb_GetCurrentAlternateSettingHook] Current alternate setting on interface {:#x} is {:#x}.\n", interface_obj->interface_number, *SettingNumber);
+
+    if (res < 0) {
+      Util::DriverLog("[WinUsb_GetCurrentAlternateSettingHook] failed on interface {:#x}: {}\n", interface_obj->interface_number, libusb_error_name(res));
       return FALSE;
     }
-    *SettingNumber = config->interface[0].altsetting[0].bAlternateSetting;
-    libusb_free_config_descriptor(config);
+
     return TRUE;
   }
 
@@ -304,11 +350,14 @@ namespace psvr2_toolkit {
       return o_WinUsb_SetCurrentAlternateSetting(InterfaceHandle, SettingNumber);
     }
 
+    Util::DriverLog("[WinUsb_SetCurrentAlternateSettingHook] Setting alternate setting {:#x} on interface {:#x}.\n", SettingNumber, interface_obj->interface_number);
+
     int res = libusb_set_interface_alt_setting(interface_obj->libusb_handle, interface_obj->interface_number, SettingNumber);
     if (res < 0) {
       Util::DriverLog("[WinUsb_SetCurrentAlternateSettingHook] failed on interface {:#x}: {}\n", interface_obj->interface_number, libusb_error_name(res));
       return FALSE;
     }
+
     return TRUE;
   }
 
