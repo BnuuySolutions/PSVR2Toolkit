@@ -27,12 +27,12 @@
     <Filter Include="Utilities">
       <UniqueIdentifier>{bcfee68e-1d1e-449f-a864-1ba6d8acd6c3}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Loader">
+      <UniqueIdentifier>{5996bd09-d318-485e-a7f7-1ca60cdc35f9}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="hmd_driver_factory.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="hmd_driver_loader.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="usb_thread_hooks.cpp">
@@ -65,11 +65,11 @@
     <ClCompile Include="eyelid_estimator.cpp">
       <Filter>Gaze</Filter>
     </ClCompile>
+    <ClCompile Include="hmd_driver_loader.cpp">
+      <Filter>Loader</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="hmd_driver_loader.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="caesar_manager_hooks.h">
       <Filter>Hooks</Filter>
     </ClInclude>
@@ -120,6 +120,9 @@
     </ClInclude>
     <ClInclude Include="eyelid_estimator.h">
       <Filter>Gaze</Filter>
+    </ClInclude>
+    <ClInclude Include="hmd_driver_loader.h">
+      <Filter>Loader</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
