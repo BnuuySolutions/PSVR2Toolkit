@@ -13,21 +13,16 @@ namespace psvr2_toolkit {
 
     static HmdDriverLoader *Instance();
 
-    bool Initialized();
-    void Initialize();
-
-    HMODULE GetHandle();
     uintptr_t GetBaseAddress();
 
     void *(*pfnHmdDriverFactory)(const char *pInterfaceName, int *pReturnCode);
 
   private:
-    bool m_initialized;
-    HMODULE m_handle;
+    static HmdDriverLoader *m_pInstance;
+
+    HMODULE m_hModule;
 
     bool GetHmdDllPath(wchar_t *pszHmdDllPath);
   };
 
 } // psvr2_toolkit
-
-extern psvr2_toolkit::HmdDriverLoader *g_pHmdDriverLoader;
