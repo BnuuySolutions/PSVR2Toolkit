@@ -1,128 +1,147 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <Filter Include="Source Files">
-      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
-      <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    <Filter Include="Core">
+      <UniqueIdentifier>{cd7520d1-28eb-47bc-b115-3fe9e0a91416}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Header Files">
-      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
-      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
+    <Filter Include="Core\Loader">
+      <UniqueIdentifier>{5996bd09-d318-485e-a7f7-1ca60cdc35f9}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Hooks">
-      <UniqueIdentifier>{523d7bdc-a142-4bff-82d8-7524395f3401}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Proxy">
+    <Filter Include="Core\Proxy">
       <UniqueIdentifier>{7dd0c1bc-0f75-4845-bd94-0fedcfd78142}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Gaze">
-      <UniqueIdentifier>{4d5d4ddd-2603-4798-ab26-ab06d40177af}</UniqueIdentifier>
+    <Filter Include="Additions">
+      <UniqueIdentifier>{4a1ca7bc-0f73-4fb7-ba39-cc57e09280d9}</UniqueIdentifier>
     </Filter>
-    <Filter Include="IPC">
-      <UniqueIdentifier>{ee097f42-b5b4-4acf-8d7e-8cc2ccd8255a}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Trigger Effect">
+    <Filter Include="Additions\Trigger Effect">
       <UniqueIdentifier>{0066da7e-b46e-445f-a6ce-7864d618c2b6}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Utilities">
+    <Filter Include="Additions\Gaze">
+      <UniqueIdentifier>{4d5d4ddd-2603-4798-ab26-ab06d40177af}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Additions\Hooks">
+      <UniqueIdentifier>{523d7bdc-a142-4bff-82d8-7524395f3401}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Core\IPC">
+      <UniqueIdentifier>{ee097f42-b5b4-4acf-8d7e-8cc2ccd8255a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Core\Factory">
+      <UniqueIdentifier>{894d9cac-c755-4b87-bdff-958cd39a5f32}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Core\Utilities">
       <UniqueIdentifier>{bcfee68e-1d1e-449f-a864-1ba6d8acd6c3}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Loader">
-      <UniqueIdentifier>{5996bd09-d318-485e-a7f7-1ca60cdc35f9}</UniqueIdentifier>
+    <Filter Include="Externals">
+      <UniqueIdentifier>{66caae44-fe91-413a-82a3-22a0fb6deb30}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Externals\MinHook">
+      <UniqueIdentifier>{836f4d53-16b4-49c2-b44f-e8f9beff03e3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Externals\HMD Driver">
+      <UniqueIdentifier>{704016a8-434b-4096-abc8-cce43bf0d21d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Externals\HMD Driver\OpenVR">
+      <UniqueIdentifier>{a3caff8b-b7bf-4652-9226-44b8fde614d9}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="hmd_driver_factory.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="usb_thread_hooks.cpp">
-      <Filter>Hooks</Filter>
+      <Filter>Additions\Hooks</Filter>
     </ClCompile>
     <ClCompile Include="hmd_device_hooks.cpp">
-      <Filter>Hooks</Filter>
+      <Filter>Additions\Hooks</Filter>
     </ClCompile>
     <ClCompile Include="caesar_manager_hooks.cpp">
-      <Filter>Hooks</Filter>
+      <Filter>Additions\Hooks</Filter>
     </ClCompile>
     <ClCompile Include="driver_host_proxy.cpp">
-      <Filter>Proxy</Filter>
+      <Filter>Core\Proxy</Filter>
     </ClCompile>
     <ClCompile Include="driver_context_proxy.cpp">
-      <Filter>Proxy</Filter>
+      <Filter>Core\Proxy</Filter>
     </ClCompile>
     <ClCompile Include="device_provider_proxy.cpp">
-      <Filter>Proxy</Filter>
+      <Filter>Core\Proxy</Filter>
     </ClCompile>
     <ClCompile Include="usb_thread_gaze.cpp">
-      <Filter>Gaze</Filter>
+      <Filter>Additions\Gaze</Filter>
     </ClCompile>
     <ClCompile Include="ipc_server.cpp">
-      <Filter>IPC</Filter>
+      <Filter>Core\IPC</Filter>
     </ClCompile>
     <ClCompile Include="trigger_effect_manager.cpp">
-      <Filter>Trigger Effect</Filter>
+      <Filter>Additions\Trigger Effect</Filter>
     </ClCompile>
     <ClCompile Include="eyelid_estimator.cpp">
-      <Filter>Gaze</Filter>
+      <Filter>Additions\Gaze</Filter>
     </ClCompile>
     <ClCompile Include="hmd_driver_loader.cpp">
-      <Filter>Loader</Filter>
+      <Filter>Core\Loader</Filter>
+    </ClCompile>
+    <ClCompile Include="hmd_driver_factory.cpp">
+      <Filter>Core\Factory</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="caesar_manager_hooks.h">
-      <Filter>Hooks</Filter>
+      <Filter>Additions\Hooks</Filter>
     </ClInclude>
     <ClInclude Include="usb_thread_hooks.h">
-      <Filter>Hooks</Filter>
+      <Filter>Additions\Hooks</Filter>
     </ClInclude>
     <ClInclude Include="hmd_device_hooks.h">
-      <Filter>Hooks</Filter>
+      <Filter>Additions\Hooks</Filter>
     </ClInclude>
     <ClInclude Include="driver_context_proxy.h">
-      <Filter>Proxy</Filter>
+      <Filter>Core\Proxy</Filter>
     </ClInclude>
     <ClInclude Include="device_provider_proxy.h">
-      <Filter>Proxy</Filter>
+      <Filter>Core\Proxy</Filter>
     </ClInclude>
     <ClInclude Include="driver_host_proxy.h">
-      <Filter>Proxy</Filter>
+      <Filter>Core\Proxy</Filter>
     </ClInclude>
     <ClInclude Include="usb_thread_gaze.h">
-      <Filter>Gaze</Filter>
+      <Filter>Additions\Gaze</Filter>
     </ClInclude>
     <ClInclude Include="ipc_server.h">
-      <Filter>IPC</Filter>
+      <Filter>Core\IPC</Filter>
     </ClInclude>
     <ClInclude Include="trigger_effect_manager.h">
-      <Filter>Trigger Effect</Filter>
+      <Filter>Additions\Trigger Effect</Filter>
     </ClInclude>
     <ClInclude Include="pad_trigger_effect.h">
-      <Filter>Trigger Effect</Filter>
+      <Filter>Additions\Trigger Effect</Filter>
     </ClInclude>
     <ClInclude Include="hmd_math.h">
-      <Filter>Utilities</Filter>
+      <Filter>Core\Utilities</Filter>
     </ClInclude>
     <ClInclude Include="vr_settings.h">
-      <Filter>Utilities</Filter>
+      <Filter>Core\Utilities</Filter>
     </ClInclude>
     <ClInclude Include="util.h">
-      <Filter>Utilities</Filter>
+      <Filter>Core\Utilities</Filter>
     </ClInclude>
     <ClInclude Include="hook_lib.h">
-      <Filter>Utilities</Filter>
+      <Filter>Core\Utilities</Filter>
     </ClInclude>
     <ClInclude Include="hmd2_gaze.h">
-      <Filter>Gaze</Filter>
-    </ClInclude>
-    <ClInclude Include="config.h">
-      <Filter>Header Files</Filter>
+      <Filter>Additions\Gaze</Filter>
     </ClInclude>
     <ClInclude Include="eyelid_estimator.h">
-      <Filter>Gaze</Filter>
+      <Filter>Additions\Gaze</Filter>
     </ClInclude>
     <ClInclude Include="hmd_driver_loader.h">
-      <Filter>Loader</Filter>
+      <Filter>Core\Loader</Filter>
+    </ClInclude>
+    <ClInclude Include="config.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="minhook\include\MinHook.h">
+      <Filter>Externals\MinHook</Filter>
+    </ClInclude>
+    <ClInclude Include="psvr2_openvr_driver\openvr\headers\openvr_driver.h">
+      <Filter>Externals\HMD Driver\OpenVR</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

@@ -203,12 +203,19 @@
     <ClInclude Include="hmd_driver_loader.h" />
     <ClInclude Include="ipc_server.h" />
     <ClInclude Include="hmd_math.h" />
+    <ClInclude Include="minhook\include\MinHook.h" />
     <ClInclude Include="pad_trigger_effect.h" />
+    <ClInclude Include="psvr2_openvr_driver\openvr\headers\openvr_driver.h" />
     <ClInclude Include="vr_settings.h" />
     <ClInclude Include="usb_thread_gaze.h" />
     <ClInclude Include="usb_thread_hooks.h" />
     <ClInclude Include="trigger_effect_manager.h" />
     <ClInclude Include="util.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\libcustomshare\libcustomshare.vcxproj">
+      <Project>{eabc1d23-54f9-455f-9fb4-c0a7a01ca592}</Project>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
