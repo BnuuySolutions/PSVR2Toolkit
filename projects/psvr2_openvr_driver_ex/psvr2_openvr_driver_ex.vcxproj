@@ -94,7 +94,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;PSVR2_OPENVR_DRIVER_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;PSVR2_OPENVR_DRIVER_EXPORTS;_WINDOWS;_USRDLL;NOMINMAX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
@@ -113,7 +113,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;PSVR2_OPENVR_DRIVER_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;PSVR2_OPENVR_DRIVER_EXPORTS;_WINDOWS;_USRDLL;NOMINMAX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
@@ -134,7 +134,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;PSVR2_OPENVR_DRIVER_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;PSVR2_OPENVR_DRIVER_EXPORTS;_WINDOWS;_USRDLL;NOMINMAX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
@@ -158,7 +158,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;PSVR2_OPENVR_DRIVER_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;PSVR2_OPENVR_DRIVER_EXPORTS;_WINDOWS;_USRDLL;NOMINMAX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
@@ -185,7 +185,10 @@
     <ClCompile Include="hmd_device_hooks.cpp" />
     <ClCompile Include="hmd_driver_factory.cpp" />
     <ClCompile Include="hmd_driver_loader.cpp" />
+    <ClCompile Include="hmd_types.h" />
     <ClCompile Include="ipc_server.cpp" />
+    <ClCompile Include="libpad_hooks.cpp" />
+    <ClCompile Include="sense_controller.cpp" />
     <ClCompile Include="usb_thread_gaze.cpp" />
     <ClCompile Include="usb_thread_hooks.cpp" />
     <ClCompile Include="trigger_effect_manager.cpp" />
@@ -203,12 +206,18 @@
     <ClInclude Include="hmd_driver_loader.h" />
     <ClInclude Include="ipc_server.h" />
     <ClInclude Include="hmd_math.h" />
+    <ClInclude Include="libpad_hooks.h" />
+    <ClInclude Include="math_helpers.h" />
     <ClInclude Include="pad_trigger_effect.h" />
+    <ClInclude Include="rolling_percentile.h" />
+    <ClInclude Include="sense_controller.h" />
+    <ClInclude Include="sense_crc.h" />
     <ClInclude Include="vr_settings.h" />
     <ClInclude Include="usb_thread_gaze.h" />
     <ClInclude Include="usb_thread_hooks.h" />
     <ClInclude Include="trigger_effect_manager.h" />
     <ClInclude Include="util.h" />
+    <ClInclude Include="write_file_async.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

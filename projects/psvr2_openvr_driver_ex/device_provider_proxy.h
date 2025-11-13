@@ -8,26 +8,26 @@ namespace psvr2_toolkit {
   public:
     DeviceProviderProxy();
 
-    static DeviceProviderProxy *Instance();
+    static DeviceProviderProxy* Instance();
 
-    void SetDeviceProvider(vr::IServerTrackedDeviceProvider *pDeviceProvider);
+    void SetDeviceProvider(vr::IServerTrackedDeviceProvider* pDeviceProvider);
 
     /** IServerTrackedDeviceProvider **/
 
-    vr::EVRInitError Init(vr::IVRDriverContext *pDriverContext) override;
+    vr::EVRInitError Init(vr::IVRDriverContext* pDriverContext) override;
     void Cleanup() override;
-    const char *const *GetInterfaceVersions() override;
+    const char* const* GetInterfaceVersions() override;
     void RunFrame() override;
     bool ShouldBlockStandbyMode() override;
     void EnterStandby() override;
     void LeaveStandby() override;
 
   private:
-    static DeviceProviderProxy *m_pInstance;
+    static DeviceProviderProxy* m_pInstance;
 
     bool m_initOnce;
 
-    vr::IServerTrackedDeviceProvider *m_pDeviceProvider;
+    vr::IServerTrackedDeviceProvider* m_pDeviceProvider;
 
     void InitOnce();
 

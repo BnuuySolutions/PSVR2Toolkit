@@ -544,6 +544,17 @@ namespace psvr2_toolkit {
     return TRUE;
   }
 
+  LDPayload currentLDPayload;
+
+  uint64_t(*CaesarUsbThreadLeddet__poll)(void* thisptr) = nullptr;
+  uint64_t CaesarUsbThreadLeddet__pollHook(void* thisptr) {
+    uint64_t result = CaesarUsbThreadLeddet__poll(thisptr);
+
+	  memcpy(&currentLDPayload, reinterpret_cast<uint8_t*>(thisptr) + 0x230, sizeof(LDPayload));
+
+    return result;
+  }
+
   void UsbThreadHooks::InstallHooks() {
     static HmdDriverLoader* pHmdDriverLoader = HmdDriverLoader::Instance();
 
@@ -589,6 +600,13 @@ namespace psvr2_toolkit {
       HookLib::InstallHook(o_WinUsb_GetPipePolicy, reinterpret_cast<void*>(WinUsb_GetPipePolicyHook), (void**)&o_WinUsb_GetPipePolicy);
       HookLib::InstallHook(o_WinUsb_ReadPipe, reinterpret_cast<void*>(WinUsb_ReadPipeHook), (void**)&o_WinUsb_ReadPipe);
       HookLib::InstallHook(o_WinUsb_ControlTransfer, reinterpret_cast<void*>(WinUsb_ControlTransferHook), (void**)&o_WinUsb_ControlTransfer);
+    }
+
+    if (VRSettings::GetBool(STEAMVR_SETTINGS_USE_TOOLKIT_SYNC, SETTING_USE_TOOLKIT_SYNC_DEFAULT_VALUE)) {
+	    // CaesarUsbThreadLeddet::poll
+	    HookLib::InstallHook(reinterpret_cast<void*>(pHmdDriverLoader->GetBaseAddress() + 0x126B80),
+		                   reinterpret_cast<void*>(CaesarUsbThreadLeddet__pollHook),
+		                   reinterpret_cast<void**>(&CaesarUsbThreadLeddet__poll));
     }
   }
 

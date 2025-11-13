@@ -59,6 +59,15 @@ namespace psvr2_toolkit {
       vr::VRDriverLog()->Log(message.c_str());
     }
 
+    static std::string WideStringToUTF8(const std::wstring& wideStr) {
+      if (wideStr.empty()) {
+        return std::string();
+      }
+      int sizeNeeded = WideCharToMultiByte(CP_UTF8, 0, wideStr.data(), (int)wideStr.size(), NULL, 0, NULL, NULL);
+      std::string utf8Str(sizeNeeded, 0);
+      WideCharToMultiByte(CP_UTF8, 0, wideStr.data(), (int)wideStr.size(), &utf8Str[0], sizeNeeded, NULL, NULL);
+      return utf8Str;
+    }
   };
 
 } // psvr2_toolkit
