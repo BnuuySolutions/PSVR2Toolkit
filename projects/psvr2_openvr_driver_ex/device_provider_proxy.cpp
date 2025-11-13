@@ -1,5 +1,6 @@
 #include "device_provider_proxy.h"
 
+#include "aston_manager_hooks.h"
 #include "config.h"
 #include "caesar_manager_hooks.h"
 #include "driver_context_proxy.h"
@@ -126,6 +127,7 @@ namespace psvr2_toolkit {
       INSTALL_STUB(reinterpret_cast<void *>(pHmdDriverLoader->GetBaseAddress() + 0x130020)); // VrDialogManager::CreateDialogProcess
     }
 
+    AstonManagerHooks::InstallHooks();
     CaesarManagerHooks::InstallHooks();
     HmdDeviceHooks::InstallHooks();
     UsbThreadHooks::InstallHooks();
