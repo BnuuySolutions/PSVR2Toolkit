@@ -221,7 +221,7 @@ namespace psvr2_toolkit {
     int padHandle = -1;
     std::mutex controllerMutex;
 
-    RollingPercentile<double> timeStampOffset = RollingPercentile<double>(5000, 99.0);
+    RollingPercentile<double> timeStampOffset = RollingPercentile<double>(5000, 80.0);
 
     bool isTracking = false;
     uint64_t lastTrackedTimestamp = 0;
