@@ -74,6 +74,9 @@
     <ClCompile Include="eyelid_estimator.cpp">
       <Filter>Gaze</Filter>
     </ClCompile>
+    <ClCompile Include="aston_manager_hooks.cpp">
+      <Filter>Hooks</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="hmd_driver_loader.h">
@@ -147,6 +150,9 @@
     </ClInclude>
     <ClInclude Include="eyelid_estimator.h">
       <Filter>Gaze</Filter>
+    </ClInclude>
+    <ClInclude Include="aston_manager_hooks.h">
+      <Filter>Hooks</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

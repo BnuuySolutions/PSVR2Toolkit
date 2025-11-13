@@ -177,6 +177,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="aston_manager_hooks.cpp" />
     <ClCompile Include="caesar_manager_hooks.cpp" />
     <ClCompile Include="device_provider_proxy.cpp" />
     <ClCompile Include="driver_context_proxy.cpp" />
@@ -194,6 +195,7 @@
     <ClCompile Include="trigger_effect_manager.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="aston_manager_hooks.h" />
     <ClInclude Include="caesar_manager_hooks.h" />
     <ClInclude Include="config.h" />
     <ClInclude Include="device_provider_proxy.h" />
