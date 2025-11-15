@@ -7,7 +7,7 @@
 namespace psvr2_toolkit {
   namespace ipc {
 
-    static constexpr uint16_t k_unIpcVersion = 2;
+    static constexpr uint16_t k_unIpcVersion = 3;
     static constexpr uint32_t k_unTriggerEffectControlPoint = 10;
 
     enum ECommandType : uint16_t {
@@ -53,6 +53,10 @@ namespace psvr2_toolkit {
 
     #pragma pack(push, 1)
     // for bool marshaling; force 1 byte wide bools
+    struct GazeVector2 {
+      float x, y;
+    };
+
     struct GazeVector3 {
       float x, y, z;
     };
@@ -88,6 +92,29 @@ namespace psvr2_toolkit {
       float open;
     };
 
+    struct GazeEyeResult3 {
+      bool isGazeOriginValid;
+      GazeVector3 gazeOriginMm;
+
+      bool isGazeDirValid;
+      GazeVector3 gazeDirNorm;
+
+      bool isPupilDiaValid;
+      float pupilDiaMm;
+
+      bool isPupilPosInSensorValid;
+      GazeVector2 pupilPosInSensor;
+
+      bool isPosGuideValid;
+      GazeVector2 posGuide;
+
+      bool isBlinkValid;
+      bool blink;
+
+      bool isOpenEnabled;
+      float open;
+    };
+
     struct CommandDataServerGazeDataResult_t {
       // TODO: Include timestamp, etc.
 
@@ -100,6 +127,13 @@ namespace psvr2_toolkit {
 
       GazeEyeResult2 leftEye;
       GazeEyeResult2 rightEye;
+    };
+
+    struct CommandDataServerGazeDataResult3_t {
+      // TODO: Include timestamp, etc.
+
+      GazeEyeResult3 leftEye;
+      GazeEyeResult3 rightEye;
     };
     #pragma pack(pop)
 

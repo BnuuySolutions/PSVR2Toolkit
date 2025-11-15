@@ -240,7 +240,7 @@ namespace psvr2_toolkit {
                   }
                 };
                 SendIpcCommand(clientSocket, Command_ServerGazeDataResult, &response, sizeof(response));
-              } else {
+              } else if (m_connections[clientPort].ipcVersion == 2) {
                 CommandDataServerGazeDataResult2_t response = {
                   .leftEye = {
                     .isGazeOriginValid = m_pGazeState->leftEye.isGazeOriginValid == Hmd2Bool::HMD2_BOOL_TRUE,
@@ -285,14 +285,82 @@ namespace psvr2_toolkit {
                   }
                 };
                 SendIpcCommand(clientSocket, Command_ServerGazeDataResult, &response, sizeof(response));
+              } else {
+                CommandDataServerGazeDataResult3_t response = {
+                  .leftEye = {
+                    .isGazeOriginValid = m_pGazeState->leftEye.isGazeOriginValid == Hmd2Bool::HMD2_BOOL_TRUE,
+                    .gazeOriginMm = {
+                      .x = m_pGazeState->leftEye.gazeOriginMm.x,
+                      .y = m_pGazeState->leftEye.gazeOriginMm.y,
+                      .z = m_pGazeState->leftEye.gazeOriginMm.z,
+                    },
+                    .isGazeDirValid = m_pGazeState->leftEye.isGazeDirValid == Hmd2Bool::HMD2_BOOL_TRUE,
+                    .gazeDirNorm {
+                      .x = m_pGazeState->leftEye.gazeDirNorm.x,
+                      .y = m_pGazeState->leftEye.gazeDirNorm.y,
+                      .z = m_pGazeState->leftEye.gazeDirNorm.z,
+                    },
+                    .isPupilDiaValid = m_pGazeState->leftEye.isPupilDiaValid == Hmd2Bool::HMD2_BOOL_TRUE,
+                    .pupilDiaMm = m_pGazeState->leftEye.pupilDiaMm,
+                    .isPupilPosInSensorValid = m_pGazeState->leftEye.isPupilPosInSensorValid == Hmd2Bool::HMD2_BOOL_TRUE,
+                    .pupilPosInSensor = {
+                      .x = m_pGazeState->leftEye.pupilPosInSensor.x,
+                      .y = m_pGazeState->leftEye.pupilPosInSensor.y,
+                    },
+                    .isPosGuideValid = m_pGazeState->leftEye.isPosGuideValid == Hmd2Bool::HMD2_BOOL_TRUE,
+                    .posGuide = {
+                      .x = m_pGazeState->leftEye.posGuide.x,
+                      .y = m_pGazeState->leftEye.posGuide.y,
+                    },
+                    .isBlinkValid = m_pGazeState->leftEye.isBlinkValid == Hmd2Bool::HMD2_BOOL_TRUE,
+                    .blink = m_pGazeState->leftEye.blink == Hmd2Bool::HMD2_BOOL_TRUE,
+                    .isOpenEnabled = m_doOpenness,
+                    .open = m_doOpenness ? m_leftEyelidOpenness : 0.0f,
+                  },
+
+                  .rightEye = {
+                    .isGazeOriginValid = m_pGazeState->rightEye.isGazeOriginValid == Hmd2Bool::HMD2_BOOL_TRUE,
+                    .gazeOriginMm = {
+                      .x = m_pGazeState->rightEye.gazeOriginMm.x,
+                      .y = m_pGazeState->rightEye.gazeOriginMm.y,
+                      .z = m_pGazeState->rightEye.gazeOriginMm.z,
+                    },
+                    .isGazeDirValid = m_pGazeState->rightEye.isGazeDirValid == Hmd2Bool::HMD2_BOOL_TRUE,
+                    .gazeDirNorm {
+                      .x = m_pGazeState->rightEye.gazeDirNorm.x,
+                      .y = m_pGazeState->rightEye.gazeDirNorm.y,
+                      .z = m_pGazeState->rightEye.gazeDirNorm.z,
+                    },
+                    .isPupilDiaValid = m_pGazeState->rightEye.isPupilDiaValid == Hmd2Bool::HMD2_BOOL_TRUE,
+                    .pupilDiaMm = m_pGazeState->rightEye.pupilDiaMm,
+                    .isPupilPosInSensorValid = m_pGazeState->rightEye.isPupilPosInSensorValid == Hmd2Bool::HMD2_BOOL_TRUE,
+                    .pupilPosInSensor = {
+                      .x = m_pGazeState->rightEye.pupilPosInSensor.x,
+                      .y = m_pGazeState->rightEye.pupilPosInSensor.y,
+                    },
+                    .isPosGuideValid = m_pGazeState->rightEye.isPosGuideValid == Hmd2Bool::HMD2_BOOL_TRUE,
+                    .posGuide = {
+                      .x = m_pGazeState->rightEye.posGuide.x,
+                      .y = m_pGazeState->rightEye.posGuide.y,
+                    },
+                    .isBlinkValid = m_pGazeState->rightEye.isBlinkValid == Hmd2Bool::HMD2_BOOL_TRUE,
+                    .blink = m_pGazeState->rightEye.blink == Hmd2Bool::HMD2_BOOL_TRUE,
+                    .isOpenEnabled = m_doOpenness,
+                    .open = m_doOpenness ? m_rightEyelidOpenness : 0.0f,
+                  }
+                };
+                SendIpcCommand(clientSocket, Command_ServerGazeDataResult, &response, sizeof(response));
               }
             } else {
               // Handle old client IPC version requests here, as well.
               if (m_connections[clientPort].ipcVersion == 1) {
                 CommandDataServerGazeDataResult_t response = {};
                 SendIpcCommand(clientSocket, Command_ServerGazeDataResult, &response, sizeof(response));
-              } else {
+              } else if (m_connections[clientPort].ipcVersion == 2) {
                 CommandDataServerGazeDataResult2_t response = {};
+                SendIpcCommand(clientSocket, Command_ServerGazeDataResult, &response, sizeof(response));
+              } else {
+                CommandDataServerGazeDataResult3_t response = {};
                 SendIpcCommand(clientSocket, Command_ServerGazeDataResult, &response, sizeof(response));
               }
             }
