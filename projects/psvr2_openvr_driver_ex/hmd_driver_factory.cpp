@@ -10,7 +10,7 @@ extern "C" __declspec(dllexport) void *HmdDriverFactory(const char *pInterfaceNa
   static HmdDriverLoader *pHmdDriverLoader = HmdDriverLoader::Instance();
 
   // Check if the HMD driver DLL is actually loaded.
-  if (pHmdDriverLoader->GetHandle()) {
+  if (pHmdDriverLoader->GetBaseAddress()) {
     void *result = pHmdDriverLoader->pfnHmdDriverFactory(pInterfaceName, pReturnCode);
 
     if (strcmp(vr::IServerTrackedDeviceProvider_Version, pInterfaceName) == 0 &&

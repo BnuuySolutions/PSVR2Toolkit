@@ -15,6 +15,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PSVR2Toolkit.IPC", "project
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PSVR2Toolkit.App", "projects\PSVR2Toolkit.App\PSVR2Toolkit.App.csproj", "{8E6661D1-6A40-4949-93CC-2280909E2DB3}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libcustomshare", "projects\libcustomshare\libcustomshare.vcxproj", "{EABC1D23-54F9-455F-9FB4-C0A7A01CA592}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -71,6 +73,14 @@ Global
 		{8E6661D1-6A40-4949-93CC-2280909E2DB3}.Release|x64.Build.0 = Release|Any CPU
 		{8E6661D1-6A40-4949-93CC-2280909E2DB3}.ReleaseCI|x64.ActiveCfg = ReleaseCI|Any CPU
 		{8E6661D1-6A40-4949-93CC-2280909E2DB3}.ReleaseCI|x64.Build.0 = ReleaseCI|Any CPU
+		{EABC1D23-54F9-455F-9FB4-C0A7A01CA592}.Debug|x64.ActiveCfg = Debug|x64
+		{EABC1D23-54F9-455F-9FB4-C0A7A01CA592}.Debug|x64.Build.0 = Debug|x64
+		{EABC1D23-54F9-455F-9FB4-C0A7A01CA592}.DebugCI|x64.ActiveCfg = Debug|x64
+		{EABC1D23-54F9-455F-9FB4-C0A7A01CA592}.DebugCI|x64.Build.0 = Debug|x64
+		{EABC1D23-54F9-455F-9FB4-C0A7A01CA592}.Release|x64.ActiveCfg = Release|x64
+		{EABC1D23-54F9-455F-9FB4-C0A7A01CA592}.Release|x64.Build.0 = Release|x64
+		{EABC1D23-54F9-455F-9FB4-C0A7A01CA592}.ReleaseCI|x64.ActiveCfg = Release|x64
+		{EABC1D23-54F9-455F-9FB4-C0A7A01CA592}.ReleaseCI|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
