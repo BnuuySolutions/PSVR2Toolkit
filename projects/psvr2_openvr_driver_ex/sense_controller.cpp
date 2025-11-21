@@ -284,6 +284,7 @@ static void PollNextEvent(vr::VREvent_t* pEvent)
   switch (pEvent->eventType)
   {
   case vr::EVREventType::VREvent_PropertyChanged:
+  {
     vr::VREvent_Property_t propertyEvent = *reinterpret_cast<vr::VREvent_Property_t*>(&pEvent->data);
 
     if (propertyEvent.prop == vr::ETrackedDeviceProperty::Prop_DisplayFrequency_Float)
@@ -292,7 +293,9 @@ static void PollNextEvent(vr::VREvent_t* pEvent)
     }
 
     break;
+  }
   case vr::EVREventType::VREvent_TrackedDeviceUserInteractionEnded:
+  {
     if (pEvent->trackedDeviceIndex == vr::k_unTrackedDeviceIndex_Hmd)
     {
       // Turn the controller status LED since the user isn't wearing the headset.
@@ -300,7 +303,9 @@ static void PollNextEvent(vr::VREvent_t* pEvent)
       SenseController::g_StatusLED = true;
     }
     break;
+  }
   case vr::EVREventType::VREvent_TrackedDeviceUserInteractionStarted:
+  {
     if (pEvent->trackedDeviceIndex == vr::k_unTrackedDeviceIndex_Hmd)
     {
       // Conserve power and turn off the status LED.
@@ -308,6 +313,7 @@ static void PollNextEvent(vr::VREvent_t* pEvent)
       SenseController::g_StatusLED = false;
     }
     break;
+  }
   case vr::EVREventType::VREvent_Input_HapticVibration:
   {
     vr::VREvent_HapticVibration_t hapticEvent = pEvent->data.hapticVibration;
@@ -357,7 +363,9 @@ static void PollNextEvent(vr::VREvent_t* pEvent)
     break;
   }
   default:
+  {
     break;
+  }
   }
 }
 
