@@ -29,26 +29,26 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='DebugCI|x64'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v145</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseCI|x64'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v145</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
@@ -208,16 +208,23 @@
     <ClInclude Include="hmd_math.h" />
     <ClInclude Include="libpad_hooks.h" />
     <ClInclude Include="math_helpers.h" />
+    <ClInclude Include="minhook\include\MinHook.h" />
     <ClInclude Include="pad_trigger_effect.h" />
     <ClInclude Include="rolling_percentile.h" />
     <ClInclude Include="sense_controller.h" />
     <ClInclude Include="sense_crc.h" />
+    <ClInclude Include="psvr2_openvr_driver\openvr\headers\openvr_driver.h" />
     <ClInclude Include="vr_settings.h" />
     <ClInclude Include="usb_thread_gaze.h" />
     <ClInclude Include="usb_thread_hooks.h" />
     <ClInclude Include="trigger_effect_manager.h" />
     <ClInclude Include="util.h" />
     <ClInclude Include="write_file_async.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\libcustomshare\libcustomshare.vcxproj">
+      <Project>{eabc1d23-54f9-455f-9fb4-c0a7a01ca592}</Project>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

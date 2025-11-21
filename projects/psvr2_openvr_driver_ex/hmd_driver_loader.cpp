@@ -6,61 +6,42 @@
 
 extern "C" IMAGE_DOS_HEADER __ImageBase;
 
-psvr2_toolkit::HmdDriverLoader *g_pHmdDriverLoader;
-
-// Allows the C++ standard library load the original HMD driver automatically for us.
-class HmdDriverLoaderInitializer {
-public:
-  HmdDriverLoaderInitializer() {
-    psvr2_toolkit::HmdDriverLoader::Instance();
-  }
-};
-HmdDriverLoaderInitializer initializer;
-
 namespace psvr2_toolkit {
+
+  // Allows the C++ standard library load the original HMD driver automatically for us.
+  class HmdDriverLoaderInitializer {
+  public:
+    HmdDriverLoaderInitializer() {
+      HmdDriverLoader::Instance();
+    }
+  };
+  HmdDriverLoaderInitializer __initializer;
+
+  HmdDriverLoader *HmdDriverLoader::m_pInstance = nullptr;
 
   HmdDriverLoader::HmdDriverLoader()
     : pfnHmdDriverFactory(nullptr)
-    , m_initialized(false)
-    , m_handle(nullptr)
+    , m_hModule(nullptr)
   {
-    Initialize();
+    wchar_t pszHmdDllPath[MAX_PATH] = { 0 };
+    if (GetHmdDllPath(pszHmdDllPath)) {
+      m_hModule = LoadLibraryW(pszHmdDllPath);
+      if (m_hModule) {
+        pfnHmdDriverFactory = decltype(pfnHmdDriverFactory)(GetProcAddress(m_hModule, "HmdDriverFactory"));
+      }
+    }
   }
 
   HmdDriverLoader *HmdDriverLoader::Instance() {
-    if (!g_pHmdDriverLoader) {
-      g_pHmdDriverLoader = new HmdDriverLoader;
+    if (!m_pInstance) {
+      m_pInstance = new HmdDriverLoader;
     }
 
-    return g_pHmdDriverLoader;
-  }
-
-  bool HmdDriverLoader::Initialized() {
-    return m_initialized;
-  }
-
-  void HmdDriverLoader::Initialize() {
-    if (m_initialized) {
-      return;
-    }
-
-    wchar_t pszHmdDllPath[MAX_PATH] = {0};
-    if (GetHmdDllPath(pszHmdDllPath)) {
-      m_handle = LoadLibraryW(pszHmdDllPath);
-      if (m_handle) {
-        pfnHmdDriverFactory = decltype(pfnHmdDriverFactory)(GetProcAddress(m_handle, "HmdDriverFactory"));
-      }
-    }
-
-    m_initialized = true;
-  }
-
-  HMODULE HmdDriverLoader::GetHandle() {
-    return m_handle;
+    return m_pInstance;
   }
 
   uintptr_t HmdDriverLoader::GetBaseAddress() {
-    return reinterpret_cast<uintptr_t>(m_handle);
+    return reinterpret_cast<uintptr_t>(m_hModule);
   }
 
   bool HmdDriverLoader::GetHmdDllPath(wchar_t *pszHmdDllPath) {
