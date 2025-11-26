@@ -369,7 +369,7 @@ namespace psvr2_toolkit {
     senseController.SetLibpadSyncs(timeSync, ledSync);
 
     int32_t latencyOffset = senseController.GetLatencyOffset();
-    size_t samples = senseController.GetTimestampOffsetSampleCount();
+    size_t hasTimeOffset = senseController.GetHasTimestampOffset();
     bool isTracking = senseController.GetTrackingState(lastTrackedTimestamp);
 
     static int32_t currentController = -1;
@@ -418,9 +418,8 @@ namespace psvr2_toolkit {
       Util::DriverLog("[{}] Controller disconnected, stopping latency calibration.", currentController == 0 ? 'L' : 'R');
     }
 
-    // Ensure there are enough samples before starting the calibration
     // We only want one controller to run the calibration if it's uncalibrated.
-    if (samples > 300 && currentController == -1 && latencyOffset == -1)
+    if (hasTimeOffset && currentController == -1 && latencyOffset == -1)
     {
       // Start calibration on this controller.
       currentController = controller;
