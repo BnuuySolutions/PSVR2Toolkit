@@ -163,11 +163,14 @@ namespace psvr2_toolkit {
     void SetLatencyOffset(int32_t newOffsetLatency) {
       std::scoped_lock<std::mutex> lock(this->controllerMutex);
       this->offsetLatency = newOffsetLatency;
+
+      // Reset filtered offset value to ensure everything is fresh
+      this->filteredOffset = this->timeStampOffset;
     }
 
     double GetTimestampOffset() {
       std::scoped_lock<std::mutex> lock(this->controllerMutex);
-      return this->timeStampOffset + this->offsetLatency;
+      return this->filteredOffset + this->offsetLatency;
     }
 
     bool GetHasTimestampOffset() {
@@ -180,6 +183,7 @@ namespace psvr2_toolkit {
 
       if (!this->hasTimestampOffset) {
         this->timeStampOffset = sample;
+        this->filteredOffset = sample;
         this->hasTimestampOffset = true;
       }
       else {
@@ -189,6 +193,11 @@ namespace psvr2_toolkit {
         if (this->timeStampOffset < sample) {
           this->timeStampOffset = sample;
         }
+
+        // Update filtered offset with maximum delta
+        double delta = this->timeStampOffset - this->filteredOffset;
+        double maxDelta = Clamp(delta, -2.5, 2.5); // Increase or decrease by at most 2.5 microseconds per sample
+        this->filteredOffset += maxDelta;
       }
 
       this->lastSampleTimestamp = GetHostTimestamp();
@@ -238,6 +247,7 @@ namespace psvr2_toolkit {
     std::mutex controllerMutex;
 
     double timeStampOffset = 0.0;
+    double filteredOffset = 0.0;
     bool hasTimestampOffset = false;
     uint64_t lastSampleTimestamp = 0;
 
