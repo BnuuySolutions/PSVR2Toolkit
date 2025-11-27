@@ -188,7 +188,7 @@ namespace psvr2_toolkit {
       }
       else {
         // Counter any potential drift to ensure accuracy.
-        this->timeStampOffset -= (GetHostTimestamp() - this->lastSampleTimestamp) * 1.0E-6;
+        this->timeStampOffset -= (GetHostTimestamp() - this->lastSampleTimestamp) * 5.0E-5;
 
         if (this->timeStampOffset < sample) {
           this->timeStampOffset = sample;
