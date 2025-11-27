@@ -72,6 +72,15 @@
     <ClCompile Include="trigger_effect_manager.cpp">
       <Filter>Additions\Trigger Effect</Filter>
     </ClCompile>
+    <ClCompile Include="libpad_hooks.cpp">
+      <Filter>Hooks</Filter>
+    </ClCompile>
+    <ClCompile Include="sense_controller.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="hmd_types.h">
+      <Filter>Utilities</Filter>
+    </ClCompile>
     <ClCompile Include="eyelid_estimator.cpp">
       <Filter>Additions\Gaze</Filter>
     </ClCompile>
@@ -133,6 +142,24 @@
     </ClInclude>
     <ClInclude Include="hmd_driver_loader.h">
       <Filter>Core\Loader</Filter>
+    </ClInclude>
+    <ClInclude Include="rolling_percentile.h">
+      <Filter>Utilities</Filter>
+    </ClInclude>
+    <ClInclude Include="libpad_hooks.h">
+      <Filter>Hooks</Filter>
+    </ClInclude>
+    <ClInclude Include="sense_controller.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="sense_crc.h">
+      <Filter>Utilities</Filter>
+    </ClInclude>
+    <ClInclude Include="math_helpers.h">
+      <Filter>Utilities</Filter>
+    </ClInclude>
+    <ClInclude Include="write_file_async.h">
+      <Filter>Utilities</Filter>
     </ClInclude>
     <ClInclude Include="config.h">
       <Filter>Core</Filter>
