@@ -28,10 +28,10 @@ namespace psvr2_toolkit {
       Command_ClientTriggerEffectSlopeFeedback, // CommandDataClientTriggerEffectSlopeFeedback_t
       Command_ClientTriggerEffectMultiplePositionVibration, // CommandDataClientTriggerEffectMultiplePositionVibration_t
 
-      Command_ClientGazeUserCalibrationStart,
-      Command_ClientGazeUserCalibrationSetPoint,
-      Command_ClientGazeUserCalibrationComputeAndApply,
-      Command_ClientGazeUserCalibrationStop,
+      Command_ClientGazeUserCalibrationStart, // No command data.
+      Command_ClientGazeUserCalibrationSetPoint, // CommandDataClientGazeUserCalibrationSetPoint_t
+      Command_ClientGazeUserCalibrationComputeAndApply, // No command data.
+      Command_ClientGazeUserCalibrationStop, // No command data.
     };
 
     enum EHandshakeResultType : uint8_t {
@@ -183,6 +183,12 @@ namespace psvr2_toolkit {
       EVRControllerType controllerType;
       uint8_t frequency;
       uint8_t amplitude[k_unTriggerEffectControlPoint];
+    };
+
+    struct CommandDataClientGazeUserCalibrationSetPoint_t {
+      float x;
+      float y;
+      float z;
     };
 
     struct CommandHeader_t {

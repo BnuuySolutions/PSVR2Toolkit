@@ -3,6 +3,7 @@
 #include "trigger_effect_manager.h"
 #include "util.h"
 #include "vr_settings.h"
+#include "usb_thread_hooks.h"
 
 #include <cstdio>
 
@@ -378,6 +379,32 @@ namespace psvr2_toolkit {
         case Command_ClientTriggerEffectMultiplePositionVibration: {
           if (m_connections.contains(clientPort)) {
             pTriggerEffectManager->HandleIpcCommand(m_connections[clientPort].processId, pHeader, pData);
+          }
+          break;
+        }
+
+        case Command_ClientGazeUserCalibrationStart: {
+          if (pHeader->dataLen == 0 && m_connections.contains(clientPort)) {
+            gazeUserCalibrationStart();
+          }
+          break;
+        }
+        case Command_ClientGazeUserCalibrationSetPoint: {
+          if (pHeader->dataLen == sizeof(CommandDataClientGazeUserCalibrationSetPoint_t) && m_connections.contains(clientPort)) {
+            CommandDataClientGazeUserCalibrationSetPoint_t* pRequest = reinterpret_cast<CommandDataClientGazeUserCalibrationSetPoint_t*>(pData);
+            gazeUserCalibrationSetPoint(pRequest->x, pRequest->y, pRequest->z);
+          }
+          break;
+        }
+        case Command_ClientGazeUserCalibrationComputeAndApply: {
+          if (pHeader->dataLen == 0 && m_connections.contains(clientPort)) {
+            gazeUserCalibrationComputeAndApply();
+          }
+          break;
+        }
+        case Command_ClientGazeUserCalibrationStop: {
+          if (pHeader->dataLen == 0 && m_connections.contains(clientPort)) {
+            gazeUserCalibrationStop();
           }
           break;
         }

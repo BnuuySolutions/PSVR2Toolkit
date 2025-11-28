@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+
 namespace psvr2_toolkit {
 
   class UsbThreadHooks {
