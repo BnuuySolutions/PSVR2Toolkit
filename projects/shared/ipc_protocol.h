@@ -7,7 +7,7 @@
 namespace psvr2_toolkit {
   namespace ipc {
 
-    static constexpr uint16_t k_unIpcVersion = 3;
+    static constexpr uint16_t k_unIpcVersion = 4;
     static constexpr uint32_t k_unTriggerEffectControlPoint = 10;
 
     enum ECommandType : uint16_t {
@@ -27,6 +27,11 @@ namespace psvr2_toolkit {
       Command_ClientTriggerEffectMultiplePositionFeedback, // CommandDataClientTriggerEffectMultiplePositionFeedback_t
       Command_ClientTriggerEffectSlopeFeedback, // CommandDataClientTriggerEffectSlopeFeedback_t
       Command_ClientTriggerEffectMultiplePositionVibration, // CommandDataClientTriggerEffectMultiplePositionVibration_t
+
+      Command_ClientGazeUserCalibrationStart,
+      Command_ClientGazeUserCalibrationSetPoint,
+      Command_ClientGazeUserCalibrationComputeAndApply,
+      Command_ClientGazeUserCalibrationStop,
     };
 
     enum EHandshakeResultType : uint8_t {
