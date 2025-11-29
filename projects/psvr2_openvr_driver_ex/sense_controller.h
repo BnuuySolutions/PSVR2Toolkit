@@ -163,23 +163,48 @@ namespace psvr2_toolkit {
     void SetLatencyOffset(int32_t newOffsetLatency) {
       std::scoped_lock<std::mutex> lock(this->controllerMutex);
       this->offsetLatency = newOffsetLatency;
+
+      // Reset filtered offset value to ensure everything is fresh
+      this->filteredOffset = this->timeStampOffset;
     }
 
     double GetTimestampOffset() {
       std::scoped_lock<std::mutex> lock(this->controllerMutex);
-      return this->timeStampOffset.getPercentile() + this->offsetLatency;
+      return this->filteredOffset + this->offsetLatency;
     }
-    size_t GetTimestampOffsetSampleCount() {
+
+    bool GetHasTimestampOffset() {
       std::scoped_lock<std::mutex> lock(this->controllerMutex);
-      return this->timeStampOffset.size();
+      return this->hasTimestampOffset;
     }
+
     void AddTimestampOffsetSample(double sample) {
       std::scoped_lock<std::mutex> lock(this->controllerMutex);
-      this->timeStampOffset.add(sample);
+
+      if (!this->hasTimestampOffset) {
+        this->timeStampOffset = sample;
+        this->filteredOffset = sample;
+        this->hasTimestampOffset = true;
+      }
+      else {
+        // Counter any potential drift to ensure accuracy.
+        this->timeStampOffset -= (GetHostTimestamp() - this->lastSampleTimestamp) * 5.0E-5;
+
+        if (this->timeStampOffset < sample) {
+          this->timeStampOffset = sample;
+        }
+
+        // Update filtered offset with maximum delta
+        double delta = this->timeStampOffset - this->filteredOffset;
+        double maxDelta = Clamp(delta, -2.5, 2.5); // Increase or decrease by at most 2.5 microseconds per sample
+        this->filteredOffset += maxDelta;
+      }
+
+      this->lastSampleTimestamp = GetHostTimestamp();
     }
-    void ClearTimestampOffsetSamples() {
+    void ClearTimestampOffset() {
       std::scoped_lock<std::mutex> lock(this->controllerMutex);
-      this->timeStampOffset.clear();
+      this->hasTimestampOffset = false;
 
       // Also reset offset for latency
       this->offsetLatency = -1;
@@ -221,7 +246,10 @@ namespace psvr2_toolkit {
     int padHandle = -1;
     std::mutex controllerMutex;
 
-    RollingPercentile<double> timeStampOffset = RollingPercentile<double>(5000, 80.0);
+    double timeStampOffset = 0.0;
+    double filteredOffset = 0.0;
+    bool hasTimestampOffset = false;
+    uint64_t lastSampleTimestamp = 0;
 
     bool isTracking = false;
     uint64_t lastTrackedTimestamp = 0;
