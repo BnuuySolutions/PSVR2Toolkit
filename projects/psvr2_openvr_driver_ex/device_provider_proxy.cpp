@@ -60,6 +60,8 @@ namespace psvr2_toolkit {
     IpcServer::Instance()->Stop();
 
     m_pDeviceProvider->Cleanup();
+
+    VR_CLEANUP_SERVER_DRIVER_CONTEXT();
   }
 
   const char *const *DeviceProviderProxy::GetInterfaceVersions() {
