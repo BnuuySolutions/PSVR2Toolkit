@@ -2,7 +2,6 @@
 
 #include "math_helpers.h"
 #include "libpad_hooks.h"
-#include "rolling_percentile.h"
 #include "write_file_async.h"
 
 #include <atomic>
@@ -16,8 +15,6 @@ constexpr uint32_t k_unSenseSubsamples = 10000;
 constexpr uint32_t k_unSenseMaxSamplePosition = k_unSenseSampleRate * k_unSenseSubsamples;
 constexpr uint32_t k_unSenseHalfSamplePosition = k_unSenseMaxSamplePosition / 2;
 constexpr uint8_t k_unSenseMaxHapticAmplitude = 127;
-
-constexpr uint32_t k_unSenseUnitsPerMicrosecond = 3;
 
 // Do not apply alignment
 #pragma pack(push, 1)

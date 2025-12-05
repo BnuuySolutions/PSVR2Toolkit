@@ -265,7 +265,7 @@ void SenseThread()
     {
       // Sleep to not eat up CPU cycles.
       timeBeginPeriod(1); // Set system timer resolution to 1 ms  
-      SleepEx(1, TRUE); // Sleep for 1ms, also be alertable
+      SleepEx(1, TRUE); // Sleep for 1ms, also be alertable for the AsyncFileWriter, which uses APCs.
       timeEndPeriod(1); // Restore system timer resolution
 
       QueryPerformanceCounter(&now);
