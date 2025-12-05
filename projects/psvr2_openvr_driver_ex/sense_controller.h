@@ -272,6 +272,7 @@ namespace psvr2_toolkit {
     uint32_t hapticPosition = 0;
     uint32_t hapticSamplesLeft = 0;
     uint32_t hapticAmp = 0;
+    uint64_t lastTransientTimestamp = 0;
     float hapticFreq = 0.0f;
     bool phaseJump = true;
 
@@ -282,5 +283,6 @@ namespace psvr2_toolkit {
   void StartSenseThread();
   void StopSenseThread();
 }
+
 
 
