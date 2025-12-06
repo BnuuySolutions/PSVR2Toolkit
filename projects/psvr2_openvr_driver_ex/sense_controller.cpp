@@ -23,12 +23,11 @@ SenseController SenseController::rightController = SenseController(false);
 
 std::atomic<std::thread*> hapticsThread;
 
-void SenseController::SetGeneratedHaptic(float freq, uint32_t amp, uint32_t sampleCount, bool phaseJump) {
+void SenseController::SetGeneratedHaptic(float freq, uint32_t amp, uint32_t sampleCount) {
   std::scoped_lock<std::mutex> lock(controllerMutex);
 
   this->hapticFreq = freq;
   this->hapticAmp = amp;
-  this->phaseJump = phaseJump;
   this->hapticSamplesLeft = sampleCount;
 }
 void SenseController::SetPCM(const std::vector<int8_t>& newPCMData) {
@@ -83,7 +82,7 @@ void SenseController::SetHandle(void* handle, int padHandle) {
 
   if (handle != nullptr)
   {
-    this->SetGeneratedHaptic(800.0f, k_unSenseMaxHapticAmplitude, 1500, false);
+    this->SetGeneratedHaptic(800.0f, k_unSenseMaxHapticAmplitude, 1500);
     this->ClearTimestampOffset();
   }
 }
@@ -148,36 +147,16 @@ void SenseController::SendToDevice() {
         this->samplesRead += bytesToCopy;
       }
 
-      // We basically want to make a thud
-      if (this->phaseJump)
-      {
-        this->phaseJump = false;
-        hapticPosition = hapticPosition > k_unSenseHalfSamplePosition ? 0 : k_unSenseHalfSamplePosition;
-
-        bool isStartingAtUp = hapticPosition == 0;
-
-        int8_t amp = static_cast<int8_t>(std::min(this->hapticAmp, static_cast<uint32_t>(k_unSenseMaxHapticAmplitude)));
-
-        for (int i = 0; i < 6; i++)
-          buffer.hapticPCM[i] = ClampedAdd(buffer.hapticPCM[i], isStartingAtUp ? amp : -amp);
-
-        for (int i = 6; i < 12; i++)
-          buffer.hapticPCM[i] = ClampedAdd(buffer.hapticPCM[i], isStartingAtUp ? -amp : amp);
-
-        // Back up a bit that so the actuator can move down in 6 samples, then all the way up.
-        hapticPosition -= 6;
-      }
-
       // Calculate the haptic overdrive based on frequency. We want overdrive to range from 25.0 to 1.0.
       // Basically, this makes a square wave from the cosine wave. Lower frequencies will have a higher overdrive.
-      // We also overdrive for frequencies above 500 Hz.
+      // We also overdrive for frequencies above 300 Hz.
 
       double overdrive = 25.0;
 
       // Make sure we don't divide by zero
       if (this->hapticFreq != 0.0)
       {
-        overdrive = Clamp(1000.0 / this->hapticFreq, 10.0 + 1.0, 35.0) - 10.0 + (this->hapticFreq - 500.0);
+        overdrive = Clamp(1000.0 / this->hapticFreq, 10.0 + 1.0, 35.0) - 10.0 + (this->hapticFreq - 300.0);
       }
 
       // In addition to copying the PCM data, we also want to add the generated haptic data to the buffer.
@@ -190,6 +169,10 @@ void SenseController::SendToDevice() {
 
           this->hapticSamplesLeft -= 1;
         }
+      }
+
+      if (this->hapticSamplesLeft == 0) {
+        hapticPosition = hapticPosition > k_unSenseHalfSamplePosition ? 0 : k_unSenseHalfSamplePosition;
       }
     }
 
@@ -335,13 +318,17 @@ static void PollNextEvent(vr::VREvent_t* pEvent)
     uint8_t senseHapticAmp = 0;
     uint32_t senseHapticSamplesLeft = 0;
 
-    // Phase jump to make a "thud."
-    bool phaseJump = hapticEvent.fDurationSeconds == 0.0f;
-
     if (hapticEvent.fAmplitude != 0.0f)
     {
       senseHapticAmp = static_cast<uint8_t>(sqrtf(hapticEvent.fAmplitude) * k_unSenseMaxHapticAmplitude);
-      senseHapticSamplesLeft = phaseJump ? 96 : 16 + static_cast<uint32_t>(hapticEvent.fDurationSeconds * k_unSenseSampleRate);
+      if (hapticEvent.fDurationSeconds == 0.0f) {
+        senseHapticFreq = std::max(80.0f, senseHapticFreq);
+        senseHapticSamplesLeft = static_cast<uint32_t>(k_unSenseSampleRate / senseHapticFreq);
+      }
+      else
+      {
+        senseHapticSamplesLeft = static_cast<uint32_t>(hapticEvent.fDurationSeconds * k_unSenseSampleRate);
+      }
     }
 
     SenseController* controller = nullptr;
@@ -357,7 +344,7 @@ static void PollNextEvent(vr::VREvent_t* pEvent)
 
     if (controller != nullptr)
     {
-      controller->SetGeneratedHaptic(senseHapticFreq, senseHapticAmp, senseHapticSamplesLeft, phaseJump);
+      controller->SetGeneratedHaptic(senseHapticFreq, senseHapticAmp, senseHapticSamplesLeft);
     }
 
     break;

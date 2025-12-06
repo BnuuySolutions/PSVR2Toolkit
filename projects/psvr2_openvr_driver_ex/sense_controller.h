@@ -120,7 +120,7 @@ namespace psvr2_toolkit {
     static void Initialize();
     static void Destroy();
 
-    void SetGeneratedHaptic(float freq, uint32_t amp, uint32_t sampleCount, bool phaseJump);
+    void SetGeneratedHaptic(float freq, uint32_t amp, uint32_t sampleCount);
     void SetPCM(const std::vector<int8_t>& newPCMData);
     void AppendPCM(const std::vector<int8_t>& newPCMData);
 
@@ -273,7 +273,6 @@ namespace psvr2_toolkit {
     uint32_t hapticSamplesLeft = 0;
     uint32_t hapticAmp = 0;
     float hapticFreq = 0.0f;
-    bool phaseJump = true;
 
     std::vector<int8_t> pcmData;
     size_t samplesRead = 0;
