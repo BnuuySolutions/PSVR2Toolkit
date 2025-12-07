@@ -162,7 +162,7 @@ void SenseController::SendToDevice() {
       {
         this->phaseJump = false;
         
-        int8_t amp = static_cast<int8_t>(k_unSenseMaxHapticAmplitude);
+        int8_t amp = static_cast<int8_t>(std::min(this->hapticAmp, static_cast<uint32_t>(k_unSenseMaxHapticAmplitude)));
         const int samplesPerHalfCycle = 8; // 187.5Hz
         const int durationSamples = 32;
 
