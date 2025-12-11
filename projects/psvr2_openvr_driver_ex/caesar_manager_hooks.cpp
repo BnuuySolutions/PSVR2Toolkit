@@ -10,11 +10,11 @@ namespace psvr2_toolkit {
 
   void *(*Framework__Thread__start)(void *thisptr) = nullptr;
 
-  void *(*CaesarManager__initialize)(void *) = nullptr;
-  void *CaesarManager__initializeHook(void *thisptr) {
-    static CaesarUsbThreadGaze *pCaesarUsbThreadGaze = CaesarUsbThreadGaze::Instance();
+  void *(*CaesarManager__initialize)(void *, void *, void *) = nullptr;
+  void *CaesarManager__initializeHook(void *thisptr, void *arg1, void *arg2) {
+    static CaesarUsbThreadGaze* pCaesarUsbThreadGaze = CaesarUsbThreadGaze::Instance();
 
-    void* result = CaesarManager__initialize(thisptr);
+    void* result = CaesarManager__initialize(thisptr, arg1, arg2);
     (*(void (__fastcall **)(__int64, __int64))(*(__int64 *)pCaesarUsbThreadGaze + 24LL))((__int64)pCaesarUsbThreadGaze, 0);
     Framework__Thread__start(pCaesarUsbThreadGaze);
     return result;
