@@ -18,7 +18,7 @@ namespace psvr2_toolkit {
 
   DriverHostProxy::DriverHostProxy()
     : m_pDriverHost(nullptr)
-    , m_pfnEventHandler(nullptr)
+    , m_pfnEventHandlers()
   {}
   
   DriverHostProxy *DriverHostProxy::Instance() {
@@ -33,8 +33,8 @@ namespace psvr2_toolkit {
     m_pDriverHost = pDriverHost;
   }
 
-  void DriverHostProxy::SetEventHandler(void (*pfnEventHandler)(vr::VREvent_t *)) {
-    m_pfnEventHandler = pfnEventHandler;
+  void DriverHostProxy::AddEventHandler(void (*pfnEventHandler)(vr::VREvent_t *)) {
+    m_pfnEventHandlers.push_back(pfnEventHandler);
   }
 
   bool DriverHostProxy::TrackedDeviceAdded(const char *pchDeviceSerialNumber, vr::ETrackedDeviceClass eDeviceClass, vr::ITrackedDeviceServerDriver *pDriver) {
@@ -69,7 +69,7 @@ namespace psvr2_toolkit {
 
   bool DriverHostProxy::PollNextEvent(vr::VREvent_t *pEvent, uint32_t uncbVREvent) {
     if (m_pDriverHost->PollNextEvent(pEvent, uncbVREvent)) {
-      if (m_pfnEventHandler) {
+      for (auto& m_pfnEventHandler : m_pfnEventHandlers) {
         m_pfnEventHandler(pEvent);
       }
       return true;
