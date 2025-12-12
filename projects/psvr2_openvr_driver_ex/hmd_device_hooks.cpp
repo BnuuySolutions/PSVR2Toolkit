@@ -61,8 +61,7 @@ namespace psvr2_toolkit {
           if (static_cast<int64_t>(ceilf(currentFloatBrightness * 31.0f)) != currentBrightness)
           {
             currentBrightness = static_cast<int64_t>(ceilf(currentFloatBrightness * 31.0f));
-            void* shareManager = ShareManager__getInstance();
-            ShareManager__setIntConfig(shareManager, 2, &currentBrightness);
+            ShareManager__setIntConfig(ShareManager__getInstance(), 2, &currentBrightness);
           }
         }
         });
