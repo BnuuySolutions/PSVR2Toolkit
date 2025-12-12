@@ -182,9 +182,8 @@ void SenseController::SendToDevice() {
   }
 
   long pendingOperationCount = asyncWriter.GetPendingOperationCount();
-  if (pendingOperationCount > 2)
+  if (pendingOperationCount > 3)
   {
-    Util::DriverLog("Failed to send. Too many pending operations.\r\n");
     return;
   }
 
@@ -196,7 +195,7 @@ void SenseController::SendToDevice() {
     this->SetHandle(NULL, -1);
   };
 
-  if (!asyncWriter.Write(this->handle, &buffer, 78, 5000, timeoutLambda))
+  if (!asyncWriter.Write(this->handle, &buffer, sizeof(buffer), 5000, timeoutLambda))
   {
     CloseHandle(this->handle);
 
@@ -219,7 +218,7 @@ void SenseThread()
   QueryPerformanceFrequency(&frequency);
 
   // Duration we want to run every iteration (32/3000 or 0.010666 seconds)
-  LONGLONG duration = static_cast<LONGLONG>((32.0 / 3000.0) * frequency.QuadPart);
+  LONGLONG duration = static_cast<LONGLONG>((32.0 / static_cast<double>(k_unSenseSampleRate)) * frequency.QuadPart);
 
   LARGE_INTEGER start;
   QueryPerformanceCounter(&start);
@@ -356,27 +355,12 @@ static void PollNextEvent(vr::VREvent_t* pEvent)
   }
 }
 
-void psvr2_toolkit::StartSenseThread() {
-  hapticsThread = new std::thread(SenseThread);
-  hapticsThread.load()->detach();
-}
-
-void psvr2_toolkit::StopSenseThread() {
-  std::thread* hapticsThreadCopy = hapticsThread;
-  hapticsThread = nullptr;
-
-  if (hapticsThreadCopy->joinable())
-  {
-    hapticsThreadCopy->join();
-  }
-  delete hapticsThreadCopy;
-}
-
 void SenseController::Initialize()
 {
   DriverHostProxy::Instance()->SetEventHandler(PollNextEvent);
 
-  StartSenseThread();
+  hapticsThread = new std::thread(SenseThread);
+  hapticsThread.load()->detach();
 }
 
 void SenseController::Destroy()
@@ -387,5 +371,12 @@ void SenseController::Destroy()
   auto& rightController = SenseController::GetRightController();
   rightController.SetHandle(NULL, -1);
 
-  StopSenseThread();
+  std::thread* hapticsThreadCopy = hapticsThread;
+  hapticsThread = nullptr;
+
+  if (hapticsThreadCopy->joinable())
+  {
+    hapticsThreadCopy->join();
+  }
+  delete hapticsThreadCopy;
 }

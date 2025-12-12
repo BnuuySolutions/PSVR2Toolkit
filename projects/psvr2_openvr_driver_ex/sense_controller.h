@@ -277,9 +277,6 @@ namespace psvr2_toolkit {
     std::vector<int8_t> pcmData;
     size_t samplesRead = 0;
   };
-
-  void StartSenseThread();
-  void StopSenseThread();
 }
 
 
