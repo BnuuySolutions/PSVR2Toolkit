@@ -43,7 +43,13 @@ namespace psvr2_toolkit {
     // Tell SteamVR to allow night mode setting.
     vr::VRProperties()->SetBoolProperty(ulPropertyContainer, vr::Prop_DisplayAllowNightMode_Bool, true);
 
-    if (VRSettings::GetBool(STEAMVR_SETTINGS_ENABLE_STEAMVR_BRIGHTNESS, SETTING_ENABLE_STEAMVR_BRIGHTNESS_DEFAULT_VALUE)) {
+    // Enable SteamVR brightness control if: opted in with setting, or settings overlay is disabled, or running on Wine
+    bool enableSteamVRBrightness =
+      VRSettings::GetBool(STEAMVR_SETTINGS_ENABLE_STEAMVR_BRIGHTNESS, SETTING_ENABLE_STEAMVR_BRIGHTNESS_DEFAULT_VALUE) ||
+      VRSettings::GetBool(STEAMVR_SETTINGS_DISABLE_OVERLAY, SETTING_DISABLE_OVERLAY_DEFAULT_VALUE) ||
+      Util::IsRunningOnWine();
+
+    if (enableSteamVRBrightness) {
       // Tell SteamVR we support brightness controls.
       vr::VRProperties()->SetBoolProperty(ulPropertyContainer, vr::Prop_DisplaySupportsAnalogGain_Bool, true);
       vr::VRProperties()->SetFloatProperty(ulPropertyContainer, vr::Prop_DisplayMinAnalogGain_Float, 0.0f);
