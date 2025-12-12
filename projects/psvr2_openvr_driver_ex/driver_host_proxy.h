@@ -2,6 +2,8 @@
 
 #include <openvr_driver.h>
 
+#include <list>
+
 namespace psvr2_toolkit {
 
   class DriverHostProxy : public vr::IVRServerDriverHost {
@@ -11,7 +13,7 @@ namespace psvr2_toolkit {
     static DriverHostProxy *Instance();
 
     void SetDriverHost(vr::IVRServerDriverHost *pDriverHost);
-    void SetEventHandler(void (*pfnEventHandler)(vr::VREvent_t *)); // Required for intercepting polled events from the PS VR2 driver.
+    void AddEventHandler(void (*pfnEventHandler)(vr::VREvent_t *)); // Required for intercepting polled events from the PS VR2 driver.
 
     /** IVRServerDriverHost **/
 
@@ -32,7 +34,7 @@ namespace psvr2_toolkit {
     static DriverHostProxy *m_pInstance;
 
     vr::IVRServerDriverHost *m_pDriverHost;
-    void (*m_pfnEventHandler)(vr::VREvent_t *);
+    std::list<void (*)(vr::VREvent_t *)> m_pfnEventHandlers;
 
     // Used internally for controller pose correction.
     vr::DriverPose_t GetPose(uint32_t unWhichDevice, const vr::DriverPose_t &originalPose);
