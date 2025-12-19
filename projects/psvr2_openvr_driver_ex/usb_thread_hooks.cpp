@@ -50,6 +50,9 @@ extern "C" {
 }
 
 namespace psvr2_toolkit {
+  std::mutex ldPayloadMutex;
+  LDPayload currentLDPayload;
+
   class LibusbInterface {
   public:
     libusb_device_handle* libusb_handle = NULL;
@@ -544,11 +547,11 @@ namespace psvr2_toolkit {
     return TRUE;
   }
 
-  LDPayload currentLDPayload;
-
   uint64_t(*CaesarUsbThreadLeddet__poll)(void* thisptr) = nullptr;
   uint64_t CaesarUsbThreadLeddet__pollHook(void* thisptr) {
     uint64_t result = CaesarUsbThreadLeddet__poll(thisptr);
+
+    std::scoped_lock<std::mutex> lock(ldPayloadMutex);
 
 	  memcpy(&currentLDPayload, reinterpret_cast<uint8_t*>(thisptr) + 0x230, sizeof(LDPayload));
 

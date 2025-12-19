@@ -212,10 +212,9 @@
     <ClInclude Include="math_helpers.h" />
     <ClInclude Include="minhook\include\MinHook.h" />
     <ClInclude Include="pad_trigger_effect.h" />
-    <ClInclude Include="psvr2_openvr_driver\openvr\headers\openvr_driver.h" />
-    <ClInclude Include="rolling_percentile.h" />
     <ClInclude Include="sense_controller.h" />
     <ClInclude Include="sense_crc.h" />
+    <ClInclude Include="psvr2_openvr_driver\openvr\headers\openvr_driver.h" />
     <ClInclude Include="vr_settings.h" />
     <ClInclude Include="usb_thread_gaze.h" />
     <ClInclude Include="usb_thread_hooks.h" />

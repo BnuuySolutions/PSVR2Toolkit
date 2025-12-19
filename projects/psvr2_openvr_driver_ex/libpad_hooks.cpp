@@ -125,13 +125,6 @@ namespace psvr2_toolkit {
   const int32_t k_bgPhasePeriod = 20;
   const int32_t k_stablePhasePeriod = 9;
 
-  // The device time that's passed in is already divided by 3.
-  // This is so that all calcuations work within this bound.
-  const uint32_t k_unDeviceTimestampMax = 0xFFFFFFFF / k_unSenseUnitsPerMicrosecond;
-
-  // The total number of unique values in the device's clock cycle (its modulus).
-  const uint32_t k_unDeviceTimestampModulus = k_unDeviceTimestampMax + 1;
-
   uintptr_t packetRecievedReturnAddress = 0;
 
   enum class CalibrationState {
@@ -148,32 +141,6 @@ namespace psvr2_toolkit {
   };
 
   CalibrationState calibrationState = CalibrationState::Idle;
-
-  inline int32_t GetWraparoundDifference(uint32_t newTimestamp, uint32_t oldTimestamp)
-  {
-    // Ensure inputs are within the device's clock domain.
-    newTimestamp %= k_unDeviceTimestampModulus;
-    oldTimestamp %= k_unDeviceTimestampModulus;
-
-    // Calculate the direct forward difference.
-    // We add k_unDeviceTimestampModulus before the final modulo to prevent underflow
-    // if newTimestamp < oldTimestamp, ensuring the result is always positive.
-    uint32_t forwardDiff = (newTimestamp - oldTimestamp + k_unDeviceTimestampModulus) % k_unDeviceTimestampModulus;
-
-    // The shortest path is either forward or backward. If the forward path is more
-    // than halfway around the clock, the backward path is shorter.
-    if (forwardDiff > k_unDeviceTimestampModulus / 2)
-    {
-      // The backward difference is negative.
-      // This is equivalent to `forwardDiff - MODULUS`.
-      return static_cast<int32_t>(forwardDiff - k_unDeviceTimestampModulus);
-    }
-    else
-    {
-      // The forward difference is the shortest path.
-      return static_cast<int32_t>(forwardDiff);
-    }
-  }
 
   uint32_t libpad_hostToDeviceHook(LibpadTimeSync* timeSync, uint32_t host, uint32_t* outDevice) {
     SenseController& senseController = SenseController::GetControllerByIsLeft(timeSync->isLeft);
@@ -210,58 +177,6 @@ namespace psvr2_toolkit {
     int32_t difference = GetWraparoundDifference(hostTime, static_cast<uint32_t>(currentTime));
 
     outHost->hostReceiveTime = currentTime + difference;
-
-    return 0;
-  }
-
-  HidDeviceDescriptor* (*libpad_CreateHidDevice)(HidDeviceDescriptor* device, const wchar_t* name, int32_t deviceType) = nullptr;
-  HidDeviceDescriptor* libpad_CreateHidDeviceHook(HidDeviceDescriptor* device, const wchar_t* name, int32_t deviceType) {
-    Util::DriverLog("libpad_CreateHidDeviceHook called for device: {}, type: {}", Util::WideStringToUTF8(name), deviceType);
-
-    HidDeviceDescriptor* result = libpad_CreateHidDevice(device, name, deviceType);
-
-    if (deviceType == k_libpadDeviceTypeSenseLeft)
-    {
-      SenseController::GetLeftController().SetHandle(device->controllerFileHandle, result->padHandle);
-    }
-    else if (deviceType == k_libpadDeviceTypeSenseRight)
-    {
-      SenseController::GetRightController().SetHandle(device->controllerFileHandle, result->padHandle);
-    }
-
-    return result;
-  }
-
-  void (*libpad_Disconnect)(int32_t device) = nullptr;
-  void libpad_DisconnectHook(int32_t device) {
-    Util::DriverLog("libpad_DisconnectHook called for device handle: {}", device);
-
-    try {
-      SenseController& controller = SenseController::GetControllerByPadHandle(device);
-      controller.SetHandle(NULL, -1);
-    }
-    catch (const std::runtime_error&) {
-      // No controller with the given pad handle.
-    }
-
-    libpad_Disconnect(device);
-  }
-
-  int32_t (*libpad_SendOutputReport)(int32_t device, const unsigned char* buffer, unsigned short size) = nullptr;
-  int32_t libpad_SendOutputReportHook(int32_t device, const unsigned char* buffer, unsigned short size) {
-    if (size != sizeof(SenseControllerPCModePacket_t)) {
-      Util::DriverLog("libpad_SendOutputReportHook called with unexpected size: {}", size);
-      return libpad_SendOutputReport(device, buffer, size);
-    }
-
-    try {
-      SenseController& controller = SenseController::GetControllerByPadHandle(device);
-      controller.SetTrackingControllerSettings(reinterpret_cast<const SenseControllerPCModePacket_t*>(buffer));
-    }
-    catch (const std::runtime_error&) {
-      // No controller with the given pad handle.
-      return 0x8001002b;
-    }
 
     return 0;
   }
@@ -393,9 +308,13 @@ namespace psvr2_toolkit {
       Util::DriverLog("[{}] Latency calibration has been reset.", currentController == 0 ? 'L' : 'R');
     };
 
-    // Bottom cameras only
-    int32_t currentLedCount = currentLDPayload.cameras[0].num_leds
-      + currentLDPayload.cameras[1].num_leds;
+    int32_t currentLedCount;
+    {
+      // Bottom cameras only
+      std::scoped_lock<std::mutex> lock(ldPayloadMutex);
+      currentLedCount = currentLDPayload.cameras[0].num_leds
+        + currentLDPayload.cameras[1].num_leds;
+    }
 
     // TODO: calibration should be triggered via IPC
     if (GetAsyncKeyState(VK_F9) & 0x8000) {
@@ -704,6 +623,58 @@ namespace psvr2_toolkit {
       previousPose, previousMeta, currentPose, currentMeta);
   }
 
+  HidDeviceDescriptor* (*libpad_CreateHidDevice)(HidDeviceDescriptor* device, const wchar_t* name, int32_t deviceType) = nullptr;
+  HidDeviceDescriptor* libpad_CreateHidDeviceHook(HidDeviceDescriptor* device, const wchar_t* name, int32_t deviceType) {
+    Util::DriverLog("libpad_CreateHidDeviceHook called for device: {}, type: {}", Util::WideStringToUTF8(name), deviceType);
+
+    HidDeviceDescriptor* result = libpad_CreateHidDevice(device, name, deviceType);
+
+    if (deviceType == k_libpadDeviceTypeSenseLeft)
+    {
+      SenseController::GetLeftController().SetHandle(device->controllerFileHandle, result->padHandle);
+    }
+    else if (deviceType == k_libpadDeviceTypeSenseRight)
+    {
+      SenseController::GetRightController().SetHandle(device->controllerFileHandle, result->padHandle);
+    }
+
+    return result;
+  }
+
+  void (*libpad_Disconnect)(int32_t device) = nullptr;
+  void libpad_DisconnectHook(int32_t device) {
+    Util::DriverLog("libpad_DisconnectHook called for device handle: {}", device);
+
+    try {
+      SenseController& controller = SenseController::GetControllerByPadHandle(device);
+      controller.SetHandle(NULL, -1);
+    }
+    catch (const std::runtime_error&) {
+      // No controller with the given pad handle.
+    }
+
+    libpad_Disconnect(device);
+  }
+
+  int32_t(*libpad_SendOutputReport)(int32_t device, const uint8_t* buffer, uint16_t size) = nullptr;
+  int32_t libpad_SendOutputReportHook(int32_t device, const uint8_t* buffer, uint16_t size) {
+    if (size != sizeof(SenseControllerPCModePacket_t)) {
+      Util::DriverLog("libpad_SendOutputReportHook called with unexpected size: {}", size);
+      return libpad_SendOutputReport(device, buffer, size);
+    }
+
+    try {
+      SenseController& controller = SenseController::GetControllerByPadHandle(device);
+      controller.SetTrackingControllerSettings(reinterpret_cast<const SenseControllerPCModePacket_t*>(buffer));
+    }
+    catch (const std::runtime_error&) {
+      // No controller with the given pad handle.
+      return 0x8001002b;
+    }
+
+    return 0;
+  }
+
   void LibpadHooks::InstallHooks() {
     static HmdDriverLoader* pHmdDriverLoader = HmdDriverLoader::Instance();
 
@@ -748,7 +719,7 @@ namespace psvr2_toolkit {
         reinterpret_cast<void*>(libpad_DisconnectHook),
         reinterpret_cast<void**>(&libpad_Disconnect));
 
-      // libpad function for int32_t libpad_SendOutputReport(int32_t handle, uchar * buffer, ushort size) @ 0x1CBA20
+      // libpad function for int32_t libpad_SendOutputReport(int32_t handle, uchar * buffer, uint16_t size) @ 0x1CBA20
       HookLib::InstallHook(reinterpret_cast<void*>(pHmdDriverLoader->GetBaseAddress() + 0x1CBA20),
         reinterpret_cast<void*>(libpad_SendOutputReportHook),
         reinterpret_cast<void**>(&libpad_SendOutputReport));

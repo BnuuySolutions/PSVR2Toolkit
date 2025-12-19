@@ -2,7 +2,6 @@
 
 #include "math_helpers.h"
 #include "libpad_hooks.h"
-#include "rolling_percentile.h"
 #include "write_file_async.h"
 
 #include <atomic>
@@ -16,8 +15,6 @@ constexpr uint32_t k_unSenseSubsamples = 10000;
 constexpr uint32_t k_unSenseMaxSamplePosition = k_unSenseSampleRate * k_unSenseSubsamples;
 constexpr uint32_t k_unSenseHalfSamplePosition = k_unSenseMaxSamplePosition / 2;
 constexpr uint8_t k_unSenseMaxHapticAmplitude = 127;
-
-constexpr uint32_t k_unSenseUnitsPerMicrosecond = 3;
 
 // Do not apply alignment
 #pragma pack(push, 1)
@@ -123,7 +120,7 @@ namespace psvr2_toolkit {
     static void Initialize();
     static void Destroy();
 
-    void SetGeneratedHaptic(float freq, uint32_t amp, uint32_t sampleCount, bool phaseJump);
+    void SetGeneratedHaptic(float freq, uint32_t amp, uint32_t sampleCount);
     void SetPCM(const std::vector<int8_t>& newPCMData);
     void AppendPCM(const std::vector<int8_t>& newPCMData);
 
@@ -276,14 +273,10 @@ namespace psvr2_toolkit {
     uint32_t hapticSamplesLeft = 0;
     uint32_t hapticAmp = 0;
     float hapticFreq = 0.0f;
-    bool phaseJump = true;
 
     std::vector<int8_t> pcmData;
     size_t samplesRead = 0;
   };
-
-  void StartSenseThread();
-  void StopSenseThread();
 }
 
 
