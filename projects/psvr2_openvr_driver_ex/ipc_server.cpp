@@ -179,7 +179,7 @@ namespace psvr2_toolkit {
             CommandDataClientRequestHandshake_t *pRequest = reinterpret_cast<CommandDataClientRequestHandshake_t *>(pData);
 
             // We only want real running processes to handshake with us.
-            if (Util::IsProcessRunning(pRequest->processId)) {
+            if (Util::IsRunningOnWine() || Util::IsProcessRunning(pRequest->processId)) {
               m_connections[clientPort] = {
                 .clientAddr = clientAddr,
                 .ipcVersion = pRequest->ipcVersion,
