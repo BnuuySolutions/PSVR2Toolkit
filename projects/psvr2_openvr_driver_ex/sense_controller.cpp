@@ -357,7 +357,7 @@ static void PollNextEvent(vr::VREvent_t* pEvent)
 
 void SenseController::Initialize()
 {
-  DriverHostProxy::Instance()->SetEventHandler(PollNextEvent);
+  DriverHostProxy::Instance()->AddEventHandler(PollNextEvent);
 
   hapticsThread = new std::thread(SenseThread);
   hapticsThread.load()->detach();
