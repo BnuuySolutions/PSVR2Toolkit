@@ -708,17 +708,17 @@ namespace psvr2_toolkit {
         reinterpret_cast<void**>(&logDeviceTrackingState));
     }
 
+    // libpad function for int32_t CreateHidDevice(HidDeviceDescriptor* device, wchar_t name, int32_t deviceType) @ 0x1CE210
+    HookLib::InstallHook(reinterpret_cast<void*>(pHmdDriverLoader->GetBaseAddress() + 0x1CE210),
+      reinterpret_cast<void*>(libpad_CreateHidDeviceHook),
+      reinterpret_cast<void**>(&libpad_CreateHidDevice));
+
+    // libpad function for void libpad_Disconnect(int32_t device) @ 0x1C7E90
+    HookLib::InstallHook(reinterpret_cast<void*>(pHmdDriverLoader->GetBaseAddress() + 0x1C7E90),
+      reinterpret_cast<void*>(libpad_DisconnectHook),
+      reinterpret_cast<void**>(&libpad_Disconnect));
+
     if (VRSettings::GetBool(STEAMVR_SETTINGS_USE_ENHANCED_HAPTICS, SETTING_USE_TOOLKIT_SYNC_DEFAULT_VALUE)) {
-      // libpad function for int32_t CreateHidDevice(HidDeviceDescriptor* device, wchar_t name, int32_t deviceType) @ 0x1CE210
-      HookLib::InstallHook(reinterpret_cast<void*>(pHmdDriverLoader->GetBaseAddress() + 0x1CE210),
-        reinterpret_cast<void*>(libpad_CreateHidDeviceHook),
-        reinterpret_cast<void**>(&libpad_CreateHidDevice));
-
-      // libpad function for void libpad_Disconnect(int32_t device) @ 0x1C7E90
-      HookLib::InstallHook(reinterpret_cast<void*>(pHmdDriverLoader->GetBaseAddress() + 0x1C7E90),
-        reinterpret_cast<void*>(libpad_DisconnectHook),
-        reinterpret_cast<void**>(&libpad_Disconnect));
-
       // libpad function for int32_t libpad_SendOutputReport(int32_t handle, uchar * buffer, uint16_t size) @ 0x1CBA20
       HookLib::InstallHook(reinterpret_cast<void*>(pHmdDriverLoader->GetBaseAddress() + 0x1CBA20),
         reinterpret_cast<void*>(libpad_SendOutputReportHook),
