@@ -43,6 +43,9 @@
     <Filter Include="Externals\HMD Driver\OpenVR">
       <UniqueIdentifier>{a3caff8b-b7bf-4652-9226-44b8fde614d9}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Additions\Sense Controller">
+      <UniqueIdentifier>{0291b240-6803-4b8a-ae31-6745612aa51a}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="usb_thread_hooks.cpp">
@@ -80,6 +83,15 @@
     </ClCompile>
     <ClCompile Include="hmd_driver_factory.cpp">
       <Filter>Core\Factory</Filter>
+    </ClCompile>
+    <ClCompile Include="libpad_hooks.cpp">
+      <Filter>Additions\Hooks</Filter>
+    </ClCompile>
+    <ClCompile Include="sense_controller.cpp">
+      <Filter>Additions\Sense Controller</Filter>
+    </ClCompile>
+    <ClCompile Include="hmd_types.h">
+      <Filter>Core\Utilities</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -142,6 +154,21 @@
     </ClInclude>
     <ClInclude Include="psvr2_openvr_driver\openvr\headers\openvr_driver.h">
       <Filter>Externals\HMD Driver\OpenVR</Filter>
+    </ClInclude>
+    <ClInclude Include="libpad_hooks.h">
+      <Filter>Additions\Hooks</Filter>
+    </ClInclude>
+    <ClInclude Include="sense_controller.h">
+      <Filter>Additions\Sense Controller</Filter>
+    </ClInclude>
+    <ClInclude Include="sense_crc.h">
+      <Filter>Additions\Sense Controller</Filter>
+    </ClInclude>
+    <ClInclude Include="math_helpers.h">
+      <Filter>Core\Utilities</Filter>
+    </ClInclude>
+    <ClInclude Include="write_file_async.h">
+      <Filter>Core\Utilities</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
