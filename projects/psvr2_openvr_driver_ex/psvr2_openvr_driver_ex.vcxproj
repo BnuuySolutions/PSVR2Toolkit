@@ -189,6 +189,7 @@
     <ClCompile Include="ipc_server.cpp" />
     <ClCompile Include="libpad_hooks.cpp" />
     <ClCompile Include="sense_controller.cpp" />
+    <ClCompile Include="slam_relocalizer_hooks.cpp" />
     <ClCompile Include="usb_thread_gaze.cpp" />
     <ClCompile Include="usb_thread_hooks.cpp" />
     <ClCompile Include="trigger_effect_manager.cpp" />
@@ -213,6 +214,7 @@
     <ClInclude Include="sense_controller.h" />
     <ClInclude Include="sense_crc.h" />
     <ClInclude Include="psvr2_openvr_driver\openvr\headers\openvr_driver.h" />
+    <ClInclude Include="slam_relocalizer_hooks.h" />
     <ClInclude Include="vr_settings.h" />
     <ClInclude Include="usb_thread_gaze.h" />
     <ClInclude Include="usb_thread_hooks.h" />

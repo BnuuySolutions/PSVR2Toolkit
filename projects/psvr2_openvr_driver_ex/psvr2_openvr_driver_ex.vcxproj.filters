@@ -93,6 +93,9 @@
     <ClCompile Include="hmd_types.h">
       <Filter>Core\Utilities</Filter>
     </ClCompile>
+    <ClCompile Include="slam_relocalizer_hooks.cpp">
+      <Filter>Additions\Hooks</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="caesar_manager_hooks.h">
@@ -169,6 +172,9 @@
     </ClInclude>
     <ClInclude Include="write_file_async.h">
       <Filter>Core\Utilities</Filter>
+    </ClInclude>
+    <ClInclude Include="slam_relocalizer_hooks.h">
+      <Filter>Additions\Hooks</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
