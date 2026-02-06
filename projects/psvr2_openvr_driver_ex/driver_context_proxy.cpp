@@ -8,8 +8,7 @@ namespace psvr2_toolkit {
 
   DriverContextProxy::DriverContextProxy()
     : m_pDriverContext(nullptr)
-  {
-  }
+  {}
 
   DriverContextProxy *DriverContextProxy::Instance() {
     if (!m_pInstance) {

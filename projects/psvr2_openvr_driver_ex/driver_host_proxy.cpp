@@ -19,8 +19,7 @@ namespace psvr2_toolkit {
   DriverHostProxy::DriverHostProxy()
     : m_pDriverHost(nullptr)
     , m_pfnEventHandlers()
-  {
-  }
+  {}
 
   DriverHostProxy *DriverHostProxy::Instance() {
     if (!m_pInstance) {
