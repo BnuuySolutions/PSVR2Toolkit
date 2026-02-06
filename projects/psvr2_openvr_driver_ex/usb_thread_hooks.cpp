@@ -17,13 +17,13 @@ namespace psvr2_toolkit {
     return result;
   }
 
-  uint64_t(*CaesarUsbThreadLeddet__poll)(void* thisptr) = nullptr;
-  uint64_t CaesarUsbThreadLeddet__pollHook(void* thisptr) {
+  uint64_t(*CaesarUsbThreadLeddet__poll)(void *thisptr) = nullptr;
+  uint64_t CaesarUsbThreadLeddet__pollHook(void *thisptr) {
     uint64_t result = CaesarUsbThreadLeddet__poll(thisptr);
 
     std::scoped_lock<std::mutex> lock(ldPayloadMutex);
 
-	  memcpy(&currentLDPayload, reinterpret_cast<uint8_t*>(thisptr) + 0x230, sizeof(LDPayload));
+    memcpy(&currentLDPayload, reinterpret_cast<uint8_t *>(thisptr) + 0x230, sizeof(LDPayload));
 
     return result;
   }
@@ -41,10 +41,10 @@ namespace psvr2_toolkit {
     }
 
     if (VRSettings::GetBool(STEAMVR_SETTINGS_USE_TOOLKIT_SYNC, SETTING_USE_TOOLKIT_SYNC_DEFAULT_VALUE)) {
-	    // CaesarUsbThreadLeddet::poll
-	    HookLib::InstallHook(reinterpret_cast<void*>(pHmdDriverLoader->GetBaseAddress() + 0x126B80),
-		                   reinterpret_cast<void*>(CaesarUsbThreadLeddet__pollHook),
-		                   reinterpret_cast<void**>(&CaesarUsbThreadLeddet__poll));
+      // CaesarUsbThreadLeddet::poll
+      HookLib::InstallHook(reinterpret_cast<void *>(pHmdDriverLoader->GetBaseAddress() + 0x126B80),
+                           reinterpret_cast<void *>(CaesarUsbThreadLeddet__pollHook),
+                           reinterpret_cast<void **>(&CaesarUsbThreadLeddet__poll));
     }
   }
 

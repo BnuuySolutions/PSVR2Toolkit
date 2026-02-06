@@ -59,7 +59,7 @@ namespace psvr2_toolkit {
       vr::VRDriverLog()->Log(message.c_str());
     }
 
-    static std::string WideStringToUTF8(const std::wstring& wideStr) {
+    static std::string WideStringToUTF8(const std::wstring &wideStr) {
       if (wideStr.empty()) {
         return std::string();
       }

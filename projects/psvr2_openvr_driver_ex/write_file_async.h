@@ -16,7 +16,7 @@ namespace psvr2_toolkit {
   private:
     // Structure to hold per-operation data.
     struct OverlappedWithData {
-      OverlappedWithData(AsyncFileWriter* asyncWriter)
+      OverlappedWithData(AsyncFileWriter *asyncWriter)
         : overlapped()
         , writerInstance(asyncWriter)
         , hFile(NULL)
@@ -31,22 +31,22 @@ namespace psvr2_toolkit {
         }
       }
 
-      OVERLAPPED overlapped; // The OVERLAPPED structure for async I/O.
-      AsyncFileWriter* writerInstance; // Pointer back to the class instance.
-      HANDLE hFile; // Handle to the file being written to.
-      HANDLE hTimer; // Handle to the waitable timer.
-      std::function<void()> timeoutCallback; // Function to call on timeout.
+      OVERLAPPED overlapped;
+      AsyncFileWriter *writerInstance;
+      HANDLE hFile;
+      HANDLE hTimer;
+      std::function<void()> timeoutCallback;
     };
 
     // A simple thread-safe object pool for OverlappedWithData structures.
     class OverlappedDataPool {
     private:
-      std::stack<OverlappedWithData*> m_pool;
+      std::stack<OverlappedWithData *> m_pool;
       std::mutex m_mutex;
-      AsyncFileWriter* m_asyncWriter;
+      AsyncFileWriter *m_asyncWriter;
 
     public:
-      OverlappedDataPool(AsyncFileWriter* asyncWriter, size_t initialSize) {
+      OverlappedDataPool(AsyncFileWriter *asyncWriter, size_t initialSize) {
         m_asyncWriter = asyncWriter;
 
         for (size_t i = 0; i < initialSize; ++i) {
@@ -62,39 +62,30 @@ namespace psvr2_toolkit {
         }
       }
 
-      OverlappedWithData* Acquire() {
+      OverlappedWithData *Acquire() {
         std::scoped_lock<std::mutex> lock(m_mutex);
         if (m_pool.empty()) {
           // Pool is empty, allocate a new one on demand.
           return new OverlappedWithData(m_asyncWriter);
         }
         else {
-          OverlappedWithData* ptr = m_pool.top();
+          OverlappedWithData *ptr = m_pool.top();
           m_pool.pop();
           return ptr;
         }
       }
 
-      void Release(OverlappedWithData* ptr) {
+      void Release(OverlappedWithData *ptr) {
         std::scoped_lock<std::mutex> lock(m_mutex);
         m_pool.push(ptr);
       }
     };
 
   public:
-    /**
-     * @brief Constructs the AsyncFileWriter.
-     * @param callback The function to be called upon completion of each write operation.
-     * @param initialPoolSize The number of OverlappedWithData objects to pre-allocate.
-     */
     AsyncFileWriter(size_t initialPoolSize = 16)
       : m_pool(this, initialPoolSize) {
     }
 
-    /**
-     * @brief Destructor. Waits for all pending I/O operations to complete.
-     * Note: This destructor does NOT close the file handle.
-     */
     ~AsyncFileWriter() {
       // Wait for all pending operations to finish or timeout before the object is destroyed.
       while (pendingOperations > 0) {
@@ -103,19 +94,13 @@ namespace psvr2_toolkit {
     }
 
     // Disable copy constructor and assignment operator.
-    AsyncFileWriter(const AsyncFileWriter&) = delete;
-    AsyncFileWriter& operator=(const AsyncFileWriter&) = delete;
+    AsyncFileWriter(const AsyncFileWriter &) = delete;
+    AsyncFileWriter &operator=(const AsyncFileWriter &) = delete;
 
-    /**
-     * @brief Initiates an asynchronous write operation.
-     * @param buffer Pointer to the buffer containing the data to be written.
-     * @param numberOfBytesToWrite The number of bytes to be written to the file.
-     * @param timeoutMilliseconds The timeout in milliseconds.
-     * @return TRUE if the operation was successfully queued, otherwise FALSE.
-     */
     BOOL Write(HANDLE hFile, LPCVOID buffer, DWORD numberOfBytesToWrite, DWORD timeoutMilliseconds, std::function<void()> timeoutCallback) {
       // Acquire an OverlappedWithData structure from our pool.
-      OverlappedWithData* opData = m_pool.Acquire();
+      OverlappedWithData *opData = m_pool.Acquire();
+
       // It's crucial to zero out the overlapped structure before each use.
       ZeroMemory(&opData->overlapped, sizeof(OverlappedWithData::overlapped));
 
@@ -139,6 +124,7 @@ namespace psvr2_toolkit {
       if (!SetWaitableTimer(opData->hTimer, &dueTime, 0, TimerTimeoutRoutine, opData, FALSE)) {
         // If setting the timer fails, we must cancel the I/O we just queued
         CancelIoEx(hFile, &opData->overlapped);
+
         // The FileWriteCompletionRoutine will still run and handle cleanup.
         return FALSE;
       }
@@ -156,12 +142,8 @@ namespace psvr2_toolkit {
 
     static inline std::atomic<long> pendingOperations = 0;
 
-    /**
-     * @brief The static completion routine for the waitable timer.
-     * This is called if the write operation takes too long.
-     */
     static VOID CALLBACK TimerTimeoutRoutine(LPVOID lpArgToCompletionRoutine, DWORD dwTimerLowValue, DWORD dwTimerHighValue) {
-      OverlappedWithData* opData = static_cast<OverlappedWithData*>(lpArgToCompletionRoutine);
+      OverlappedWithData *opData = static_cast<OverlappedWithData *>(lpArgToCompletionRoutine);
 
       // The timer has expired, so try to cancel the I/O operation.
       // Note: The FileWriteCompletionRoutine will still be called, but with an error code.
@@ -173,15 +155,12 @@ namespace psvr2_toolkit {
       }
     }
 
-    /**
-     * @brief The static completion routine required by WriteFileEx.
-     */
     static VOID CALLBACK FileWriteCompletionRoutine(
       DWORD dwErrorCode,
       DWORD dwNumberOfBytesTransfered,
       LPOVERLAPPED lpOverlapped)
     {
-      OverlappedWithData* opData = reinterpret_cast<OverlappedWithData*>(lpOverlapped);
+      OverlappedWithData *opData = reinterpret_cast<OverlappedWithData *>(lpOverlapped);
 
       if (opData->hTimer) {
         // We must cancel the timer in case the I/O completed *before* the timeout.
