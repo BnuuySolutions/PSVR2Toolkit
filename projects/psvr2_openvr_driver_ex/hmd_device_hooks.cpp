@@ -160,13 +160,13 @@ namespace psvr2_toolkit {
 
     // sie::psvr2::HmdDevice::Activate
     HookLib::InstallHook(reinterpret_cast<void *>(pHmdDriverLoader->GetBaseAddress() + 0x19D1B0),
-      reinterpret_cast<void *>(sie__psvr2__HmdDevice__ActivateHook),
-      reinterpret_cast<void **>(&sie__psvr2__HmdDevice__Activate));
+                         reinterpret_cast<void *>(sie__psvr2__HmdDevice__ActivateHook),
+                         reinterpret_cast<void **>(&sie__psvr2__HmdDevice__Activate));
 
     // sie::psvr2::HmdDevice::Deactivate
     HookLib::InstallHook(reinterpret_cast<void *>(pHmdDriverLoader->GetBaseAddress() + 0x19EBF0),
-      reinterpret_cast<void *>(sie__psvr2__HmdDevice__DeactivateHook),
-      reinterpret_cast<void **>(&sie__psvr2__HmdDevice__Deactivate));
+                         reinterpret_cast<void *>(sie__psvr2__HmdDevice__DeactivateHook),
+                         reinterpret_cast<void **>(&sie__psvr2__HmdDevice__Deactivate));
 
     CaesarManager__getInstance = decltype(CaesarManager__getInstance)(pHmdDriverLoader->GetBaseAddress() + 0x124c90);
     CaesarManager__getIMUTimestampOffset = decltype(CaesarManager__getIMUTimestampOffset)(pHmdDriverLoader->GetBaseAddress() + 0x1252e0);
