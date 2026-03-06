@@ -23,7 +23,7 @@ namespace psvr2_toolkit {
 #ifdef OPENVR_EXTENSIONS_AVAILABLE
   void* g_pOpenVRExHandle = nullptr;
 #endif
-  vr::VRInputComponentHandle_t eyeTrackingComponent;
+  vr::VRInputComponentHandle_t eyeTrackingComponent = vr::k_ulInvalidInputComponentHandle;
   int64_t currentBrightness;
 
   vr::EVRInitError (*sie__psvr2__HmdDevice__Activate)(void *, uint32_t) = nullptr;
@@ -125,6 +125,11 @@ namespace psvr2_toolkit {
 
   void HmdDeviceHooks::UpdateGaze(void* pData, size_t dwSize)
   {
+      if (eyeTrackingComponent == vr::k_ulInvalidInputComponentHandle)
+      {
+        return;
+      }
+
       Hmd2GazeState* pGazeState = reinterpret_cast<Hmd2GazeState*>(pData);
       vr::VREyeTrackingData_t eyeTrackingData {};
 
