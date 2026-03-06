@@ -5,7 +5,7 @@
 namespace psvr2_toolkit {
 
   struct AstonContext_t {
-    void* vfptr;
+    void *vfptr;
     char unk1[0x28];
     int handle; // libpad handle
     char unk3[0xEFE8C];
