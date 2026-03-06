@@ -1,5 +1,5 @@
 > [!WARNING]
-> If you have paid for PlayStation VR2 Toolkit, you have been scammed and you should immediately request a refund. PlayStation VR2 Toolkit is entirely free and **is intended for NON-COMMERCIAL use only**, we do not attempt to profit off of it. Additionally, eye tracking data from PlayStation VR2 Toolkit **must not** be used in commercial environments. \
+> If you have paid for PlayStation VR2 Toolkit, you have been scammed and you should immediately request a refund. PlayStation VR2 Toolkit is entirely free and **is intended for NON-COMMERCIAL use only**, we do not attempt to profit off of it. Additionally, eye tracking data from PlayStation VR2 Toolkit **must not** be used in commercial environments and/or for commercial purposes. \
 > \
 > PlayStation VR2 Toolkit is provided "as is", without warranty of any kind, express or implied, including but not limited to the warranties of merchantability, fitness for a particular purpose and noninfringement. In no event shall the authors or copyright holders be liable for any claim, damages or other liability, whether in an action of contract, tort or otherwise, arising from, out of or in connection with the software or the use or other dealings in the software.
 
