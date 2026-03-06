@@ -6,7 +6,7 @@
 > [!NOTE]
 > Bnuuy Solutions and PlayStation VR2 Toolkit is not affiliated with Sony Interactive Entertainment, our project is not official or endorsed by Sony Interactive Entertainment in any way. \
 > \
-> Sony, Sony Interactive Entertainment and PSVR2/PlayStation VR2 are trademarks or registered trademarks of Sony Interactive Entertainment LLC in the United States of America and elsewhere.
+> Sony, Sony Interactive Entertainment and PS VR2/PlayStation VR2 are trademarks or registered trademarks of Sony Interactive Entertainment LLC in the United States of America and elsewhere.
 
 <p align="center"><img src="https://github.com/BnuuySolutions/PSVR2Toolkit/blob/main/assets/Icon.png?raw=true" width="128" height="128"></p>
 <h1 align="center">PlayStation VR2 Toolkit</h1>
