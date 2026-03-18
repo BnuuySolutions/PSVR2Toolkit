@@ -13,9 +13,9 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "UnifiedTelemetry.Service_st
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PSVR2Toolkit.IPC", "projects\PSVR2Toolkit.IPC\PSVR2Toolkit.IPC.csproj", "{48FCC06F-F55F-F3B4-0563-5CD83BA2FC85}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PSVR2Toolkit.App", "projects\PSVR2Toolkit.App\PSVR2Toolkit.App.csproj", "{8E6661D1-6A40-4949-93CC-2280909E2DB3}"
-EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libcustomshare", "projects\libcustomshare\libcustomshare.vcxproj", "{EABC1D23-54F9-455F-9FB4-C0A7A01CA592}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PSVR2Toolkit.App", "projects\PSVR2Toolkit.App\PSVR2Toolkit.App.csproj", "{19D73E5D-9C32-4E94-BAC4-901994C9A9B2}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -65,14 +65,6 @@ Global
 		{48FCC06F-F55F-F3B4-0563-5CD83BA2FC85}.Release|x64.Build.0 = Release|Any CPU
 		{48FCC06F-F55F-F3B4-0563-5CD83BA2FC85}.ReleaseCI|x64.ActiveCfg = ReleaseCI|Any CPU
 		{48FCC06F-F55F-F3B4-0563-5CD83BA2FC85}.ReleaseCI|x64.Build.0 = ReleaseCI|Any CPU
-		{8E6661D1-6A40-4949-93CC-2280909E2DB3}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{8E6661D1-6A40-4949-93CC-2280909E2DB3}.Debug|x64.Build.0 = Debug|Any CPU
-		{8E6661D1-6A40-4949-93CC-2280909E2DB3}.DebugCI|x64.ActiveCfg = DebugCI|Any CPU
-		{8E6661D1-6A40-4949-93CC-2280909E2DB3}.DebugCI|x64.Build.0 = DebugCI|Any CPU
-		{8E6661D1-6A40-4949-93CC-2280909E2DB3}.Release|x64.ActiveCfg = Release|Any CPU
-		{8E6661D1-6A40-4949-93CC-2280909E2DB3}.Release|x64.Build.0 = Release|Any CPU
-		{8E6661D1-6A40-4949-93CC-2280909E2DB3}.ReleaseCI|x64.ActiveCfg = ReleaseCI|Any CPU
-		{8E6661D1-6A40-4949-93CC-2280909E2DB3}.ReleaseCI|x64.Build.0 = ReleaseCI|Any CPU
 		{EABC1D23-54F9-455F-9FB4-C0A7A01CA592}.Debug|x64.ActiveCfg = Debug|x64
 		{EABC1D23-54F9-455F-9FB4-C0A7A01CA592}.Debug|x64.Build.0 = Debug|x64
 		{EABC1D23-54F9-455F-9FB4-C0A7A01CA592}.DebugCI|x64.ActiveCfg = Debug|x64
@@ -81,6 +73,11 @@ Global
 		{EABC1D23-54F9-455F-9FB4-C0A7A01CA592}.Release|x64.Build.0 = Release|x64
 		{EABC1D23-54F9-455F-9FB4-C0A7A01CA592}.ReleaseCI|x64.ActiveCfg = Release|x64
 		{EABC1D23-54F9-455F-9FB4-C0A7A01CA592}.ReleaseCI|x64.Build.0 = Release|x64
+		{19D73E5D-9C32-4E94-BAC4-901994C9A9B2}.Debug|x64.ActiveCfg = Debug|x64
+		{19D73E5D-9C32-4E94-BAC4-901994C9A9B2}.DebugCI|x64.ActiveCfg = Debug|x64
+		{19D73E5D-9C32-4E94-BAC4-901994C9A9B2}.Release|x64.ActiveCfg = Release|x64
+		{19D73E5D-9C32-4E94-BAC4-901994C9A9B2}.Release|x64.Build.0 = Release|x64
+		{19D73E5D-9C32-4E94-BAC4-901994C9A9B2}.ReleaseCI|x64.ActiveCfg = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
