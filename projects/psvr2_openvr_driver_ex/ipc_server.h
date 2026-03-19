@@ -14,6 +14,8 @@ namespace psvr2_toolkit {
 
     class IpcServer {
     public:
+      uint8_t HeadsetVibration = 0; // TEMP
+
       IpcServer();
 
       static IpcServer *Instance();

@@ -27,6 +27,8 @@ namespace psvr2_toolkit {
       Command_ClientTriggerEffectMultiplePositionFeedback, // CommandDataClientTriggerEffectMultiplePositionFeedback_t
       Command_ClientTriggerEffectSlopeFeedback, // CommandDataClientTriggerEffectSlopeFeedback_t
       Command_ClientTriggerEffectMultiplePositionVibration, // CommandDataClientTriggerEffectMultiplePositionVibration_t
+
+      Command_ClientSetHeadsetVibration, // CommandDataClientSetHeadsetVibration_t
     };
 
     enum EHandshakeResultType : uint8_t {
@@ -178,6 +180,10 @@ namespace psvr2_toolkit {
       EVRControllerType controllerType;
       uint8_t frequency;
       uint8_t amplitude[k_unTriggerEffectControlPoint];
+    };
+
+    struct CommandDataClientSetHeadsetVibration_t {
+      uint8_t frequency;
     };
 
     struct CommandHeader_t {
