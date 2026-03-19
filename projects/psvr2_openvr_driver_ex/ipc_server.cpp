@@ -381,6 +381,14 @@ namespace psvr2_toolkit {
           }
           break;
         }
+
+        case Command_ClientSetHeadsetVibration: {
+          if (pHeader->dataLen == sizeof(CommandDataClientSetHeadsetVibration_t) && m_connections.contains(clientPort)) {
+            CommandDataClientSetHeadsetVibration_t* pRequest = reinterpret_cast<CommandDataClientSetHeadsetVibration_t*>(pData);
+            HeadsetVibration = pRequest->frequency;
+          }
+          break;
+        }
       }
     }
 
