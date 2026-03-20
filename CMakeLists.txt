@@ -1,0 +1,5 @@
+cmake_minimum_required(VERSION 3.10)
+
+project(PSVR2Toolkit)
+
+add_subdirectory(projects)
