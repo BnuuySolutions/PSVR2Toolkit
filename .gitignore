@@ -403,4 +403,5 @@ FodyWeavers.xsd
 !projects/psvr2_openvr_driver_ex/minhook/lib/*
 
 # CMake
+build/*
 out/*
