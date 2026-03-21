@@ -7,7 +7,7 @@ namespace psvr2_toolkit {
   class HmdDeviceHooks {
   public:
     static void InstallHooks();
-    static void UpdateGaze(void* pData, size_t dwSize);
+    static void UpdateGaze(void *pData, size_t dwSize);
   };
 
 } // psvr2_toolkit
