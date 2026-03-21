@@ -6,6 +6,8 @@
 #include "ipc_server.h"
 
 namespace psvr2_toolkit {
+  std::mutex ldPayloadMutex;
+  LDPayload currentLDPayload;
 
   int (*CaesarUsbThread__report)(void *thisptr, bool bIsSet, uint16_t reportId, void *buffer, uint16_t length, uint16_t value, uint16_t index, uint16_t subcmd);
 
@@ -26,6 +28,17 @@ namespace psvr2_toolkit {
     return result;
   }
 
+  uint64_t(*CaesarUsbThreadLeddet__poll)(void *thisptr) = nullptr;
+  uint64_t CaesarUsbThreadLeddet__pollHook(void *thisptr) {
+    uint64_t result = CaesarUsbThreadLeddet__poll(thisptr);
+
+    std::scoped_lock<std::mutex> lock(ldPayloadMutex);
+
+    memcpy(&currentLDPayload, reinterpret_cast<uint8_t *>(thisptr) + 0x230, sizeof(LDPayload));
+
+    return result;
+  }
+
   void UsbThreadHooks::InstallHooks() {
     static HmdDriverLoader *pHmdDriverLoader = HmdDriverLoader::Instance();
 
@@ -36,6 +49,13 @@ namespace psvr2_toolkit {
       HookLib::InstallHook(reinterpret_cast<void *>(pHmdDriverLoader->GetBaseAddress() + 0x1268D0),
                            reinterpret_cast<void *>(CaesarUsbThreadImuStatus__pollHook),
                            reinterpret_cast<void **>(&CaesarUsbThreadImuStatus__poll));
+    }
+
+    if (VRSettings::GetBool(STEAMVR_SETTINGS_USE_TOOLKIT_SYNC, SETTING_USE_TOOLKIT_SYNC_DEFAULT_VALUE)) {
+      // CaesarUsbThreadLeddet::poll
+      HookLib::InstallHook(reinterpret_cast<void *>(pHmdDriverLoader->GetBaseAddress() + 0x126B80),
+                           reinterpret_cast<void *>(CaesarUsbThreadLeddet__pollHook),
+                           reinterpret_cast<void **>(&CaesarUsbThreadLeddet__poll));
     }
   }
 

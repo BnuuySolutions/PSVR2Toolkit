@@ -1,3 +1,5 @@
+add_definitions(-DNOMINMAX)
+
 add_library(psvr2_openvr_driver_ex SHARED
   caesar_manager_hooks.cpp
   device_provider_proxy.cpp
@@ -7,7 +9,9 @@ add_library(psvr2_openvr_driver_ex SHARED
   hmd_device_hooks.cpp
   hmd_driver_factory.cpp
   hmd_driver_loader.cpp
+  libpad_hooks.cpp
   ipc_server.cpp
+  sense_controller.cpp
   trigger_effect_manager.cpp
   usb_thread_gaze.cpp
   usb_thread_hooks.cpp
