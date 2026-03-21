@@ -27,3 +27,9 @@ jobs:
 
     - name: Build
       run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: psvr2-toolkit-build
+        path: ${{github.workspace}}/build
