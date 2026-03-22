@@ -5,4 +5,5 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 project(PSVR2Toolkit)
 
+add_subdirectory(externals)
 add_subdirectory(projects)
