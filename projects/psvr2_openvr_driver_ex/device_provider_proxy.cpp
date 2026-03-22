@@ -103,10 +103,6 @@ namespace psvr2_toolkit {
     Util::DriverLog("You are using an experimental build of PlayStation VR2 Toolkit, please report any issues that may occur to the developers!");
 #endif
 
-    if (!HookLib::Initialize()) {
-      MessageBoxW(nullptr, L"MinHook initialization failed, please report this to the developers!", L"PlayStation VR2 Toolkit (DriverEx)", MB_ICONERROR | MB_OK);
-    }
-
     if (isRunningOnWine) {
       Util::DriverLog("PlayStation VR2 Toolkit has detected itself running on Wine, compatibility patches will be applied.");
     }
