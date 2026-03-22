@@ -26,7 +26,7 @@ namespace psvr2_toolkit {
       void Start();
       void Stop();
 
-      void UpdateGazeState(Hmd2GazeState *pGazeState, float leftEyelidOpenness, float rightEyelidOpenness);
+      void UpdateGazeState(Hmd2GazeState *pGazeState);
 
     private:
       struct ConnectionInfo_t {
@@ -40,15 +40,12 @@ namespace psvr2_toolkit {
       bool m_initialized;
       bool m_running;
       bool m_doGaze;
-      bool m_doOpenness;
       SOCKET m_socket;
       sockaddr_in m_serverAddr;
       std::thread m_receiveThread;
       std::map<uint16_t, ConnectionInfo_t> m_connections;
 
       Hmd2GazeState *m_pGazeState;
-      float m_leftEyelidOpenness;
-      float m_rightEyelidOpenness;
 
       void ReceiveLoop();
       void HandleClient(SOCKET clientSocket, SOCKADDR_IN clientAddr);

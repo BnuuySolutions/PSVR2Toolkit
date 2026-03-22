@@ -90,8 +90,8 @@ namespace psvr2_toolkit {
       bool isBlinkValid;
       bool blink;
 
-      bool isOpenEnabled;
-      float open;
+      bool isOpenEnabled; // deprecated
+      float open; // deprecated
     };
 
     struct GazeEyeResult3 {
@@ -113,8 +113,8 @@ namespace psvr2_toolkit {
       bool isBlinkValid;
       bool blink;
 
-      bool isOpenEnabled;
-      float open;
+      bool isOpenEnabled; // deprecated
+      float open; // deprecated
     };
 
     struct CommandDataServerGazeDataResult_t {
