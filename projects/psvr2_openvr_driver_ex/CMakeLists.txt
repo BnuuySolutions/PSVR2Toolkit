@@ -15,10 +15,14 @@ add_library(psvr2_openvr_driver_ex SHARED
   usb_thread_gaze.cpp
   usb_thread_hooks.cpp
 )
-set_target_properties(psvr2_openvr_driver_ex PROPERTIES
-  OUTPUT_NAME "driver_playstation_vr2"
-)
 target_include_directories(psvr2_openvr_driver_ex PRIVATE .)
-target_link_libraries(psvr2_openvr_driver_ex PRIVATE shlwapi ws2_32 winusb)
+
+target_link_libraries(psvr2_openvr_driver_ex PRIVATE shlwapi winusb ws2_32)
+
+# Link our external libraries
 target_link_libraries(psvr2_openvr_driver_ex PRIVATE PolyHook_2)
 target_link_libraries(psvr2_openvr_driver_ex PRIVATE openvr-headers)
+
+set_target_properties(psvr2_openvr_driver_ex PROPERTIES
+  OUTPUT_NAME driver_playstation_vr2
+)
