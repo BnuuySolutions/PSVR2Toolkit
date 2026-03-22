@@ -1,6 +1,6 @@
 #pragma once
 
-#include <minhook.h>
+#include "polyhook2/Detour/NatDetour.hpp"
 
 #define INSTALL_STUB(pTarget) psvr2_toolkit::HookLib::InstallStub(pTarget)
 #define INSTALL_STUB_ORIGINAL(pTarget, ppOriginal) psvr2_toolkit::HookLib::InstallStub(pTarget, ppOriginal)
@@ -17,13 +17,9 @@ namespace psvr2_toolkit {
     static __int64 StubRet0() { return 0; }
 
   public:
-    static bool Initialize() {
-      return MH_Initialize() == MH_OK;
-    }
-
     static void InstallHook(void *pTarget, void *pDetour, void **ppOriginal = nullptr) {
-      MH_CreateHook(pTarget, pDetour, ppOriginal);
-      MH_EnableHook(pTarget);
+      PLH::NatDetour detour = PLH::NatDetour((uint64_t)pTarget, (uint64_t)pDetour, (uint64_t*)ppOriginal);
+      detour.hook();
     }
 
     static void InstallStub(void *pTarget, void **ppOriginal = nullptr) {
