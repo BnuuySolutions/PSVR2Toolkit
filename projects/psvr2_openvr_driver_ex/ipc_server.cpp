@@ -46,7 +46,6 @@ namespace psvr2_toolkit {
 
       m_initialized = true;
       m_doGaze = !VRSettings::GetBool(STEAMVR_SETTINGS_DISABLE_GAZE, SETTING_DISABLE_GAZE_DEFAULT_VALUE);
-      m_doOpenness = VRSettings::GetBool(STEAMVR_SETTINGS_ENABLE_EYELID_ESTIMATION, SETTING_ENABLE_EYELID_ESTIMATION_DEFAULT_VALUE);
     }
 
     void IpcServer::Start() {
@@ -90,15 +89,13 @@ namespace psvr2_toolkit {
       m_receiveThread.join();
     }
 
-    void IpcServer::UpdateGazeState(Hmd2GazeState *pGazeState, float leftEyelidOpenness, float rightEyelidOpenness) {
+    void IpcServer::UpdateGazeState(Hmd2GazeState *pGazeState) {
       if (!m_pGazeState) {
         m_pGazeState = reinterpret_cast<Hmd2GazeState *>(malloc(sizeof(Hmd2GazeState)));
       }
       if (m_pGazeState) {
         memcpy(m_pGazeState, pGazeState, sizeof(Hmd2GazeState)); // Realistically, we should have a mutex here. Sadly, we do not have the time.
       }
-      m_leftEyelidOpenness = leftEyelidOpenness;
-      m_rightEyelidOpenness = rightEyelidOpenness;
     }
 
     void IpcServer::ReceiveLoop() {
@@ -259,8 +256,8 @@ namespace psvr2_toolkit {
                     .pupilDiaMm = m_pGazeState->leftEye.pupilDiaMm,
                     .isBlinkValid = m_pGazeState->leftEye.isBlinkValid == Hmd2Bool::HMD2_BOOL_TRUE,
                     .blink = m_pGazeState->leftEye.blink == Hmd2Bool::HMD2_BOOL_TRUE,
-                    .isOpenEnabled = m_doOpenness,
-                    .open = m_doOpenness ? m_leftEyelidOpenness : 0.0f,
+                    .isOpenEnabled = false,
+                    .open = 0.0f,
                   },
 
                   .rightEye = {
@@ -280,8 +277,8 @@ namespace psvr2_toolkit {
                     .pupilDiaMm = m_pGazeState->rightEye.pupilDiaMm,
                     .isBlinkValid = m_pGazeState->rightEye.isBlinkValid == Hmd2Bool::HMD2_BOOL_TRUE,
                     .blink = m_pGazeState->rightEye.blink == Hmd2Bool::HMD2_BOOL_TRUE,
-                    .isOpenEnabled = m_doOpenness,
-                    .open = m_doOpenness ? m_rightEyelidOpenness : 0.0f,
+                    .isOpenEnabled = false,
+                    .open = 0.0f,
                   }
                 };
                 SendIpcCommand(clientSocket, Command_ServerGazeDataResult, &response, sizeof(response));
@@ -314,8 +311,8 @@ namespace psvr2_toolkit {
                     },
                     .isBlinkValid = m_pGazeState->leftEye.isBlinkValid == Hmd2Bool::HMD2_BOOL_TRUE,
                     .blink = m_pGazeState->leftEye.blink == Hmd2Bool::HMD2_BOOL_TRUE,
-                    .isOpenEnabled = m_doOpenness,
-                    .open = m_doOpenness ? m_leftEyelidOpenness : 0.0f,
+                    .isOpenEnabled = false,
+                    .open = 0.0f,
                   },
 
                   .rightEye = {
@@ -345,8 +342,8 @@ namespace psvr2_toolkit {
                     },
                     .isBlinkValid = m_pGazeState->rightEye.isBlinkValid == Hmd2Bool::HMD2_BOOL_TRUE,
                     .blink = m_pGazeState->rightEye.blink == Hmd2Bool::HMD2_BOOL_TRUE,
-                    .isOpenEnabled = m_doOpenness,
-                    .open = m_doOpenness ? m_rightEyelidOpenness : 0.0f,
+                    .isOpenEnabled = false,
+                    .open = 0.0f,
                   }
                 };
                 SendIpcCommand(clientSocket, Command_ServerGazeDataResult, &response, sizeof(response));

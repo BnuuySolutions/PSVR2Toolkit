@@ -5,7 +5,6 @@ add_library(psvr2_openvr_driver_ex SHARED
   device_provider_proxy.cpp
   driver_context_proxy.cpp
   driver_host_proxy.cpp
-  eyelid_estimator.cpp
   hmd_device_hooks.cpp
   hmd_driver_factory.cpp
   hmd_driver_loader.cpp
@@ -17,7 +16,7 @@ add_library(psvr2_openvr_driver_ex SHARED
   usb_thread_hooks.cpp
 )
 set_target_properties(psvr2_openvr_driver_ex PROPERTIES
-  OUTPUT_NAME "psvr2_openvr_driver"
+  OUTPUT_NAME "driver_playstation_vr2"
 )
 target_include_directories(psvr2_openvr_driver_ex PRIVATE .)
 target_include_directories(psvr2_openvr_driver_ex PRIVATE ./minhook/include)
