@@ -9,7 +9,6 @@ add_library(psvr2_openvr_driver_ex SHARED
   hmd_driver_factory.cpp
   hmd_driver_loader.cpp
   libpad_hooks.cpp
-  ipc_server.cpp
   sense_controller.cpp
   trigger_effect_manager.cpp
   usb_thread_gaze.cpp
