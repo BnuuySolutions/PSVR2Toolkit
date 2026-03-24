@@ -10,7 +10,7 @@
 
 namespace psvr2_toolkit {
 
-  // Provides a thin wrapper around MinHook.
+  // Provides a thin wrapper around PolyHook 2.0.
   class HookLib {
   private:
     static void Stub() {}
@@ -18,8 +18,9 @@ namespace psvr2_toolkit {
 
   public:
     static void InstallHook(void *pTarget, void *pDetour, void **ppOriginal = nullptr) {
-      PLH::NatDetour detour = PLH::NatDetour((uint64_t)pTarget, (uint64_t)pDetour, (uint64_t*)ppOriginal);
-      detour.hook();
+      uint64_t original = 0; // Only used if ppOriginal is null.
+      PLH::NatDetour *detour = new PLH::NatDetour((uint64_t)pTarget, (uint64_t)pDetour, ppOriginal ? (uint64_t*)ppOriginal : &original);
+      detour->hook();
     }
 
     static void InstallStub(void *pTarget, void **ppOriginal = nullptr) {
