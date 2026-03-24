@@ -3,6 +3,7 @@
 #include <windows.h>
 
 CustomShareManager *CustomShareManager::m_pInstance = nullptr;
+bool CustomShareManager::m_initialized = false;
 
 void CustomShareManager::createSingleton() {
   m_initialized = true;
