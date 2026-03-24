@@ -4,6 +4,7 @@
 #include "hmd_device_hooks.h"
 #include "hmd2_gaze.h"
 #include "ipc_server.h"
+#include "custom_share_manager.h"
 
 #include <cstdlib>
 
@@ -133,7 +134,9 @@ int CaesarUsbThreadGaze::poll() {
   if (buffer[0] == GAZE_MAGIC_0 && buffer[1] == GAZE_MAGIC_1_STATE) {
     Hmd2GazeState *pGazeState = reinterpret_cast<Hmd2GazeState *>(buffer);
     HmdDeviceHooks::UpdateGaze(pGazeState, sizeof(Hmd2GazeState));
-    pIpcServer->UpdateGazeState(pGazeState);
+    pIpcServer->UpdateGazeState(pGazeState); // TODO: remove old ipc server
+    CustomShareManager* pShareManager = CustomShareManager::getSingleton();
+    pShareManager->setGazeStatus(reinterpret_cast<unsigned char *>(buffer)); // TODO: fix casting.
   }
 
   return 0;

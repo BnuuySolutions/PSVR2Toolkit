@@ -15,6 +15,7 @@
 
 #include <windows.h>
 #include "sense_controller.h"
+#include "custom_share_manager.h"
 
 using namespace psvr2_toolkit::ipc;
 
@@ -52,7 +53,8 @@ namespace psvr2_toolkit {
       m_initOnce = true;
     }
 
-    IpcServer::Instance()->Start();
+    IpcServer::Instance()->Start(); // TODO: remove old IPC server.
+    CustomShareManager::createSingleton();
 
     static DriverContextProxy *pDriverContextProxy = DriverContextProxy::Instance();
     pDriverContextProxy->SetDriverContext(pDriverContext);
