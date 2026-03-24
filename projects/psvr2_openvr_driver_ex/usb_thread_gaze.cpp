@@ -3,7 +3,6 @@
 #include "hmd_driver_loader.h"
 #include "hmd_device_hooks.h"
 #include "hmd2_gaze.h"
-#include "ipc_server.h"
 #include "custom_share_manager.h"
 
 #include <cstdlib>
@@ -16,7 +15,6 @@
 #define GAZE_MAGIC_1_STATE 0x53
 
 using namespace psvr2_toolkit;
-using namespace psvr2_toolkit::ipc;
 
 void **ppVTable = nullptr; // We need to keep track of our customized CaesarUsbThread VTable here, so we may restore it.
 
@@ -123,8 +121,6 @@ uint8_t CaesarUsbThreadGaze::getReadPipeId() {
 }
 
 int CaesarUsbThreadGaze::poll() {
-  static IpcServer *pIpcServer = IpcServer::Instance();
-
   static char buffer[0x200000];
   int result = CaesarUsbThread__read(this, 0x85, buffer, sizeof(buffer));
   if (result < 0) {
@@ -134,7 +130,6 @@ int CaesarUsbThreadGaze::poll() {
   if (buffer[0] == GAZE_MAGIC_0 && buffer[1] == GAZE_MAGIC_1_STATE) {
     Hmd2GazeState *pGazeState = reinterpret_cast<Hmd2GazeState *>(buffer);
     HmdDeviceHooks::UpdateGaze(pGazeState, sizeof(Hmd2GazeState));
-    pIpcServer->UpdateGazeState(pGazeState); // TODO: remove old ipc server
     CustomShareManager* pShareManager = CustomShareManager::getSingleton();
     pShareManager->setGazeStatus(reinterpret_cast<unsigned char *>(buffer)); // TODO: fix casting.
   }

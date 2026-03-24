@@ -3,7 +3,6 @@
 #include "hmd_driver_loader.h"
 #include "hook_lib.h"
 #include "vr_settings.h"
-#include "ipc_server.h"
 
 namespace psvr2_toolkit {
   std::mutex ldPayloadMutex;
@@ -16,11 +15,11 @@ namespace psvr2_toolkit {
     int result = CaesarUsbThreadImuStatus__poll(thisptr);
     CaesarUsbThread__report(thisptr, true, 12, nullptr, 0, 0, 0, 1); // Keep gaze enabled
 
-    ipc::IpcServer* pIpcServer = ipc::IpcServer::Instance();
-    if (pIpcServer) {
-      uint8_t headsetVibration = pIpcServer->HeadsetVibration;
-      CaesarUsbThread__report(thisptr, true, 8, &headsetVibration, 1, 0, 0, 1);
-    }
+    //ipc::IpcServer* pIpcServer = ipc::IpcServer::Instance();
+    //if (pIpcServer) {
+    //  uint8_t headsetVibration = pIpcServer->HeadsetVibration;
+    //  CaesarUsbThread__report(thisptr, true, 8, &headsetVibration, 1, 0, 0, 1);
+    //}
 
     //char data[8] = { 1, 0, 0, 0, 0x05, 0, 0, 0 };
 

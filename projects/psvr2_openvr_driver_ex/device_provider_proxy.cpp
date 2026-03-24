@@ -6,7 +6,6 @@
 #include "hmd_device_hooks.h"
 #include "hmd_driver_loader.h"
 #include "hook_lib.h"
-#include "ipc_server.h"
 #include "libpad_hooks.h"
 #include "trigger_effect_manager.h"
 #include "usb_thread_hooks.h"
@@ -16,8 +15,6 @@
 #include <windows.h>
 #include "sense_controller.h"
 #include "custom_share_manager.h"
-
-using namespace psvr2_toolkit::ipc;
 
 namespace psvr2_toolkit {
 
@@ -53,7 +50,6 @@ namespace psvr2_toolkit {
       m_initOnce = true;
     }
 
-    IpcServer::Instance()->Start(); // TODO: remove old IPC server.
     CustomShareManager::createSingleton();
 
     static DriverContextProxy *pDriverContextProxy = DriverContextProxy::Instance();
@@ -63,8 +59,6 @@ namespace psvr2_toolkit {
   }
 
   void DeviceProviderProxy::Cleanup() {
-    IpcServer::Instance()->Stop();
-
     if (VRSettings::GetBool(STEAMVR_SETTINGS_USE_ENHANCED_HAPTICS, SETTING_USE_TOOLKIT_SYNC_DEFAULT_VALUE)) {
       SenseController::Destroy();
     }
@@ -130,7 +124,6 @@ namespace psvr2_toolkit {
   }
 
   void DeviceProviderProxy::InitSystems() {
-    IpcServer::Instance()->Initialize();
     TriggerEffectManager::Instance()->Initialize();
     if (VRSettings::GetBool(STEAMVR_SETTINGS_USE_ENHANCED_HAPTICS, SETTING_USE_TOOLKIT_SYNC_DEFAULT_VALUE)) {
       SenseController::Initialize();
