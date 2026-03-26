@@ -6,13 +6,13 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\Baballonia\src\Baballonia.SDK\Baballonia.SDK.csproj" />
+    <None Update="PSVR2Toolkit.CAPI.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
   <ItemGroup>
-    <None Update="customshare.dll">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
+    <ProjectReference Include="..\..\..\Baballonia\src\Baballonia.SDK\Baballonia.SDK.csproj" />
   </ItemGroup>
 
 </Project>

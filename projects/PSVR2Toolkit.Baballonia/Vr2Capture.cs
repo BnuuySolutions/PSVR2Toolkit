@@ -1,7 +1,6 @@
 ﻿using Microsoft.Extensions.Logging;
 using OpenCvSharp;
 using System;
-using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -11,20 +10,20 @@ namespace PSVR2Toolkit.Baballonia;
 
 public sealed class Vr2Capture(string source, ILogger<Vr2Capture> logger) : Capture(source, logger)
 {
-    private const string DllName = "customshare.dll";
+    private const int IMAGE_WIDTH = 400;
+    private const int IMAGE_HEIGHT = 200;
+    private const int IMAGE_HEADER_SIZE = 0x100;
+    // The image from the buffer is BC4, there is only one channel.
+    private const int IMAGE_DATA_SIZE = IMAGE_WIDTH * IMAGE_HEIGHT;
 
-    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-    public static extern void CustomShare_Initialize();
-
-    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-    public static extern void CustomShare_GetGazeImage(byte[] buffer);
+    private byte[] _imageBuffer = new byte[0x200100];
 
     private CancellationTokenSource? _cts;
     private Task? _captureTask;
 
     static Vr2Capture()
     {
-        CustomShare_Initialize();
+        CAPI.CAPI_Initialize();
     }
 
     public override Task<bool> StartCapture()
@@ -45,39 +44,17 @@ public sealed class Vr2Capture(string source, ILogger<Vr2Capture> logger) : Capt
         {
             try
             {
-                byte[] buffer = new byte[0x200100];
-                CustomShare_GetGazeImage(buffer);
-                byte[] img = null!;
-                using (var ms = new MemoryStream(buffer))
-                using (var reader = new BinaryReader(ms))
+                CAPI.CAPI_GetGazeImage(_imageBuffer);
+
+                // Check for VI in header.
+                if (_imageBuffer[0] == 0x56 && _imageBuffer[1] == 0x49)
                 {
-                    ms.Seek(4, SeekOrigin.Begin);
-                    int len = reader.ReadInt32();
-                    ms.Seek(0x100, SeekOrigin.Begin);
-                    img = reader.ReadBytes(len - 0x100);
+                    var mat = new Mat(IMAGE_HEIGHT, IMAGE_WIDTH, MatType.CV_8UC1);
+                    // We can skip the header when copying the image data to the matrix data.
+                    Marshal.Copy(_imageBuffer, IMAGE_HEADER_SIZE, mat.Data, IMAGE_DATA_SIZE);
+                    SetRawMat(mat);
                 }
-                var mat = new Mat((int)200, (int)400, MatType.CV_8UC1);
-                Marshal.Copy(img, 0, mat.Data, img.Length);
-                SetRawMat(mat);
-                /*if (_device.CaptureFrame(out byte[]? frame))
-                {
-                    if (frame is { Length: > 0 })
-                    {
-                        switch (_device.PixelFormat)
-                        {
-                            case v4l2_pix_fmt.V4L2_PIX_FMT_MJPEG:
-                                DecodeMJPEG(frame);
-                                break;
-                            case v4l2_pix_fmt.V4L2_PIX_FMT_YUYV:
-                                var pix = _device.CurrentFormat.pix;
-                                DecodeYUYV(frame, pix.width, pix.height);
-                                break;
-                            default:
-                                throw new ArgumentOutOfRangeException();
-                        }
-                    }
-                }
-                else*/
+                else
                 {
                     await Task.Delay(1, ct);
                 }
