@@ -11,7 +11,7 @@
 <p align="center"><img src="https://github.com/BnuuySolutions/PSVR2Toolkit/blob/main/assets/Icon.png?raw=true" width="128" height="128"></p>
 <h1 align="center">PlayStation VR2 Toolkit</h1>
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) [![Discord](https://img.shields.io/discord/1466476893543862274)](https://discord.gg/jym8CgJPF3)
 
 Unofficial modification for the official PlayStation VR2 driver/app, which aims to improve your PlayStation VR2 experience on PC.
 
