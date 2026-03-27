@@ -36,7 +36,7 @@ For developers, we also have our own API library, which allows you to take full 
 
 5.) Your "win64" directory should now have 2 DLL files inside it, "driver_playstation_vr2.dll" and "driver_playstation_vr2_orig.dll". If you do not have both of those files, you fucked something up.
 
-6.) Enjoy your new features, please give us feedback in our [Discord](https://discord.gg/dPsfJhsGwb).
+6.) Enjoy your new features, please give us feedback in our [Discord](https://discord.gg/jym8CgJPF3).
 
 # Contact
 Have any legal complaints or questions?
