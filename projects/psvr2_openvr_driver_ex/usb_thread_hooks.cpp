@@ -24,9 +24,9 @@ namespace psvr2_toolkit {
     //  CaesarUsbThread__report(thisptr, true, 8, &headsetVibration, 1, 0, 0, 1);
     //}
 
-    char data[8] = { 1, 0, 0, 0, 0x05, 0, 0, 0 };
+    //char data[8] = { 1, 0, 0, 0, 0x05, 0, 0, 0 };
 
-    CaesarUsbThread__report(thisptr, true, 0xb, data, 8, 0, 0, 1); // Camera Mode
+    //CaesarUsbThread__report(thisptr, true, 0xb, data, 8, 0, 0, 1); // Camera Mode
     return result;
   }
 
