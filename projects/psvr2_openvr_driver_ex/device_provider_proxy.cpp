@@ -1,3 +1,4 @@
+#include "caesar_manager_hooks.h"
 #include "device_provider_proxy.h"
 
 #include "config.h"
