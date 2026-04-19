@@ -140,7 +140,7 @@ namespace psvr2_toolkit {
     Finalize
   };
 
-  struct CalibrationContext {
+  struct ControllerContext {
     CalibrationState state = CalibrationState::Idle;
     int32_t thresholdLedCount = 0;
     uint64_t syncStartTime = 0;
@@ -150,8 +150,10 @@ namespace psvr2_toolkit {
     int32_t searchUpperBound = 16666;
     int32_t leftEdge = 0;
     int32_t rightEdge = 0;
+
+    int32_t tunedCycle = 16683350; // 59.94hz. When we hit STABLE, we'll replace this.
   };
-  static CalibrationContext calibCtx[2];
+  static ControllerContext controllerCtx[2];
   std::atomic<int32_t> g_controllerLedCount[2] = {0, 0};
   std::atomic<uint64_t> g_opticalFrameIndex[2] = {0, 0};
 
@@ -227,7 +229,7 @@ namespace psvr2_toolkit {
     std::scoped_lock lock(ledCommandMutex);
 
     int32_t controller = isLeft ? 1 : 0;
-    if (calibCtx[controller].state != CalibrationState::Idle)
+    if (controllerCtx[controller].state != CalibrationState::Idle)
     {
       // Don't allow the driver to issue LED commands while calibrating.
       return;
@@ -254,10 +256,14 @@ namespace psvr2_toolkit {
         // Ensure we correctly line up with the center due to the difference in period
         ledCommand->payload.syncPhase.offset = (ledSync->oneSubGridTime * (k_bgPhasePeriod - k_stablePhasePeriod));
 
+        // Store the new tuned frequency to make it so we work less on future led syncs.
+        controllerCtx[controller].tunedCycle = ledSync->frameCycle; 
+
         break;
       }
 
       if (ledCommand->payload.syncPhase.phase == LedPhase::PRESCAN) {
+        ledCommand->payload.syncPhase.frameCycle = controllerCtx[controller].tunedCycle;
         Util::DriverLog("SET_SYNC_PHASE: phase={}, period={}, frameCycle={}, leds=[{},{},{},{}] {}",
           ledCommand->payload.syncPhase.phase,
           ledCommand->payload.syncPhase.period,
@@ -295,9 +301,10 @@ namespace psvr2_toolkit {
         ledCommand->payload.adjustTime.offset);
       break;
     case CommandType::ADJUST_TIME_AND_CYCLE:
-      Util::DriverLog("ADJUST_TIME_AND_CYCLE: adjustmentFactor={}, offset={}",
+      Util::DriverLog("ADJUST_TIME_AND_CYCLE: adjustmentFactor={}, offset={}, ledsync.frameCycle={}",
         ledCommand->payload.adjustTimeAndCycle.adjustmentFactor,
-        ledCommand->payload.adjustTimeAndCycle.offset);
+        ledCommand->payload.adjustTimeAndCycle.offset,
+        ledSync->frameCycle);
       break;
     case CommandType::SYSTEM_CONTROL:
       Util::DriverLog("SYSTEM_CONTROL: subCommand={}, subCommandPayload={}",
@@ -328,7 +335,7 @@ namespace psvr2_toolkit {
     size_t hasTimeOffset = senseController.GetHasTimestampOffset();
     bool isTracking = senseController.GetTrackingState(lastTrackedTimestamp);
 
-    CalibrationContext &ctx = calibCtx[controller];
+    ControllerContext &ctx = controllerCtx[controller];
 
     auto resetCalibration = [&]() {
       senseController.SetLatencyOffset(-1);
@@ -346,8 +353,8 @@ namespace psvr2_toolkit {
     static bool f9Pressed = false;
     if (GetAsyncKeyState(VK_F9) & 0x8000) {
       if (!f9Pressed) {
-        calibCtx[0].state = CalibrationState::Idle;
-        calibCtx[1].state = CalibrationState::Idle;
+        controllerCtx[0].state = CalibrationState::Idle;
+        controllerCtx[1].state = CalibrationState::Idle;
         SenseController::GetLeftController().SetLatencyOffset(-1);
         SenseController::GetRightController().SetLatencyOffset(-1);
         f9Pressed = true;
