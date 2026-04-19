@@ -1,5 +1,7 @@
 add_definitions(-DNOMINMAX)
 
+add_subdirectory(libusb)
+
 add_library(psvr2_openvr_driver_ex SHARED
   aston_manager_hooks.cpp
   caesar_manager_hooks.cpp
@@ -23,6 +25,7 @@ target_link_libraries(psvr2_openvr_driver_ex PRIVATE libcustomshare)
 # Link our external libraries
 target_link_libraries(psvr2_openvr_driver_ex PRIVATE PolyHook_2)
 target_link_libraries(psvr2_openvr_driver_ex PRIVATE openvr-headers)
+target_link_libraries(psvr2_openvr_driver_ex PRIVATE libusb)
 
 set_target_properties(psvr2_openvr_driver_ex PROPERTIES
   OUTPUT_NAME driver_playstation_vr2
