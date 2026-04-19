@@ -2,7 +2,8 @@ add_definitions(-DNOMINMAX)
 
 add_library(psvr2_openvr_driver_ex SHARED
   common/hmd2_gaze.h
-
+  
+  driver_hooks/aston_manager_hooks.cpp
   driver_hooks/caesar_manager_hooks.h
   driver_hooks/caesar_manager_hooks.cpp
   driver_hooks/hmd_device_hooks.h
