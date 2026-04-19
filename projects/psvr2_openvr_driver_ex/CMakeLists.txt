@@ -1,6 +1,7 @@
 add_definitions(-DNOMINMAX)
 
 add_library(psvr2_openvr_driver_ex SHARED
+  aston_manager_hooks.cpp
   caesar_manager_hooks.cpp
   device_provider_proxy.cpp
   driver_context_proxy.cpp
