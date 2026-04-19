@@ -1,0 +1,3 @@
+add_subdirectory(libcustomshare)
+add_subdirectory(psvr2_openvr_driver_ex)
+add_subdirectory(psvr2_toolkit_capi)

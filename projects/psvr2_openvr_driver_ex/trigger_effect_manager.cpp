@@ -5,7 +5,7 @@
 namespace psvr2_toolkit {
 
   struct AstonContext_t {
-    void* vfptr;
+    void *vfptr;
     char unk1[0x28];
     int handle; // libpad handle
     char unk3[0xEFE8C];
@@ -50,7 +50,7 @@ namespace psvr2_toolkit {
     m_initialized = true;
   }
 
-  void TriggerEffectManager::HandleIpcCommand(uint32_t processId, ipc::CommandHeader_t *pHeader, void *pData) {
+  /*void TriggerEffectManager::HandleIpcCommand(uint32_t processId, ipc::CommandHeader_t *pHeader, void *pData) {
     if (!pData || !pHeader)
       return;
     ScePadTriggerEffectCommand command = {};
@@ -172,6 +172,6 @@ namespace psvr2_toolkit {
         }
       }
     }
-  }
+  }*/
 
 } // psvr2_toolkit
