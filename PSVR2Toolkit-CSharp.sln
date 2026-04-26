@@ -1,10 +1,8 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
-VisualStudioVersion = 17.14.36930.0 d17.14
+VisualStudioVersion = 17.14.36930.0
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PSVR2Toolkit.App", "projects\PSVR2Toolkit.App\PSVR2Toolkit.App.csproj", "{19D73E5D-9C32-4E94-BAC4-901994C9A9B2}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PSVR2Toolkit.Baballonia", "projects\PSVR2Toolkit.Baballonia\PSVR2Toolkit.Baballonia.csproj", "{FBC95346-2DF6-4636-B235-D99695F41CE5}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Baballonia.SDK", "..\Baballonia\src\Baballonia.SDK\Baballonia.SDK.csproj", "{4F8D8BB3-7FE8-07E5-F0AF-7438CDFC57C2}"
@@ -17,12 +15,6 @@ Global
 		ReleaseCI|x64 = ReleaseCI|x64
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{19D73E5D-9C32-4E94-BAC4-901994C9A9B2}.Debug|x64.ActiveCfg = Debug|x64
-		{19D73E5D-9C32-4E94-BAC4-901994C9A9B2}.Debug|x64.Build.0 = Debug|x64
-		{19D73E5D-9C32-4E94-BAC4-901994C9A9B2}.DebugCI|x64.ActiveCfg = Debug|x64
-		{19D73E5D-9C32-4E94-BAC4-901994C9A9B2}.Release|x64.ActiveCfg = Release|x64
-		{19D73E5D-9C32-4E94-BAC4-901994C9A9B2}.Release|x64.Build.0 = Release|x64
-		{19D73E5D-9C32-4E94-BAC4-901994C9A9B2}.ReleaseCI|x64.ActiveCfg = Release|x64
 		{FBC95346-2DF6-4636-B235-D99695F41CE5}.Debug|x64.ActiveCfg = Debug|Any CPU
 		{FBC95346-2DF6-4636-B235-D99695F41CE5}.Debug|x64.Build.0 = Debug|Any CPU
 		{FBC95346-2DF6-4636-B235-D99695F41CE5}.DebugCI|x64.ActiveCfg = Debug|Any CPU
