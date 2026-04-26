@@ -1,6 +1,3 @@
-#ifdef _WIN32
-#include <windows.h>
-#endif // defined(_WIN32)
 #include "imgui.h"
 #include "imgui_impl_sdl3.h"
 #include "imgui_impl_sdlgpu3.h"
