@@ -14,19 +14,19 @@
 #include <cstdint>
 
 namespace psvr2_toolkit {
-  void* (*CaesarManager__getInstance)();
-  uint64_t (*CaesarManager__getIMUTimestampOffset)(void* thisptr, int64_t* hmdToHostOffset);
-  void* (*ShareManager__getInstance)();
-  void (*ShareManager__getIntConfig)(void* thisPtr, uint32_t configId, int64_t* outValue);
-  void (*ShareManager__setIntConfig)(void* thisPtr, uint32_t configId, int64_t* value);
+  void *(*CaesarManager__getInstance)();
+  uint64_t(*CaesarManager__getIMUTimestampOffset)(void *thisptr, int64_t *hmdToHostOffset);
+  void *(*ShareManager__getInstance)();
+  void (*ShareManager__getIntConfig)(void *thisPtr, uint32_t configId, int64_t *outValue);
+  void (*ShareManager__setIntConfig)(void *thisPtr, uint32_t configId, int64_t *value);
 
 #ifdef OPENVR_EXTENSIONS_AVAILABLE
-  void* g_pOpenVRExHandle = nullptr;
+  void *g_pOpenVRExHandle = nullptr;
 #endif
   vr::VRInputComponentHandle_t eyeTrackingComponent = vr::k_ulInvalidInputComponentHandle;
   int64_t currentBrightness;
 
-  vr::EVRInitError (*sie__psvr2__HmdDevice__Activate)(void *, uint32_t) = nullptr;
+  vr::EVRInitError(*sie__psvr2__HmdDevice__Activate)(void *, uint32_t) = nullptr;
   vr::EVRInitError sie__psvr2__HmdDevice__ActivateHook(void *thisptr, uint32_t unObjectId) {
     vr::EVRInitError result = sie__psvr2__HmdDevice__Activate(thisptr, unObjectId);
     vr::PropertyContainerHandle_t ulPropertyContainer = vr::VRProperties()->TrackedDeviceToPropertyContainer(unObjectId);
@@ -54,7 +54,7 @@ namespace psvr2_toolkit {
     vr::VRSettings()->SetFloat(vr::k_pch_SteamVR_Section, "analogGain", powf(static_cast<float>(currentBrightness) / 31.0f, 2.2f));
 
     // Set event handler for when brightness ("analogGain") changes.
-    DriverHostProxy::Instance()->AddEventHandler([](vr::VREvent_t* event) {
+    DriverHostProxy::Instance()->AddEventHandler([](vr::VREvent_t *event) {
       if (event->eventType == vr::EVREventType::VREvent_SteamVRSectionSettingChanged) {
         float currentFloatBrightness = powf(vr::VRSettings()->GetFloat(vr::k_pch_SteamVR_Section, "analogGain"), 1 / 2.2f);
         if (static_cast<int64_t>(ceilf(currentFloatBrightness * 31.0f)) != currentBrightness)
@@ -72,14 +72,14 @@ namespace psvr2_toolkit {
 
     if (vr::VRDriverInput())
     {
-        vr::EVRInputError result = (vr::VRDriverInput())->CreateEyeTrackingComponent(ulPropertyContainer, "/eyetracking", &eyeTrackingComponent);
-        if (result != vr::VRInputError_None) {
-            vr::VRDriverLog()->Log("Failed to create eye tracking component.");
-        }
+      vr::EVRInputError result = (vr::VRDriverInput())->CreateEyeTrackingComponent(ulPropertyContainer, "/eyetracking", &eyeTrackingComponent);
+      if (result != vr::VRInputError_None) {
+        vr::VRDriverLog()->Log("Failed to create eye tracking component.");
+      }
     }
     else
     {
-        vr::VRDriverLog()->Log("Failed to get driver input interface. Are you on the latest version of SteamVR?");
+      vr::VRDriverLog()->Log("Failed to get driver input interface. Are you on the latest version of SteamVR?");
     }
 
 #ifdef OPENVR_EXTENSIONS_AVAILABLE
@@ -112,10 +112,10 @@ namespace psvr2_toolkit {
     QueryPerformanceCounter(&now);
 
     return static_cast<int64_t>((static_cast<double>(now.QuadPart) /
-        static_cast<double>(frequency.QuadPart)) * 1e6);
+      static_cast<double>(frequency.QuadPart)) * 1e6);
   }
 
-  void HmdDeviceHooks::UpdateGaze(void* pData, size_t dwSize)
+  void HmdDeviceHooks::UpdateGaze(void *pData, size_t dwSize)
   {
       if (eyeTrackingComponent == vr::k_ulInvalidInputComponentHandle)
       {
@@ -125,31 +125,31 @@ namespace psvr2_toolkit {
       Hmd2GazeState* pGazeState = reinterpret_cast<Hmd2GazeState*>(pData);
       vr::VREyeTrackingData_t eyeTrackingData {};
 
-      bool valid = pGazeState->combined.isGazeDirValid;
+    bool valid = pGazeState->combined.isGazeDirValid;
 
-      eyeTrackingData.bActive = valid;
-      eyeTrackingData.bTracked = valid;
-      eyeTrackingData.bValid = valid;
+    eyeTrackingData.bActive = valid;
+    eyeTrackingData.bTracked = valid;
+    eyeTrackingData.bValid = valid;
 
-      auto& origin = pGazeState->combined.gazeOriginMm;
-      auto& direction = pGazeState->combined.gazeDirNorm;
+    auto &origin = pGazeState->combined.gazeOriginMm;
+    auto &direction = pGazeState->combined.gazeDirNorm;
 
-      eyeTrackingData.vGazeOrigin = vr::HmdVector3_t { -origin.x / 1000.0f, origin.y / 1000.0f, -origin.z / 1000.0f };
-      eyeTrackingData.vGazeTarget = vr::HmdVector3_t { -direction.x, direction.y, -direction.z };
+    eyeTrackingData.vGazeOrigin = vr::HmdVector3_t{ -origin.x / 1000.0f, origin.y / 1000.0f, -origin.z / 1000.0f };
+    eyeTrackingData.vGazeTarget = vr::HmdVector3_t{ -direction.x, direction.y, -direction.z };
 
-      int64_t hmdToHostOffset;
+    int64_t hmdToHostOffset;
 
-      CaesarManager__getIMUTimestampOffset(CaesarManager__getInstance(), &hmdToHostOffset);
+    CaesarManager__getIMUTimestampOffset(CaesarManager__getInstance(), &hmdToHostOffset);
 
-      double timeOffset = ((static_cast<int64_t>(pGazeState->combined.timestamp) + hmdToHostOffset) - GetHostTimestamp()) / 1e6;
+    double timeOffset = ((static_cast<int64_t>(pGazeState->combined.timestamp) + hmdToHostOffset) - GetHostTimestamp()) / 1e6;
 
-      (vr::VRDriverInput())->UpdateEyeTrackingComponent(eyeTrackingComponent, &eyeTrackingData, timeOffset);
+    (vr::VRDriverInput())->UpdateEyeTrackingComponent(eyeTrackingComponent, &eyeTrackingData, timeOffset);
 
-  #ifdef OPENVR_EXTENSIONS_AVAILABLE
-      if (g_pOpenVRExHandle) {
-        psvr2_toolkit::openvr_ex::OnHmdUpdate(&g_pOpenVRExHandle, pData, dwSize);
-      }
-  #endif
+#ifdef OPENVR_EXTENSIONS_AVAILABLE
+    if (g_pOpenVRExHandle) {
+      psvr2_toolkit::openvr_ex::OnHmdUpdate(&g_pOpenVRExHandle, pData, dwSize);
+    }
+#endif
   }
 
   void HmdDeviceHooks::InstallHooks() {
