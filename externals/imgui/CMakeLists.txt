@@ -11,4 +11,5 @@ add_library(imgui STATIC
 target_include_directories(imgui PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_include_directories(imgui PUBLIC backends)
 
+# TODO(bnuuy): We should consider switching to SDL3 shared library in the future.
 target_link_libraries(imgui PRIVATE SDL3::SDL3-static)
