@@ -1,4 +1,4 @@
-# Remove most SDL subsystems (they aren't required for us)
+# Remove SDL subsystems we don't need.
 set(SDL_AUDIO OFF CACHE BOOL "" FORCE)
 set(SDL_RENDER OFF CACHE BOOL "" FORCE)
 set(SDL_CAMERA OFF CACHE BOOL "" FORCE)
