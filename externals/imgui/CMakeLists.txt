@@ -1,3 +1,4 @@
+# Our ImGui external only requires SDL3+GPU.
 add_library(imgui STATIC
   imgui.cpp
   imgui_demo.cpp
