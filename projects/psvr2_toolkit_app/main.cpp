@@ -24,7 +24,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
          // Create SDL window graphics context
   float main_scale = SDL_GetDisplayContentScale(SDL_GetPrimaryDisplay());
   SDL_WindowFlags window_flags = SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIDDEN | SDL_WINDOW_HIGH_PIXEL_DENSITY;
-  app_state->window = SDL_CreateWindow("Dear ImGui SDL3+SDL_GPU example", (int)(1280 * main_scale), (int)(800 * main_scale), window_flags);
+  app_state->window = SDL_CreateWindow("PlayStation VR2 Toolkit", (int)(1280 * main_scale), (int)(720 * main_scale), window_flags);
   if (app_state->window == nullptr)
     {
       printf("Error: SDL_CreateWindow(): %s\n", SDL_GetError());
@@ -85,7 +85,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
          //style.FontSizeBase = 20.0f;
          //io.Fonts->AddFontDefaultVector();
          //io.Fonts->AddFontDefaultBitmap();
-         //io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\segoeui.ttf");
+         //io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\segoeui.ttf", 18.0f);
          //io.Fonts->AddFontFromFileTTF("../../misc/fonts/DroidSans.ttf");
          //io.Fonts->AddFontFromFileTTF("../../misc/fonts/Roboto-Medium.ttf");
          //io.Fonts->AddFontFromFileTTF("../../misc/fonts/Cousine-Regular.ttf");
@@ -105,7 +105,6 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
 }
 
 static bool show_demo_window = true;
-static bool show_another_window = false;
 static ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
 SDL_AppResult SDL_AppIterate(void *appstate) {
@@ -134,7 +133,6 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
 
     ImGui::Text("This is some useful text.");               // Display some text (you can use a format strings too)
     ImGui::Checkbox("Demo Window", &show_demo_window);      // Edit bools storing our window open/close state
-    ImGui::Checkbox("Another Window", &show_another_window);
 
     ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
     ImGui::ColorEdit3("clear color", (float*)&clear_color); // Edit 3 floats representing a color
@@ -147,16 +145,6 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
     //ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
     ImGui::End();
   }
-
-         // 3. Show another simple window.
-  if (show_another_window)
-    {
-      ImGui::Begin("Another Window", &show_another_window);   // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
-      ImGui::Text("Hello from another window!");
-      if (ImGui::Button("Close Me"))
-        show_another_window = false;
-      ImGui::End();
-    }
 
          // Rendering
   ImGui::Render();
