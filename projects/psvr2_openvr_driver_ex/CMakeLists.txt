@@ -14,7 +14,7 @@ add_library(psvr2_openvr_driver_ex SHARED
   usb_thread_gaze.cpp
   usb_thread_hooks.cpp
 )
-target_include_directories(psvr2_openvr_driver_ex PRIVATE .)
+target_include_directories(psvr2_openvr_driver_ex PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
 target_link_libraries(psvr2_openvr_driver_ex PRIVATE shlwapi winusb ws2_32)
 target_link_libraries(psvr2_openvr_driver_ex PRIVATE libcustomshare)
