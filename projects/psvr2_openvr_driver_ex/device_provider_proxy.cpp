@@ -6,15 +6,15 @@
 #include "hmd_device_hooks.h"
 #include "hmd_driver_loader.h"
 #include "hook_lib.h"
-#include "ipc_server.h"
+#include "libpad_hooks.h"
 #include "trigger_effect_manager.h"
 #include "usb_thread_hooks.h"
 #include "util.h"
 #include "vr_settings.h"
 
 #include <windows.h>
-
-using namespace psvr2_toolkit::ipc;
+#include "sense_controller.h"
+#include "custom_share_manager.h"
 
 namespace psvr2_toolkit {
 
@@ -23,7 +23,8 @@ namespace psvr2_toolkit {
   DeviceProviderProxy::DeviceProviderProxy()
     : m_initOnce(false)
     , m_pDeviceProvider(nullptr)
-  {}
+  {
+  }
 
   DeviceProviderProxy *DeviceProviderProxy::Instance() {
     if (!m_pInstance) {
@@ -49,15 +50,18 @@ namespace psvr2_toolkit {
       m_initOnce = true;
     }
 
-    IpcServer::Instance()->Start();
+    CustomShareManager::createSingleton();
 
     static DriverContextProxy *pDriverContextProxy = DriverContextProxy::Instance();
     pDriverContextProxy->SetDriverContext(pDriverContext);
+
     return m_pDeviceProvider->Init(pDriverContextProxy);
   }
 
   void DeviceProviderProxy::Cleanup() {
-    IpcServer::Instance()->Stop();
+    if (VRSettings::GetBool(STEAMVR_SETTINGS_USE_ENHANCED_HAPTICS, SETTING_USE_TOOLKIT_SYNC_DEFAULT_VALUE)) {
+      SenseController::Destroy();
+    }
 
     m_pDeviceProvider->Cleanup();
 
@@ -95,10 +99,6 @@ namespace psvr2_toolkit {
     Util::DriverLog("You are using an experimental build of PlayStation VR2 Toolkit, please report any issues that may occur to the developers!");
 #endif
 
-    if (!HookLib::Initialize()) {
-      MessageBoxW(nullptr, L"MinHook initialization failed, please report this to the developers!", L"PlayStation VR2 Toolkit (DriverEx)", MB_ICONERROR | MB_OK);
-    }
-
     if (isRunningOnWine) {
       Util::DriverLog("PlayStation VR2 Toolkit has detected itself running on Wine, compatibility patches will be applied.");
     }
@@ -119,12 +119,15 @@ namespace psvr2_toolkit {
 
     CaesarManagerHooks::InstallHooks();
     HmdDeviceHooks::InstallHooks();
+    LibpadHooks::InstallHooks();
     UsbThreadHooks::InstallHooks();
   }
 
   void DeviceProviderProxy::InitSystems() {
-    IpcServer::Instance()->Initialize();
     TriggerEffectManager::Instance()->Initialize();
+    if (VRSettings::GetBool(STEAMVR_SETTINGS_USE_ENHANCED_HAPTICS, SETTING_USE_TOOLKIT_SYNC_DEFAULT_VALUE)) {
+      SenseController::Initialize();
+    }
   }
 
 } // psvr2_toolkit

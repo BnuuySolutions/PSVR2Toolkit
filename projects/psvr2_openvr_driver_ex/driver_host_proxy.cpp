@@ -20,7 +20,7 @@ namespace psvr2_toolkit {
     : m_pDriverHost(nullptr)
     , m_pfnEventHandlers()
   {}
-  
+
   DriverHostProxy *DriverHostProxy::Instance() {
     if (!m_pInstance) {
       m_pInstance = new DriverHostProxy;
@@ -39,12 +39,38 @@ namespace psvr2_toolkit {
 
   bool DriverHostProxy::TrackedDeviceAdded(const char *pchDeviceSerialNumber, vr::ETrackedDeviceClass eDeviceClass, vr::ITrackedDeviceServerDriver *pDriver) {
     if (Util::StartsWith(pchDeviceSerialNumber, "playstation_vr2_sense_controller_") &&
-        VRSettings::GetBool(STEAMVR_SETTINGS_DISABLE_SENSE, SETTING_DISABLE_SENSE_DEFAULT_VALUE))
+      VRSettings::GetBool(STEAMVR_SETTINGS_DISABLE_SENSE, SETTING_DISABLE_SENSE_DEFAULT_VALUE))
     {
       return false;
     }
 
-    return m_pDriverHost->TrackedDeviceAdded(pchDeviceSerialNumber, eDeviceClass, pDriver);
+    bool success = m_pDriverHost->TrackedDeviceAdded(pchDeviceSerialNumber, eDeviceClass, pDriver);
+
+    if (success)
+    {
+      switch (eDeviceClass)
+      {
+      case vr::ETrackedDeviceClass::TrackedDeviceClass_HMD:
+        if (hmdContainer == vr::k_ulInvalidPropertyContainer) {
+          hmdContainer = vr::VRProperties()->TrackedDeviceToPropertyContainer(k_unDeviceIndexHeadset);
+        }
+        break;
+      case vr::ETrackedDeviceClass::TrackedDeviceClass_Controller:
+        if (Util::StartsWith(pchDeviceSerialNumber, "playstation_vr2_sense_controller_left")) {
+          if (leftControllerContainer == vr::k_ulInvalidPropertyContainer) {
+            leftControllerContainer = vr::VRProperties()->TrackedDeviceToPropertyContainer(k_unDeviceIndexSenseControllerLeft);
+          }
+        }
+
+        else if (Util::StartsWith(pchDeviceSerialNumber, "playstation_vr2_sense_controller_right")) {
+          if (rightControllerContainer == vr::k_ulInvalidPropertyContainer) {
+            rightControllerContainer = vr::VRProperties()->TrackedDeviceToPropertyContainer(k_unDeviceIndexSenseControllerRight);
+          }
+        }
+      }
+    }
+
+    return success;
   }
 
   void DriverHostProxy::TrackedDevicePoseUpdated(uint32_t unWhichDevice, const vr::DriverPose_t &newPose, uint32_t unPoseStructSize) {
@@ -69,7 +95,7 @@ namespace psvr2_toolkit {
 
   bool DriverHostProxy::PollNextEvent(vr::VREvent_t *pEvent, uint32_t uncbVREvent) {
     if (m_pDriverHost->PollNextEvent(pEvent, uncbVREvent)) {
-      for (auto& m_pfnEventHandler : m_pfnEventHandlers) {
+      for (auto &m_pfnEventHandler : m_pfnEventHandlers) {
         m_pfnEventHandler(pEvent);
       }
       return true;
@@ -115,7 +141,7 @@ namespace psvr2_toolkit {
     newPose.qRotation = HmdMath::QuaternionMultiply(newPose.qRotation, imuRotationOffsetInverse);
 
     // PS VR2 driver pose offset.
-    vr::HmdVector3d_t poseOffset = {isLeft ? 0.03439270332455635 : -0.03439270332455635, 0.05370872840285301, -0.09804324805736542};
+    vr::HmdVector3d_t poseOffset = { isLeft ? 0.03439270332455635 : -0.03439270332455635, 0.05370872840285301, -0.09804324805736542 };
 
     // Rotate the offset by the new rotation.
     vr::HmdVector3d_t rotationOffset = HmdMath::RotateVectorByQuaternion(poseOffset, newPose.qRotation);
@@ -127,7 +153,7 @@ namespace psvr2_toolkit {
 
     // Offset from the driver's root to the IMU. Given by the PS VR2 driver.
     // We'll also have to factor it to make the result pose identical to the one from the driver.
-    vr::HmdVector3d_t imuOffset = {isLeft ? -0.00937270000576973 : 0.020072702318429947, 0.012248100712895393, 0.006003900431096554};
+    vr::HmdVector3d_t imuOffset = { isLeft ? -0.00937270000576973 : 0.020072702318429947, 0.012248100712895393, 0.006003900431096554 };
 
     // Rotate IMU offset to counteract the rotation we did on qRotation. See next comment.
     imuOffset = HmdMath::RotateVectorByQuaternion(imuOffset, imuRotationOffset);
