@@ -16,8 +16,8 @@
 namespace vr
 {
 	static const uint32_t k_nSteamVRVersionMajor = 2;
-	static const uint32_t k_nSteamVRVersionMinor = 12;
-	static const uint32_t k_nSteamVRVersionBuild = 14;
+	static const uint32_t k_nSteamVRVersionMinor = 15;
+	static const uint32_t k_nSteamVRVersionBuild = 6;
 } // namespace vr
 
 // public_vrtypes.h
@@ -193,6 +193,17 @@ struct VRTextureWithPoseAndDepth_t : public VRTextureWithPose_t
 	VRTextureDepthInfo_t depth;
 };
 
+struct VRTextureMotionInfo_t
+{
+	void *handle; // See ETextureType definition above
+	HmdMatrix44_t mDeltaPose; // Incremental application-applied transform, if any, since the previous frame that affects the view.
+};
+
+struct VRTextureWithMotion_t : VRTextureWithPoseAndDepth_t
+{
+	VRTextureMotionInfo_t motion;
+};
+
 // 64-bit types that are part of public structures
 // that are replicated in shared memory.
 #if defined(__linux__) || defined(__APPLE__)
@@ -209,7 +220,7 @@ struct DmabufPlane_t
 {
 	uint32_t unOffset;
 	uint32_t unStride;
-	int32_t nFd;
+	int32_t nFd; // This is not consumed, it is dup'ed.
 };
 
 struct DmabufAttributes_t
@@ -476,6 +487,8 @@ enum ETrackedDeviceProperty
 	Prop_AllowLightSourceFrequency_Bool			= 1056, // Shows the Anti-Flicker option in camera settings.
 	Prop_SteamRemoteClientID_Uint64				= 1057, // For vrlink
 	Prop_Reserved_1058							= 1058,
+	Prop_Reserved_1059							= 1059,
+	Prop_Reserved_1060							= 1060,
 
 	// Properties that are unique to TrackedDeviceClass_HMD
 	Prop_ReportsTimeSinceVSync_Bool				= 2000,
@@ -483,7 +496,7 @@ enum ETrackedDeviceProperty
 	Prop_DisplayFrequency_Float					= 2002,
 	Prop_UserIpdMeters_Float					= 2003,
 	Prop_CurrentUniverseId_Uint64				= 2004,
-	Prop_PreviousUniverseId_Uint64				= 2005,
+	Prop_PreviousUniverseId_Uint64_deprecated	= Prop_Invalid,
 	Prop_DisplayFirmwareVersion_Uint64			= 2006,
 	Prop_IsOnDesktop_Bool						= 2007,
 	Prop_DisplayMCType_Int32					= 2008,
@@ -778,11 +791,15 @@ enum EVRSubmitFlags
 	// If the texture is an EGL texture and not an glX/wGL texture (Linux only, currently)
 	Submit_IsEgl = 0x100,
 
+	// Set to indicate that pTexture is a pointer to a VRTextureWithMotion_t.
+	Submit_TextureWithMotion = 0x200 | Submit_TextureWithPose | Submit_TextureWithDepth,
+
 	// Do not use
 	Submit_Reserved2 = 0x08000,
 	Submit_Reserved3 = 0x10000,
 	Submit_Reserved4 = 0x20000,
 	Submit_Reserved5 = 0x40000,
+	Submit_Reserved6 = 0x80000,
 };
 
 /** Data required for passing Vulkan textures to IVRCompositor::Submit.
@@ -930,8 +947,8 @@ enum EVREventType
 	VREvent_ScreenshotProgressToDashboard	= 524, // Sent by compositor to the dashboard that a completed screenshot was submitted
 
 	VREvent_PrimaryDashboardDeviceChanged	= 525,
-	VREvent_RoomViewShown					= 526, // Sent by compositor whenever room-view is enabled
-	VREvent_RoomViewHidden					= 527, // Sent by compositor whenever room-view is disabled
+	VREvent_RoomViewShown					= 526, // Sent by compositor whenever room-view is enabled (for scene apps only - not for construct or transient bounds)
+	VREvent_RoomViewHidden					= 527, // Sent by compositor whenever room-view is disabled (for scene apps only - not for construct or transient bounds)
 	VREvent_ShowUI							= 528, // data is showUi
 	VREvent_ShowDevTools					= 529, // data is showDevTools
 	VREvent_DesktopViewUpdating				= 530,
@@ -939,13 +956,14 @@ enum EVREventType
 
 	VREvent_StartDashboard					= 532,
 	VREvent_ElevatePrism					= 533,
-	VREvent_OverlayClosed					= 534,
+	VREvent_OverlayClosed					= 534, // The overlay's close button is pressed.
 	VREvent_DashboardThumbChanged			= 535, // Sent when a dashboard thumbnail image changes
 	VREvent_DesktopMightBeVisible			= 536, // Sent when any known desktop related overlay is visible
 	VREvent_DesktopMightBeHidden			= 537, // Sent when all known desktop related overlays are hidden
 	VREvent_MutualSteamCapabilitiesChanged	= 538, // Sent when the set of capabilities common between both Steam and SteamVR have changed.
 	VREvent_OverlayCreated					= 539, // An OpenVR overlay of any sort was created. Data is overlay.
 	VREvent_OverlayDestroyed				= 540, // An OpenVR overlay of any sort was destroyed. Data is overlay.
+	VREvent_OverlayNameChanged				= 544, // An OpenVR overlay's name changed. Data is overlay.
 
 	VREvent_TrackingRecordingStarted		= 541,
 	VREvent_TrackingRecordingStopped		= 542,
@@ -982,6 +1000,9 @@ enum EVREventType
 	VREvent_Reserved_0809  					= 809,
 	VREvent_Reserved_0810  					= 810,
 	VREvent_Reserved_0811  					= 811,
+	VREvent_Reserved_0812  					= 812,
+	VREvent_Reserved_0813  					= 813,
+	VREvent_Reserved_0814  					= 814,
 
 	VREvent_AudioSettingsHaveChanged		= 820,
 
@@ -1008,6 +1029,7 @@ enum EVREventType
 	VREvent_WindowsMRSectionSettingChanged			= 870,
 	VREvent_OtherSectionSettingChanged				= 871,
 	VREvent_AnyDriverSettingsChanged				= 872,
+	VREvent_Reserved_0873							= 873,
 
 	VREvent_StatusUpdate					= 900,
 
@@ -1259,7 +1281,7 @@ struct VREvent_Ipd_t
 
 struct VREvent_Chaperone_t
 {
-	uint64_t m_nPreviousUniverse;
+	uint64_t m_nPreviousUniverse_deprecated;
 	uint64_t m_nCurrentUniverse;
 };
 
@@ -1843,6 +1865,8 @@ enum EVRInitError
 	VRInitError_Init_VRDashboardTokenFailure		= 165,
 	VRInitError_Init_VRDashboardEnvironmentFailure	= 166,
 	VRInitError_Init_VRDashboardPathFailure			= 167,
+	VRInitError_Init_InstallationTooOld				= 168,
+	VRInitError_Init_ClientVersionAlreadyProvided	= 169,
 
 	VRInitError_Driver_Failed						= 200,
 	VRInitError_Driver_Unknown						= 201,
@@ -1996,6 +2020,12 @@ enum EVRInitError
 	VRInitError_VendorSpecific_HmdFound_ConfigFailedSanityCheck		= 1113,
 	VRInitError_VendorSpecific_OculusRuntimeBadInstall				= 1114,
 	VRInitError_VendorSpecific_HmdFound_UnexpectedConfiguration_1	= 1115,
+
+	VRInitError_VendorSpecific_Oasis_UnlockRequired					= 1150,
+
+	VRInitError_VendorSpecific_VRLink_OutdatedDriverMESA			= 1200,
+	VRInitError_VendorSpecific_VRLink_OutdatedDriverNVIDIA			= 1201,
+	VRInitError_VendorSpecific_VRLink_NoVideoSupport				= 1202,
 
 	VRInitError_Steam_SteamInstallationNotFound = 2000,
 
@@ -2219,6 +2249,22 @@ struct ImuSample_t
 	HmdVector3d_t vAccel;
 	HmdVector3d_t vGyro;
 	uint32_t unOffScaleFlags;
+};
+
+enum class EVRDistortionChannel : uint32_t
+{
+	Red = 0,		// given a coordinate in distorted panel space, returns the coordinate to sample in rectilinear render space for the red channel
+	Green,			// given a coordinate in distorted panel space, returns the coordinate to sample in rectilinear render space for the green channel
+	Blue,			// given a coordinate in distorted panel space, returns the coordinate to sample in rectilinear render space for the blue channel
+	InverseRed,		// given a coordinate in rectilinear render space, returns the corresponding coordinate in distorted panel space for the red channel
+	InverseGreen,	// given a coordinate in rectilinear render space, returns the corresponding coordinate in distorted panel space for the green channel
+	InverseBlue,	// given a coordinate in rectilinear render space, returns the corresponding coordinate in distorted panel space for the blue channel
+	Count
+};
+
+struct DistortionCoordinate_t
+{
+	float u, v; // 0..1
 };
 
 #pragma pack( pop )
@@ -2515,6 +2561,7 @@ namespace vr
 	//-----------------------------------------------------------------------------
 	// steamvr keys
 	static const char * const k_pch_SteamVR_Section = "steamvr";
+	static const char * const k_pch_SteamVR_Contrast_Float = "contrast";
 	static const char * const k_pch_SteamVR_RequireHmd_String = "requireHmd";
 	static const char * const k_pch_SteamVR_ForcedDriverKey_String = "forcedDriver";
 	static const char * const k_pch_SteamVR_ForcedHmdKey_String = "forcedHmd";
@@ -2532,6 +2579,7 @@ namespace vr
 	static const char * const k_pch_SteamVR_GridColor_String = "gridColor";
 	static const char * const k_pch_SteamVR_PlayAreaColor_String = "playAreaColor";
 	static const char * const k_pch_SteamVR_TrackingLossColor_String = "trackingLossColor";
+	static const char * const k_pch_SteamVR_StartColor_String = "startColor";
 	static const char * const k_pch_SteamVR_ShowStage_Bool = "showStage";
 	static const char * const k_pch_SteamVR_DrawTrackingReferences_Bool = "drawTrackingReferences";
 	static const char * const k_pch_SteamVR_ActivateMultipleDrivers_Bool = "activateMultipleDrivers";
@@ -2544,6 +2592,8 @@ namespace vr
 	static const char * const k_pch_SteamVR_MaxRecommendedResolution_Int32 = "maxRecommendedResolution";
 	static const char * const k_pch_SteamVR_MotionSmoothing_Bool = "motionSmoothing";
 	static const char * const k_pch_SteamVR_MotionSmoothingOverride_Int32 = "motionSmoothingOverride";
+	static const char * const k_pch_SteamVR_FoveatedSharpening_Bool = "sharpening";
+	static const char * const k_pch_SteamVR_FoveatedSharpeningOverride_Int32 = "sharpeningOverride";
 	static const char * const k_pch_SteamVR_FramesToThrottle_Int32 = "framesToThrottle";
 	static const char * const k_pch_SteamVR_AdditionalFramesToPredict_Int32 = "additionalFramesToPredict";
 	static const char * const k_pch_SteamVR_WorldScale_Float = "worldScale";
@@ -2742,6 +2792,7 @@ namespace vr
 	static const char * const k_pch_Power_ReturnToWatchdogTimeout_Float = "returnToWatchdogTimeout";
 	static const char * const k_pch_Power_AutoLaunchSteamVROnButtonPress = "autoLaunchSteamVROnButtonPress";
 	static const char * const k_pch_Power_PauseCompositorOnStandby_Bool = "pauseCompositorOnStandby";
+	static const char * const k_pch_Power_OverrideWindowsPowerScheme_Bool = "overrideWindowsPowerScheme";
 
 	//-----------------------------------------------------------------------------
 	// dashboard keys
@@ -2749,14 +2800,13 @@ namespace vr
 	static const char * const k_pch_Dashboard_EnableDashboard_Bool = "enableDashboard";
 	static const char * const k_pch_Dashboard_ArcadeMode_Bool = "arcadeMode";
 	static const char * const k_pch_Dashboard_Position = "position";
-	static const char * const k_pch_Dashboard_DesktopScale = "desktopScale";
 	static const char * const k_pch_Dashboard_DashboardScale = "dashboardScale";
 	static const char * const k_pch_Dashboard_UseStandaloneSystemLayer = "standaloneSystemLayer";
 	static const char * const k_pch_Dashboard_AllowSteamOverlays_Bool = "allowSteamOverlays";
 	static const char * const k_pch_Dashboard_AllowVRGamepadUI_Bool = "allowVRGamepadUI";
-	static const char * const k_pch_Dashboard_AllowVRGamepadUIViaGamescope_Bool = "allowVRGamepadUIViaGamescope";
 	static const char * const k_pch_Dashboard_SteamMatchesHMDFramerate = "steamMatchesHMDFramerate";
 	static const char * const k_pch_Dashboard_GrabHandleAcceleration = "grabHandleAcceleration";
+	static const char * const k_pch_Dashboard_OverlayBacksideColor_String = "overlayBacksideColor";
 
 	//-----------------------------------------------------------------------------
 	// model skin keys
@@ -4256,7 +4306,7 @@ public:
 	 *
 	 * nImageFormat: in VkFormat
 	 */
-	virtual bool NewSharedVulkanImage( uint32_t nImageFormat, uint32_t nWidth, uint32_t nHeight, bool bRenderable, bool bMappable, bool bComputeAccess, uint32_t unMipLevels, uint32_t unArrayLayerCount, vr::SharedTextureHandle_t *pSharedHandle ) = 0;
+	virtual bool NewSharedVulkanImage( uint32_t nImageFormat, uint32_t nWidth, uint32_t nHeight, bool bRenderable, bool bMappable, bool bComputeAccess, uint32_t unMipLevels, uint32_t unArrayLayerCount, uint32_t unAdditionalVkCreateFlags, uint32_t unAdditionalVkUsageFlags, vr::SharedTextureHandle_t *pSharedHandle ) = 0;
 
 	/** Create a new tracked Vulkan Buffer */
 	virtual bool NewSharedVulkanBuffer( uint32_t nSize, uint32_t nUsageFlags, vr::SharedTextureHandle_t *pSharedHandle ) = 0;
@@ -4314,7 +4364,7 @@ protected:
 	virtual ~IVRIPCResourceManagerClient() {};
 };
 
-static const char *IVRIPCResourceManagerClient_Version = "IVRIPCResourceManagerClient_002";
+static const char *IVRIPCResourceManagerClient_Version = "IVRIPCResourceManagerClient_003";
 
 }
 
