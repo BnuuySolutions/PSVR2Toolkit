@@ -48,7 +48,19 @@ jobs:
       run: msbuild /m /p:Configuration=${{env.BUILD_CONFIGURATION}} /p:OutDir=${{env.ARTIFACTS_DIR}} ${{env.SOLUTION_FILE_PATH}}
 
     - name: Upload artifacts
+      id: upload-artifacts
       uses: actions/upload-artifact@v4
       with:
         name: psvr2-toolkit-build
         path: ${{env.ARTIFACTS_DIR}}
+
+    - id: optional_step_id
+      uses: signpath/github-action-submit-signing-request@v2
+      with:
+        api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+        organization-id: e5b00777-6877-43dd-8f53-89ac106cb9be
+        project-slug: PSVR2Toolkit
+        signing-policy-slug: test-signing
+        github-artifact-id: ${{ steps.upload-artifacts.outputs.artifact-id }}
+        wait-for-completion: true
+        output-artifact-directory: ${{env.ARTIFACTS_DIR}}
