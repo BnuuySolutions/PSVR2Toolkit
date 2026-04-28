@@ -18,7 +18,8 @@ Unofficial modification for the official PlayStation VR2 driver/app, which aims 
 ## Features
 - Eye tracking\*
 - Improved controller prediction
-- Improved controller haptics (w/ PCM haptics) (coming soon, see `custom-controller-sync` branch and !24)
+- Improved controller haptics (w/ PCM haptics) (coming soon, see `custom-controller-sync` branch and [Custom Controller LED Sync and Enhanced Haptics
+#24](https://github.com/BnuuySolutions/PSVR2Toolkit/pull/24))
 - Adaptive triggers
 
 For developers, we also have our own API library, which allows you to take full advantage of these features.
