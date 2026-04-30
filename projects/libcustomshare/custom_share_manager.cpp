@@ -1,6 +1,32 @@
 #include "custom_share_manager.h"
 
-#include <windows.h>
+#include <cstring>
+
+void GazeStatus::set(const unsigned char* pGazeStatus) {
+  std::memcpy(data, pGazeStatus, sizeof(data));
+}
+
+void GazeStatus::get(unsigned char* pGazeStatus) const {
+  std::memcpy(pGazeStatus, data, sizeof(data));
+}
+
+void GazeImage::pushToCircularBuffer(const unsigned char* pGazeImage) {
+  int index = counter % 8;
+  // TODO: size shouldn't be 0x200100?
+  std::memcpy(&images[0x200100 * index], pGazeImage, 0x200100);
+  counter++;
+}
+
+int GazeImage::getFromCircularBuffer(unsigned char** gazeImageBuffer) {
+  if (counter == 0) {
+    *gazeImageBuffer = nullptr;
+    return -1;
+  }
+  int index = (counter - 1) % 8;
+  // TODO: size shouldn't be 0x200100?
+  *gazeImageBuffer = &images[0x200100 * index];
+  return index;
+}
 
 CustomShareManager *CustomShareManager::m_pInstance = nullptr;
 bool CustomShareManager::m_initialized = false;
@@ -28,72 +54,39 @@ CustomShareManager *CustomShareManager::getSingleton() {
 }
 
 void CustomShareManager::initialize() {
-  // If you add more handle names, you must also increase the size of m_handles.
-  const char *handleNames[2][2] = {
-    {"CUSTOM_SHARE_VRT2_WIN_GAZE_STATUS_EVT", "CUSTOM_SHARE_VRT2_WIN_GAZE_STATUS_MTX"},
-    {"CUSTOM_SHARE_VRT2_WIN_GAZE_IMAGE_EVT", "CUSTOM_SHARE_VRT2_WIN_GAZE_IMAGE_MTX"}
-  };
+  m_gazeStatusEvent = CreateIpcEvent("CUSTOM_SHARE_VRT2_WIN_GAZE_STATUS_EVT");
+  m_gazeStatusMutex = CreateIpcMutex("CUSTOM_SHARE_VRT2_WIN_GAZE_STATUS_MTX");
 
-  for (size_t i = 0; i < sizeof(handleNames) / sizeof(handleNames[0]); i++) {
-    m_handles[i].hEvent = CreateEventA(NULL, TRUE, FALSE, handleNames[i][0]);
-    m_handles[i].hMutex = CreateMutexA(NULL, FALSE, handleNames[i][1]);
-  }
+  m_gazeImageEvent = CreateIpcEvent("CUSTOM_SHARE_VRT2_WIN_GAZE_IMAGE_EVT");
+  m_gazeImageMutex = CreateIpcMutex("CUSTOM_SHARE_VRT2_WIN_GAZE_IMAGE_MTX");
 
-  m_hFileMap = CreateFileMappingA(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, 0x2000000, "CUSTOM_SHARE_VRT2_WIN");
-  m_pBufferData = static_cast<BufferData*>(MapViewOfFile(m_hFileMap, FILE_MAP_WRITE, 0, 0, 0x2000000));
+  m_sharedMemory = CreateIpcSharedMemory("CUSTOM_SHARE_VRT2_WIN", sizeof(BufferData));
+  m_pBufferData = static_cast<BufferData*>(m_sharedMemory->map());
 }
 
-void CustomShareManager::setGazeStatus(unsigned char* pGazeStatus) {
-  WaitForSingleObject(m_handles[0].hMutex, INFINITE);
-  memcpy(&m_pBufferData->gazeStatus, pGazeStatus, 0x148);
-  ReleaseMutex(m_handles[0].hMutex);
-  SetEvent(m_handles[0].hEvent);
+void CustomShareManager::setGazeStatus(const unsigned char* pGazeStatus) {
+  m_gazeStatusMutex->lock();
+  m_pBufferData->gazeStatus.set(pGazeStatus);
+  m_gazeStatusMutex->unlock();
+  m_gazeStatusEvent->set();
 }
 
-void CustomShareManager::getGazeStatus(unsigned char* pGazeStatus) {
-  WaitForSingleObject(m_handles[0].hMutex, INFINITE);
-  memcpy(pGazeStatus, &m_pBufferData->gazeStatus, 0x148);
-  ReleaseMutex(m_handles[0].hMutex);
+void CustomShareManager::getGazeStatus(unsigned char* pGazeStatus) const {
+  m_gazeStatusMutex->lock();
+  m_pBufferData->gazeStatus.get(pGazeStatus);
+  m_gazeStatusMutex->unlock();
 }
 
-void CustomShareManager::setGazeImage(unsigned char* pGazeImage) {
-  WaitForSingleObject(m_handles[1].hMutex, INFINITE);
-  memcpy(&m_pBufferData->gazeImage, pGazeImage, 0x200100);
-  ReleaseMutex(m_handles[1].hMutex);
-  SetEvent(m_handles[1].hEvent);
+void CustomShareManager::setGazeImage(const unsigned char* pGazeImage) {
+  m_gazeImageMutex->lock();
+  m_pBufferData->gazeImage.pushToCircularBuffer(pGazeImage);
+  m_gazeImageMutex->unlock();
+  m_gazeImageEvent->set();
 }
 
-void CustomShareManager::getGazeImage(unsigned char* pGazeImage) {
-  WaitForSingleObject(m_handles[1].hMutex, INFINITE);
-  memcpy(pGazeImage, &m_pBufferData->gazeImage, 0x200100);
-  ReleaseMutex(m_handles[1].hMutex);
-}
-
-/*int CustomShareManager::getGazeImageBuffer(unsigned char** gazeImageBuffer, unsigned char** a2) {
-  WaitForSingleObject(m_handles[1].hMutex, INFINITE);
-  int result = -1;
-  int i = 0;
-  int gazeImageIndex = 0;
-  int gazeImageCount = gazeImageCounter + 1;
-  while (1) {
-    gazeImageIndex = gazeImageCount % 8;
-    if (*(int *)&m_pBufferData->bufferInfo[0x878 * (gazeImageCount % 8)] <= 1) {
-      break;
-    }
-    ++i;
-    ++gazeImageCount;
-    if (i >= 8) {
-      ReleaseMutex(m_handles[1].hMutex);
-      return result;
-    }
-  }
-  result = gazeImageCount % 8;
-  if (gazeImageIndex >= 0) {
-    int bufferInfoOffset = 0x878 * gazeImageIndex;
-    *gazeImageBuffer = &m_pBufferData->gazeImage[0x200100 * gazeImageIndex];
-    *(int *)&m_pBufferData->bufferInfo[bufferInfoOffset] = 3;
-    *a2 = &m_pBufferData->bufferInfo[bufferInfoOffset + 12];
-  }
-  ReleaseMutex(m_handles[1].hMutex);
+int CustomShareManager::getGazeImageBuffer(unsigned char** gazeImageBuffer) {
+  m_gazeImageMutex->lock();
+  int result = m_pBufferData->gazeImage.getFromCircularBuffer(gazeImageBuffer);
+  m_gazeImageMutex->unlock();
   return result;
-}*/
+}

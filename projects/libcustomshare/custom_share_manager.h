@@ -1,36 +1,51 @@
 #pragma once
 
+#include "cross_ipc.h" // The new IPC abstraction DLL header
+
+struct GazeStatus {
+  unsigned char data[0x148];
+
+  void set(const unsigned char* pGazeStatus);
+  void get(unsigned char* pGazeStatus) const;
+};
+
+struct GazeImage {
+  int counter;
+  unsigned char images[0x200100 * 8];
+
+  void pushToCircularBuffer(const unsigned char* pGazeImage);
+  int getFromCircularBuffer(unsigned char** gazeImageBuffer);
+};
+
+struct BufferData {
+  GazeStatus gazeStatus;
+  GazeImage gazeImage;
+};
+
 class CustomShareManager {
 public:
   static void createSingleton();
   static CustomShareManager *getSingleton();
 
-  void setGazeStatus(unsigned char* pGazeStatus);
-  void getGazeStatus(unsigned char* pGazeStatus);
+  void setGazeStatus(const unsigned char* pGazeStatus);
+  void getGazeStatus(unsigned char* pGazeStatus) const;
 
-  void setGazeImage(unsigned char* pGazeImage);
-  void getGazeImage(unsigned char* pGazeImage);
+  void setGazeImage(const unsigned char* pGazeImage);
 
-  //int getGazeImageBuffer(unsigned char** gazeImageBuffer, unsigned char** a2);
+  int getGazeImageBuffer(unsigned char** gazeImageBuffer);
 
 private:
-  struct HandlePair {
-    void* hEvent;
-    void* hMutex;
-  };
-  struct BufferData {
-    unsigned char gazeStatus[0x148];
-    //unsigned char bufferInfo[0x878 * 8]; // TODO: Circular buffer
-    unsigned char gazeImage[0x200100/* * 8*/];
-  };
-
   static CustomShareManager *m_pInstance;
   static bool m_initialized;
 
-  HandlePair m_handles[2];
-  void* m_hFileMap;
+  IIpcEvent* m_gazeStatusEvent;
+  IIpcMutex* m_gazeStatusMutex;
+
+  IIpcEvent* m_gazeImageEvent;
+  IIpcMutex* m_gazeImageMutex;
+
+  IIpcSharedMemory* m_sharedMemory;
   BufferData* m_pBufferData;
-  //int gazeImageCounter;
 
   void initialize();
 };
