@@ -39,6 +39,11 @@ For developers, we also have our own API library, which allows you to take full 
 
 6.) Enjoy your new features, please give us feedback in our [Discord](https://discord.gg/jym8CgJPF3).
 
+## Troubleshooting
+
+### Eye tracking
+The PS VR2 headset is a bit picky about the USB connection it uses, especially when eye tracking is concerned. If eye tracking doesn't seem to be working for you try another USB port, ideally one linked directly to the CPU and not to the chipset (consult the manual for your motherboard for this information).
+
 # Contact
 Have any legal complaints or questions?
 - Email: `wdh at bnuuy.solutions`
