@@ -8,6 +8,7 @@
 #include "hmd_driver_loader.h"
 #include "hook_lib.h"
 #include "vr_settings.h"
+#include "hmd_math.h"
 #include "util.h"
 
 #include <cmath>
@@ -30,6 +31,52 @@ namespace psvr2_toolkit {
   vr::EVRInitError sie__psvr2__HmdDevice__ActivateHook(void *thisptr, uint32_t unObjectId) {
     vr::EVRInitError result = sie__psvr2__HmdDevice__Activate(thisptr, unObjectId);
     vr::PropertyContainerHandle_t ulPropertyContainer = vr::VRProperties()->TrackedDeviceToPropertyContainer(unObjectId);
+
+    // Sony driver only defines the standard hidden area mesh.
+    // OpenVR and OpenXR applications can ask for other types
+    // and may end up with broken rendering in some cases
+    // (like Unity 6.2+ apps with post processing on).
+    // Thanks to Checkerboard for spotting this!
+    if (result == vr::VRInitError_None) {
+      vr::CVRHiddenAreaHelpers hamHelpers(vr::VRPropertiesRaw());
+      
+      for (int e = 0; e < 2; ++e) {
+        vr::EVREye eye = static_cast<vr::EVREye>(e);
+        vr::ETrackedPropertyError err;
+
+        uint32_t vertCount = hamHelpers.GetHiddenArea(eye, vr::k_eHiddenAreaMesh_Standard, nullptr, 0, &err);
+
+        if (vertCount > 0) {
+          std::vector<vr::HmdVector2_t> standardVerts(vertCount);
+          hamHelpers.GetHiddenArea(eye, vr::k_eHiddenAreaMesh_Standard, standardVerts.data(), vertCount, &err);
+
+          std::vector<vr::HmdVector2_t> perimeter = HmdMath::ExtractInnerHAMPerimeter(standardVerts);
+
+          if (perimeter.size() > 2) {
+            hamHelpers.SetHiddenArea(eye, vr::k_eHiddenAreaMesh_LineLoop, perimeter.data(), static_cast<uint32_t>(perimeter.size()));
+
+            // Triangle Fan from optical center
+            std::vector<vr::HmdVector2_t> inverseVerts;
+            inverseVerts.reserve(perimeter.size() * 3);
+
+            vr::HmdVector2_t center = { 0.5f, 0.5f };
+            
+            for (size_t i = 0; i < perimeter.size() - 1; ++i) {
+              inverseVerts.push_back(center);
+              inverseVerts.push_back(perimeter[i]);
+              inverseVerts.push_back(perimeter[i + 1]);
+            }
+            
+            // Close the fan gap from the last perimeter point back to the first
+            inverseVerts.push_back(center);
+            inverseVerts.push_back(perimeter.back());
+            inverseVerts.push_back(perimeter.front());
+
+            hamHelpers.SetHiddenArea(eye, vr::k_eHiddenAreaMesh_Inverse, inverseVerts.data(), static_cast<uint32_t>(inverseVerts.size()));
+          }
+        }
+      }
+    }
 
     // Tell SteamVR we want the chaperone visibility disabled if we're actually disabling the chaperone.
     if (VRSettings::GetBool(STEAMVR_SETTINGS_DISABLE_CHAPERONE, SETTING_DISABLE_CHAPERONE_DEFAULT_VALUE)) {

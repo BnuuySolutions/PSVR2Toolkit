@@ -2,6 +2,8 @@
 
 #include <openvr_driver.h>
 
+#include <vector>
+
 namespace psvr2_toolkit {
 
   class HmdMath {
@@ -43,6 +45,61 @@ namespace psvr2_toolkit {
       return { result.x, result.y, result.z };
     }
 
+    static std::vector<vr::HmdVector2_t> ExtractInnerHAMPerimeter(const std::vector<vr::HmdVector2_t>& standardMesh) {
+      if (standardMesh.empty()) return {};
+
+      // Find the center of the mesh
+      float minX = 9999.0f, maxX = -9999.0f, minY = 9999.0f, maxY = -9999.0f;
+      for (const auto& v : standardMesh) {
+          if (v.v[0] < minX) minX = v.v[0];
+          if (v.v[0] > maxX) maxX = v.v[0];
+          if (v.v[1] < minY) minY = v.v[1];
+          if (v.v[1] > maxY) maxY = v.v[1];
+      }
+      
+      float centerX = (minX + maxX) / 2.0f;
+      float centerY = (minY + maxY) / 2.0f;
+
+      // Get the distance to the furthest outer corner
+      float maxDistSq = 0.0f;
+      for (const auto& v : standardMesh) {
+        float dx = v.v[0] - centerX;
+        float dy = v.v[1] - centerY;
+        float distSq = (dx * dx) + (dy * dy);
+        if (distSq > maxDistSq) maxDistSq = distSq;
+      }
+
+      // Set a dynamic threshold (the inner circle is much closer to the center than the corners)
+      float thresholdSq = maxDistSq * 0.9f;
+
+      // Extract the inner points in their native sweep order, ignoring duplicates
+      std::vector<vr::HmdVector2_t> perimeter;
+      for (const auto& v : standardMesh) {
+        float dx = v.v[0] - centerX;
+        float dy = v.v[1] - centerY;
+
+        // Skip the far outer corners
+        if ((dx * dx + dy * dy) > thresholdSq) {
+          continue; 
+        }
+
+        // Keep sequential unique points
+        if (perimeter.empty() || 
+          perimeter.back().v[0] != v.v[0] || 
+          perimeter.back().v[1] != v.v[1]) {
+          perimeter.push_back(v);
+        }
+      }
+
+      // Pop the last vertex if it closes the loop perfectly
+      if (perimeter.size() > 1 && 
+        perimeter.front().v[0] == perimeter.back().v[0] && 
+        perimeter.front().v[1] == perimeter.back().v[1]) {
+        perimeter.pop_back();
+      }
+
+      return perimeter;
+    }
   };
 
 }
