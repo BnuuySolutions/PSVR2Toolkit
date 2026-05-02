@@ -1,6 +1,9 @@
 #pragma once
 
-#include "cross_ipc.h" // The new IPC abstraction DLL header
+#include "cross_ipc.h"
+
+#define MAX_PCM_SLOTS 4
+#define PCM_BUFFER_SIZE 32 // TODO: we should have a header for commnn types and defines
 
 struct GazeStatus {
   unsigned char data[0x148];
@@ -20,6 +23,8 @@ struct GazeImage {
 struct BufferData {
   GazeStatus gazeStatus;
   GazeImage gazeImage;
+  unsigned char pcmLeft[MAX_PCM_SLOTS][PCM_BUFFER_SIZE];
+  unsigned char pcmRight[MAX_PCM_SLOTS][PCM_BUFFER_SIZE];
 };
 
 class CustomShareManager {
@@ -34,6 +39,14 @@ public:
 
   int getGazeImageBuffer(unsigned char** gazeImageBuffer);
 
+  void signalPcmUpdate();
+  void readPcm(int slot, unsigned char* pcmLeft, unsigned char* pcmRight);
+
+  int claimPcmSlot();
+  void releasePcmSlot(int slot);
+  void writePcm(int slot, const unsigned char* pcmLeft, const unsigned char* pcmRight);
+  void waitForPcmUpdate(int slot);
+
 private:
   static CustomShareManager *m_pInstance;
   static bool m_initialized;
@@ -43,6 +56,10 @@ private:
 
   IIpcEvent* m_gazeImageEvent;
   IIpcMutex* m_gazeImageMutex;
+
+  IIpcMutex* m_pcmOwnerMutex[MAX_PCM_SLOTS];
+
+  IIpcEvent* m_pcmEvent[MAX_PCM_SLOTS];
 
   IIpcSharedMemory* m_sharedMemory;
   BufferData* m_pBufferData;

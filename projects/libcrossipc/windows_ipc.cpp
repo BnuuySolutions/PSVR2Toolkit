@@ -23,6 +23,12 @@ void WindowsIpcMutex::lock() {
     }
 }
 
+bool WindowsIpcMutex::try_lock() {
+    DWORD result = WaitForSingleObject(m_hMutex, 0);
+    // WAIT_ABANDONED means the previous owning process crashed, and we successfully claimed this mutex.
+    return (result == WAIT_OBJECT_0 || result == WAIT_ABANDONED);
+}
+
 void WindowsIpcMutex::unlock() {
     if (!ReleaseMutex(m_hMutex)) {
         throw std::runtime_error("ReleaseMutex failed. Error: " + std::to_string(GetLastError()));

@@ -8,6 +8,7 @@ public:
     virtual ~WindowsIpcMutex();
 
     void lock() override;
+    bool try_lock() override;
     void unlock() override;
 
 private:
