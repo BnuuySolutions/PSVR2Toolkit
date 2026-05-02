@@ -21,4 +21,20 @@ extern "C" {
     }
   }
 
+  __declspec(dllexport) int CAPI_ClaimPcmSlot() {
+    return CustomShareManager::getSingleton()->claimPcmSlot();
+  }
+
+  __declspec(dllexport) void CAPI_ReleasePcmSlot(int slot) {
+    CustomShareManager::getSingleton()->releasePcmSlot(slot);
+  }
+
+  __declspec(dllexport) void CAPI_WritePcm(int slot, const unsigned char* pcmLeft, const unsigned char* pcmRight) {
+    CustomShareManager::getSingleton()->writePcm(slot, pcmLeft, pcmRight);
+  }
+
+  __declspec(dllexport) void CAPI_WaitForPcmUpdate(int slot) {
+    CustomShareManager::getSingleton()->waitForPcmUpdate(slot);
+  }
+
 }

@@ -4,11 +4,9 @@
 #include "driver_hooks/libpad_hooks.h"
 #include "write_file_async.h"
 
+#include <array>
 #include <atomic>
-#include <cmath>
 #include <mutex>
-#include <vector>
-#include <string>
 
 constexpr uint32_t k_unSenseSampleRate = 3000;
 constexpr uint32_t k_unSenseSubsamples = 10000;
@@ -121,8 +119,8 @@ namespace psvr2_toolkit {
     static void Destroy();
 
     void SetGeneratedHaptic(float freq, uint32_t amp, uint32_t sampleCount);
-    void SetPCM(const std::vector<int8_t>& newPCMData);
-    void AppendPCM(const std::vector<int8_t>& newPCMData);
+    void MixPCM(const std::array<int8_t, 32>& newPCMData);
+    void ResetPCM();
 
     const SenseControllerPCModePacket_t& GetTrackingControllerSettings() { return driverTrackingData; };
 
@@ -274,9 +272,6 @@ namespace psvr2_toolkit {
     uint32_t hapticAmp = 0;
     float hapticFreq = 0.0f;
 
-    std::vector<int8_t> pcmData;
-    size_t samplesRead = 0;
+    std::array<int8_t, 32> pcmData;
   };
 }
-
-

@@ -4,11 +4,75 @@
 #include "imgui_impl_sdlgpu3.h"
 #include <iostream>
 #include <vector>
+#include <atomic>
+#include <cmath>
+#include <mutex>
+#include <thread>
 
 extern "C" {
   __declspec(dllimport) void CAPI_Initialize();
   __declspec(dllimport) void CAPI_GetGazeStatus(unsigned char* pGazeStatus);
   __declspec(dllimport) void CAPI_GetGazeImage(unsigned char* pGazeImage);
+  __declspec(dllimport) int CAPI_ClaimPcmSlot();
+  __declspec(dllimport) void CAPI_ReleasePcmSlot(int slot);
+  __declspec(dllimport) void CAPI_WritePcm(int slot, const unsigned char* pcmLeft, const unsigned char* pcmRight);
+  __declspec(dllimport) void CAPI_WaitForPcmUpdate(int slot);
+}
+
+std::atomic<bool> g_appRunning = true;
+std::mutex g_hapticsMutex;
+bool g_playToneLeft = false;
+bool g_playToneRight = false;
+float g_toneFrequency = 200.0f;
+float g_toneAmplitude = 0.5f;
+
+void HapticsThreadFunc() {
+    int slot = CAPI_ClaimPcmSlot();
+    if (slot < 0) {
+        std::cerr << "Failed to claim PCM slot! Are 4 applications already running?" << std::endl;
+        return;
+    }
+
+    double phaseLeft = 0.0;
+    double phaseRight = 0.0;
+    unsigned char leftBuf[32];
+    unsigned char rightBuf[32];
+
+    while (g_appRunning) {
+        // Pause thread until it's time to provide the next 32 samples (~93.75Hz)
+        CAPI_WaitForPcmUpdate(slot);
+
+        bool playL, playR;
+        float freq, amp;
+        {
+            std::scoped_lock<std::mutex> lock(g_hapticsMutex);
+            playL = g_playToneLeft;
+            playR = g_playToneRight;
+            freq = g_toneFrequency;
+            amp = g_toneAmplitude;
+        }
+
+        // Calculate sine wave phase increment assuming a 3000 Hz sample rate
+        double phaseInc = 2.0 * 3.14159265358979323846 * freq / 3000.0;
+
+        for (int i = 0; i < 32; ++i) {
+            if (playL) {
+                leftBuf[i] = static_cast<unsigned char>(static_cast<int8_t>(sin(phaseLeft) * 127.0f * amp));
+                phaseLeft = fmod(phaseLeft + phaseInc, 2.0 * 3.14159265358979323846);
+            } else {
+                leftBuf[i] = 0; phaseLeft = 0.0;
+            }
+            if (playR) {
+                rightBuf[i] = static_cast<unsigned char>(static_cast<int8_t>(sin(phaseRight) * 127.0f * amp));
+                phaseRight = fmod(phaseRight + phaseInc, 2.0 * 3.14159265358979323846);
+            } else {
+                rightBuf[i] = 0; phaseRight = 0.0;
+            }
+        }
+
+        CAPI_WritePcm(slot, leftBuf, rightBuf);
+    }
+    CAPI_ReleasePcmSlot(slot);
 }
 
 int main(int argc, char* argv[]) {
@@ -64,6 +128,9 @@ int main(int argc, char* argv[]) {
 
   // Initialize our CAPI
   CAPI_Initialize();
+  
+  std::thread hapticsThread(HapticsThreadFunc);
+  hapticsThread.detach(); // Detached so if PSVR2TK goes down, the test app can still exit cleanly
 
   // Buffers for CAPI data
   std::vector<unsigned char> gazeStatus(0x148, 0);
@@ -127,6 +194,14 @@ int main(int argc, char* argv[]) {
     ImGui::SetNextWindowSize(ImVec2(1280, 720), ImGuiCond_FirstUseEver);
     ImGui::Begin("Gaze Info");
 
+    if (ImGui::CollapsingHeader("Haptics", ImGuiTreeNodeFlags_DefaultOpen)) {
+      std::scoped_lock<std::mutex> lock(g_hapticsMutex);
+      ImGui::Checkbox("Play Tone Left", &g_playToneLeft);
+      ImGui::Checkbox("Play Tone Right", &g_playToneRight);
+      ImGui::SliderFloat("Frequency (Hz)", &g_toneFrequency, 10.0f, 1000.0f);
+      ImGui::SliderFloat("Amplitude", &g_toneAmplitude, 0.0f, 1.0f);
+    }
+
     if (ImGui::CollapsingHeader("Gaze Status Bytes", ImGuiTreeNodeFlags_DefaultOpen)) {
       for (int i = 0; i < 0x148; ++i) {
         ImGui::Text("%02X ", gazeStatus[i]);
@@ -188,6 +263,8 @@ int main(int argc, char* argv[]) {
   }
 
   // Cleanup
+  g_appRunning = false;
+
   ImGui_ImplSDLGPU3_Shutdown();
   ImGui_ImplSDL3_Shutdown();
   ImGui::DestroyContext();
