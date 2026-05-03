@@ -2,6 +2,8 @@
 
 #include <openvr_driver.h>
 
+#include <algorithm>
+#include <cmath>
 #include <vector>
 
 namespace psvr2_toolkit {
@@ -71,8 +73,9 @@ namespace psvr2_toolkit {
 
       // Set a dynamic threshold (the inner circle is much closer to the center than the corners)
       float thresholdSq = maxDistSq * 0.9f;
+      const float epsilon = 1e-3f;
 
-      // Extract the inner points in their native sweep order, ignoring duplicates
+      // Extract the inner points
       std::vector<vr::HmdVector2_t> perimeter;
       for (const auto& v : standardMesh) {
         float dx = v.v[0] - centerX;
@@ -83,20 +86,23 @@ namespace psvr2_toolkit {
           continue; 
         }
 
-        // Keep sequential unique points
-        if (perimeter.empty() || 
-          perimeter.back().v[0] != v.v[0] || 
-          perimeter.back().v[1] != v.v[1]) {
-          perimeter.push_back(v);
-        }
+        perimeter.push_back(v);
       }
 
-      // Pop the last vertex if it closes the loop perfectly
-      if (perimeter.size() > 1 && 
-        perimeter.front().v[0] == perimeter.back().v[0] && 
-        perimeter.front().v[1] == perimeter.back().v[1]) {
-        perimeter.pop_back();
-      }
+      // Sort by angle from center
+      std::sort(perimeter.begin(), perimeter.end(), [centerX, centerY](const vr::HmdVector2_t& a, const vr::HmdVector2_t& b) {
+        float angleA = atan2(a.v[1] - centerY, a.v[0] - centerX);
+        float angleB = atan2(b.v[1] - centerY, b.v[0] - centerX);
+        return angleA < angleB;
+      });
+
+      // Remove duplicates now that they are adjacent
+      perimeter.erase(std::unique(perimeter.begin(), perimeter.end(), [epsilon](const vr::HmdVector2_t& a, const vr::HmdVector2_t& b) {
+        return std::abs(a.v[0] - b.v[0]) <= epsilon && std::abs(a.v[1] - b.v[1]) <= epsilon;
+      }), perimeter.end());
+
+      // Close the loop
+      perimeter.push_back(perimeter.at(0));
 
       return perimeter;
     }
