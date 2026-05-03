@@ -1,5 +1,6 @@
 #pragma once
 
+#include "common.h"
 #include "pad_trigger_effect.h"
 
 namespace psvr2_toolkit {
@@ -13,14 +14,15 @@ namespace psvr2_toolkit {
     bool Initialized();
     void Initialize();
 
-    //void HandleIpcCommand(uint32_t processId, ipc::CommandHeader_t *pHeader, void *pData);
+    void Update();
 
   private:
     static psvr2_toolkit::TriggerEffectManager *m_pInstance;
 
     bool m_initialized;
 
-    //void SetTriggerEffectCommand(uint32_t processId, ipc::EVRControllerType controllerType, ScePadTriggerEffectCommand command);
+    void ApplyEffect(const TriggerEffectCommandPayload& payload);
+    void SetTriggerEffectCommand(VRControllerType controllerType, ScePadTriggerEffectCommand command);
   };
 
 } // psvr2_toolkit

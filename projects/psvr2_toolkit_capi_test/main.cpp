@@ -1,23 +1,18 @@
 #include <SDL3/SDL.h>
 #include <imgui.h>
 #include <imgui_impl_sdl3.h>
+#include "hmd2_gaze.h"
 #include "imgui_impl_sdlgpu3.h"
 #include <iostream>
+#include <string>
 #include <vector>
 #include <atomic>
 #include <cmath>
 #include <mutex>
 #include <thread>
+#include "common.h"
 
-extern "C" {
-  __declspec(dllimport) void CAPI_Initialize();
-  __declspec(dllimport) void CAPI_GetGazeStatus(unsigned char* pGazeStatus);
-  __declspec(dllimport) void CAPI_GetGazeImage(unsigned char* pGazeImage);
-  __declspec(dllimport) int CAPI_ClaimPcmSlot();
-  __declspec(dllimport) void CAPI_ReleasePcmSlot(int slot);
-  __declspec(dllimport) void CAPI_WritePcm(int slot, const unsigned char* pcmLeft, const unsigned char* pcmRight);
-  __declspec(dllimport) void CAPI_WaitForPcmUpdate(int slot);
-}
+#include "psvr2tk_capi.h"
 
 std::atomic<bool> g_appRunning = true;
 std::mutex g_hapticsMutex;
@@ -27,20 +22,12 @@ float g_toneFrequency = 200.0f;
 float g_toneAmplitude = 0.5f;
 
 void HapticsThreadFunc() {
-    int slot = CAPI_ClaimPcmSlot();
-    if (slot < 0) {
-        std::cerr << "Failed to claim PCM slot! Are 4 applications already running?" << std::endl;
-        return;
-    }
-
-    double phaseLeft = 0.0;
-    double phaseRight = 0.0;
-    unsigned char leftBuf[32];
-    unsigned char rightBuf[32];
+    double phase = 0.0;
+    unsigned char buf[k_unSenseChunkSize];
 
     while (g_appRunning) {
         // Pause thread until it's time to provide the next 32 samples (~93.75Hz)
-        CAPI_WaitForPcmUpdate(slot);
+        CAPI_WaitForPcmUpdate();
 
         bool playL, playR;
         float freq, amp;
@@ -55,24 +42,27 @@ void HapticsThreadFunc() {
         // Calculate sine wave phase increment assuming a 3000 Hz sample rate
         double phaseInc = 2.0 * 3.14159265358979323846 * freq / 3000.0;
 
-        for (int i = 0; i < 32; ++i) {
-            if (playL) {
-                leftBuf[i] = static_cast<unsigned char>(static_cast<int8_t>(sin(phaseLeft) * 127.0f * amp));
-                phaseLeft = fmod(phaseLeft + phaseInc, 2.0 * 3.14159265358979323846);
-            } else {
-                leftBuf[i] = 0; phaseLeft = 0.0;
-            }
-            if (playR) {
-                rightBuf[i] = static_cast<unsigned char>(static_cast<int8_t>(sin(phaseRight) * 127.0f * amp));
-                phaseRight = fmod(phaseRight + phaseInc, 2.0 * 3.14159265358979323846);
-            } else {
-                rightBuf[i] = 0; phaseRight = 0.0;
-            }
+        for (int i = 0; i < k_unSenseChunkSize; ++i) {
+            buf[i] = static_cast<unsigned char>(static_cast<int8_t>(sin(phase) * 127.0f * amp));
+            phase = fmod(phase + phaseInc, 2.0 * 3.14159265358979323846);
         }
 
-        CAPI_WritePcm(slot, leftBuf, rightBuf);
+        VRControllerType controllerType;
+        if (playL && playR) {
+            controllerType = VRControllerType::Both;
+        }
+        else if (playL) {
+            controllerType = VRControllerType::Left;
+        }
+        else if (playR) {
+            controllerType = VRControllerType::Right;
+        }
+        else {
+            continue;
+        }
+
+        CAPI_WritePcm(controllerType, buf);
     }
-    CAPI_ReleasePcmSlot(slot);
 }
 
 int main(int argc, char* argv[]) {
@@ -127,13 +117,16 @@ int main(int argc, char* argv[]) {
   ImGui_ImplSDLGPU3_Init(&init_info);
 
   // Initialize our CAPI
-  CAPI_Initialize();
+  if (CAPI_Initialize() < 0) {
+      std::cerr << "Failed to initialize CAPI! Are 4 applications already running?" << std::endl;
+      // Continue anyway for the sake of the test app
+  }
   
   std::thread hapticsThread(HapticsThreadFunc);
   hapticsThread.detach(); // Detached so if PSVR2TK goes down, the test app can still exit cleanly
 
   // Buffers for CAPI data
-  std::vector<unsigned char> gazeStatus(0x148, 0);
+  hmd2_gaze_status_t gazeStatus;
   std::vector<unsigned char> gazeImage(0x200100, 0);
 
   // Gaze image is 2048x1024 8-bit grayscale, with a 256-byte header.
@@ -170,7 +163,7 @@ int main(int argc, char* argv[]) {
     }
 
     // Fetch the latest data from the CAPI
-    CAPI_GetGazeStatus(gazeStatus.data());
+    CAPI_GetGazeStatus(&gazeStatus);
     CAPI_GetGazeImage(gazeImage.data());
 
     // Convert and upload texture data
@@ -202,11 +195,104 @@ int main(int argc, char* argv[]) {
       ImGui::SliderFloat("Amplitude", &g_toneAmplitude, 0.0f, 1.0f);
     }
 
-    if (ImGui::CollapsingHeader("Gaze Status Bytes", ImGuiTreeNodeFlags_DefaultOpen)) {
-      for (int i = 0; i < 0x148; ++i) {
-        ImGui::Text("%02X ", gazeStatus[i]);
-        if ((i + 1) % 16 != 0) ImGui::SameLine();
+    if (ImGui::CollapsingHeader("Trigger Effects", ImGuiTreeNodeFlags_DefaultOpen)) {
+      // Mode dropdown
+      static int mode = 0;
+      const char* modes[] = { "Off", "Feedback", "Weapon", "Vibration", "MultiplePositionFeedback", "SlopeFeedback", "MultiplePositionVibration" };
+      bool modeChanged = ImGui::Combo("Mode", &mode, modes, IM_ARRAYSIZE(modes));
+      // Controller type dropdown
+      static int controllerType = 0;
+      const char* controllerTypes[] = { "Left", "Right", "Both" };
+      ImGui::Combo("Controller Type", &controllerType, controllerTypes, IM_ARRAYSIZE(controllerTypes));
+      // Parameters based on mode
+      static TriggerEffectCommandPayload payload = {};
+      if (modeChanged) {
+          payload = {}; // Reset payload when mode changes to avoid garbage values
       }
+      payload.controllerType = static_cast<VRControllerType>(controllerType);
+      payload.mode = static_cast<TriggerEffectMode>(mode);
+
+      auto SliderUint8 = [](const char* label, uint8_t* v, int v_min, int v_max) {
+          uint8_t min = static_cast<uint8_t>(v_min);
+          uint8_t max = static_cast<uint8_t>(v_max);
+          return ImGui::SliderScalar(label, ImGuiDataType_U8, v, &min, &max, "%u");
+      };
+
+      switch (payload.mode) {
+        case TriggerEffectMode::Feedback:
+          SliderUint8("Position", &payload.commandData.feedbackParam.position, 0, 10);
+          SliderUint8("Strength", &payload.commandData.feedbackParam.strength, 0, 10);
+          break;
+        case TriggerEffectMode::Weapon:
+          SliderUint8("Start Position", &payload.commandData.weaponParam.startPosition, 0, 10);
+          SliderUint8("End Position", &payload.commandData.weaponParam.endPosition, 0, 10);
+          SliderUint8("Strength", &payload.commandData.weaponParam.strength, 0, 10);
+          break;
+        case TriggerEffectMode::Vibration:
+          SliderUint8("Position", &payload.commandData.vibrationParam.position, 0, 10);
+          SliderUint8("Amplitude", &payload.commandData.vibrationParam.amplitude, 0, 10);
+          SliderUint8("Frequency", &payload.commandData.vibrationParam.frequency, 0, 255);
+          break;
+        case TriggerEffectMode::MultiplePositionFeedback:
+          for (int i = 0; i < 10; i++) {
+            SliderUint8(("Strength " + std::to_string(i)).c_str(), &payload.commandData.multiplePositionFeedbackParam.strength[i], 0, 10);
+          }
+          break;
+        case TriggerEffectMode::SlopeFeedback:
+          SliderUint8("Start Position", &payload.commandData.slopeFeedbackParam.startPosition, 0, 10);
+          SliderUint8("End Position", &payload.commandData.slopeFeedbackParam.endPosition, 0, 10);
+          SliderUint8("Start Strength", &payload.commandData.slopeFeedbackParam.startStrength, 0, 10);
+          SliderUint8("End Strength", &payload.commandData.slopeFeedbackParam.endStrength, 0, 10);
+          break;
+        case TriggerEffectMode::MultiplePositionVibration:
+          SliderUint8("Frequency", &payload.commandData.multiplePositionVibrationParam.frequency, 0, 255);
+          for (int i = 0; i < 10; i++) {
+            SliderUint8(("Amplitude " + std::to_string(i)).c_str(), &payload.commandData.multiplePositionVibrationParam.amplitude[i], 0, 10);
+          }
+          break;
+      }
+      if (ImGui::Button("Send Trigger Effect")) {
+        CAPI_SendTriggerEffect(&payload);
+      }
+    }
+
+    if (ImGui::CollapsingHeader("Gaze Status Bytes", ImGuiTreeNodeFlags_DefaultOpen)) {
+      ImGui::Text("Magic: %c%c", gazeStatus.magic[0], gazeStatus.magic[1]);
+      ImGui::Text("Version: %u", gazeStatus.version);
+      ImGui::Text("Size: %u", gazeStatus.size);
+      
+      ImGui::Text("Exp_l: %f", gazeStatus.exp_l);
+      ImGui::Text("Exp_r: %f", gazeStatus.exp_r);
+      ImGui::Text("Led Status: %u", gazeStatus.led_status);
+      ImGui::Text("Exp Counter L: %u", gazeStatus.exp_counter_l);
+      ImGui::Text("Exp Counter R: %u", gazeStatus.exp_counter_r);
+      ImGui::Text("Led Counter: %u", gazeStatus.led_counter);
+      ImGui::Separator();
+      ImGui::Text("Wearable Timestamp: %lld", gazeStatus.wearable.timestamp);
+      ImGui::Text("Wearable Frame: %u", gazeStatus.wearable.frame_counter);
+      ImGui::Text("Left Gaze Origin: (%.2f, %.2f, %.2f)", gazeStatus.wearable.left.gaze_origin_mm.x, gazeStatus.wearable.left.gaze_origin_mm.y, gazeStatus.wearable.left.gaze_origin_mm.z);
+      ImGui::Text("Right Gaze Origin: (%.2f, %.2f, %.2f)", gazeStatus.wearable.right.gaze_origin_mm.x, gazeStatus.wearable.right.gaze_origin_mm.y, gazeStatus.wearable.right.gaze_origin_mm.z);
+      ImGui::Text("Combined Gaze Dir: (%.2f, %.2f, %.2f)", gazeStatus.wearable.gaze_dir_combined_norm.x, gazeStatus.wearable.gaze_dir_combined_norm.y, gazeStatus.wearable.gaze_dir_combined_norm.z);
+      ImGui::Separator();
+      ImGui::Text("Foveated Frame: %u", gazeStatus.foveated.frame_counter);
+      ImGui::Text("Convergence Distance: %.2f mm", gazeStatus.foveated.convergence_distance_mm);
+      ImGui::Text("Foveated Gaze Dir Combined: (%.2f, %.2f, %.2f)", gazeStatus.foveated.gaze_dir_combined_norm.x, gazeStatus.foveated.gaze_dir_combined_norm.y, gazeStatus.foveated.gaze_dir_combined_norm.z);
+      ImGui::Separator();
+      ImGui::Text("Lens Config Left: (%.2f, %.2f, %.2f)", gazeStatus.lens_config.left.x, gazeStatus.lens_config.left.y, gazeStatus.lens_config.left.z);
+      ImGui::Text("Lens Config Right: (%.2f, %.2f, %.2f)", gazeStatus.lens_config.right.x, gazeStatus.lens_config.right.y, gazeStatus.lens_config.right.z);
+      ImGui::Text("User Calibration ID: %u", gazeStatus.user_calibration_id);
+      ImGui::Text("FR Gaze Origin: (%.2f, %.2f, %.2f)", gazeStatus.fr_gaze_origin.x, gazeStatus.fr_gaze_origin.y, gazeStatus.fr_gaze_origin.z);
+      ImGui::Text("Enabled Eye: %u", (uint32_t)gazeStatus.enabled_eye);
+      ImGui::Text("Motor Sequence: %u", gazeStatus.motor_sequence);
+      ImGui::Text("Motor Strength: %u", gazeStatus.motor_strength);
+      ImGui::Text("DSP Return Code: %d", gazeStatus.dsp_return_code);
+      ImGui::Separator();
+      ImGui::Text("Left Eye Blink: %s", gazeStatus.wearable.left.blink == HMD2_GAZE_BOOL_TRUE ? "Yes" : "No");
+      ImGui::Text("Right Eye Blink: %s", gazeStatus.wearable.right.blink == HMD2_GAZE_BOOL_TRUE ? "Yes" : "No");
+      ImGui::Text("Pupil Diameter Left: %.2f mm", gazeStatus.wearable.left.pupil_dia_mm);
+      ImGui::Text("Pupil Diameter Right: %.2f mm", gazeStatus.wearable.right.pupil_dia_mm);
+      ImGui::Text("Gaze Origin Combined Valid: %s", gazeStatus.wearable.is_gaze_origin_combined_valid == HMD2_GAZE_BOOL_TRUE ? "Yes" : "No");
+      ImGui::Text("Gaze Dir Combined Valid: %s", gazeStatus.wearable.is_gaze_dir_combined_valid == HMD2_GAZE_BOOL_TRUE ? "Yes" : "No");
     }
 
     if (ImGui::CollapsingHeader("Gaze Image Stream", ImGuiTreeNodeFlags_DefaultOpen)) {
@@ -275,6 +361,8 @@ int main(int argc, char* argv[]) {
   SDL_DestroyGPUDevice(gpu_device);
   SDL_DestroyWindow(window);
   SDL_Quit();
+
+  CAPI_Deinitialize();
 
   return 0;
 }

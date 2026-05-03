@@ -1,10 +1,18 @@
 #include "trigger_effect_manager.h"
 #include "hmd_driver_loader.h"
-#include "util.h"
+#include "custom_share_manager.h"
+
+#include <cstring>
 
 #include "driver_interface/aston_manager.h"
 
 namespace psvr2_toolkit {
+
+  // State tracking for the 4 slots
+  static TriggerEffectCommandPayload g_slotEffects[MAX_SLOTS][2];
+  static bool g_slotAlive[MAX_SLOTS];
+  static TriggerEffectCommandPayload g_lastLeft = { VRControllerType::Left, TriggerEffectMode::Off };
+  static TriggerEffectCommandPayload g_lastRight = { VRControllerType::Right, TriggerEffectMode::Off };
 
   AstonManager_t *(*getAstonManager)();
   int (*scePadSetTriggerEffect)(int handle, ScePadTriggerEffectParam *param);
@@ -40,107 +48,79 @@ namespace psvr2_toolkit {
     m_initialized = true;
   }
 
-  /*void TriggerEffectManager::HandleIpcCommand(uint32_t processId, ipc::CommandHeader_t *pHeader, void *pData) {
-    if (!pData || !pHeader)
-      return;
+  void TriggerEffectManager::ApplyEffect(const TriggerEffectCommandPayload& payload) {
     ScePadTriggerEffectCommand command = {};
-    switch (pHeader->type) {
-      case ipc::Command_ClientTriggerEffectOff: {
-        if (pHeader->dataLen == sizeof(ipc::CommandDataClientTriggerEffectOff_t)) {
-          ipc::CommandDataClientTriggerEffectOff_t *pRequest = reinterpret_cast<ipc::CommandDataClientTriggerEffectOff_t *>(pData);
-          command.mode = SCE_PAD_TRIGGER_EFFECT_MODE_OFF;
-          SetTriggerEffectCommand(processId, pRequest->controllerType, command);
+    command.mode = static_cast<ScePadTriggerEffectMode>(payload.mode);
+    
+    std::memcpy(static_cast<void*>(&command.commandData), static_cast<const void*>(&payload.commandData), sizeof(payload.commandData));
+    SetTriggerEffectCommand(payload.controllerType, command);
+  }
+
+  void TriggerEffectManager::Update() {
+    CustomShareManager* pShareManager = CustomShareManager::getSingleton();
+    if (!pShareManager) return;
+
+    TriggerEffectCommand cmd;
+    while (pShareManager->popTriggerEffect(cmd)) {
+      if (cmd.slot >= 0 && cmd.slot < MAX_SLOTS) {
+        if (cmd.payload.controllerType == VRControllerType::Left || cmd.payload.controllerType == VRControllerType::Both) {
+          g_slotEffects[cmd.slot][0] = cmd.payload;
+          g_slotEffects[cmd.slot][0].controllerType = VRControllerType::Left;
         }
-        break;
-      }
-      case ipc::Command_ClientTriggerEffectFeedback: {
-        if (pHeader->dataLen == sizeof(ipc::CommandDataClientTriggerEffectFeedback_t)) {
-          ipc::CommandDataClientTriggerEffectFeedback_t *pRequest = reinterpret_cast<ipc::CommandDataClientTriggerEffectFeedback_t *>(pData);
-          command.mode = SCE_PAD_TRIGGER_EFFECT_MODE_FEEDBACK;
-          command.commandData.feedbackParam.position = pRequest->position;
-          command.commandData.feedbackParam.strength = pRequest->strength;
-          SetTriggerEffectCommand(processId, pRequest->controllerType, command);
+        if (cmd.payload.controllerType == VRControllerType::Right || cmd.payload.controllerType == VRControllerType::Both) {
+          g_slotEffects[cmd.slot][1] = cmd.payload;
+          g_slotEffects[cmd.slot][1].controllerType = VRControllerType::Right;
         }
-        break;
       }
-      case ipc::Command_ClientTriggerEffectWeapon: {
-        if (pHeader->dataLen == sizeof(ipc::CommandDataClientTriggerEffectWeapon_t)) {
-          ipc::CommandDataClientTriggerEffectWeapon_t *pRequest = reinterpret_cast<ipc::CommandDataClientTriggerEffectWeapon_t *>(pData);
-          command.mode = SCE_PAD_TRIGGER_EFFECT_MODE_WEAPON;
-          command.commandData.weaponParam.startPosition = pRequest->startPosition;
-          command.commandData.weaponParam.endPosition = pRequest->endPosition;
-          command.commandData.weaponParam.strength = pRequest->strength;
-          SetTriggerEffectCommand(processId, pRequest->controllerType, command);
-        }
-        break;
+    }
+
+    for (int i = 0; i < MAX_SLOTS; i++) {
+      bool alive = pShareManager->isSlotAlive(i);
+      if (g_slotAlive[i] && !alive) {
+        g_slotEffects[i][0].mode = TriggerEffectMode::Off;
+        g_slotEffects[i][1].mode = TriggerEffectMode::Off;
       }
-      case ipc::Command_ClientTriggerEffectVibration: {
-        if (pHeader->dataLen == sizeof(ipc::CommandDataClientTriggerEffectVibration_t)) {
-          ipc::CommandDataClientTriggerEffectVibration_t *pRequest = reinterpret_cast<ipc::CommandDataClientTriggerEffectVibration_t *>(pData);
-          command.mode = SCE_PAD_TRIGGER_EFFECT_MODE_VIBRATION;
-          command.commandData.vibrationParam.position = pRequest->position;
-          command.commandData.vibrationParam.amplitude = pRequest->amplitude;
-          command.commandData.vibrationParam.frequency = pRequest->frequency;
-          SetTriggerEffectCommand(processId, pRequest->controllerType, command);
-        }
-        break;
+      g_slotAlive[i] = alive;
+    }
+
+    TriggerEffectCommandPayload finalLeft = {};
+    finalLeft.controllerType = VRControllerType::Left;
+    TriggerEffectCommandPayload finalRight = {};
+    finalRight.controllerType = VRControllerType::Right;
+
+    for (int i = MAX_SLOTS - 1; i >= 0; i--) {
+      if (g_slotAlive[i]) {
+        if (g_slotEffects[i][0].mode != TriggerEffectMode::Off) finalLeft = g_slotEffects[i][0];
+        if (g_slotEffects[i][1].mode != TriggerEffectMode::Off) finalRight = g_slotEffects[i][1];
       }
-      case ipc::Command_ClientTriggerEffectMultiplePositionFeedback: {
-        if (pHeader->dataLen == sizeof(ipc::CommandDataClientTriggerEffectMultiplePositionFeedback_t)) {
-          ipc::CommandDataClientTriggerEffectMultiplePositionFeedback_t *pRequest = reinterpret_cast<ipc::CommandDataClientTriggerEffectMultiplePositionFeedback_t *>(pData);
-          command.mode = SCE_PAD_TRIGGER_EFFECT_MODE_MULTIPLE_POSITION_FEEDBACK;
-          for (int i = 0; i < ipc::k_unTriggerEffectControlPoint; i++) {
-            command.commandData.multiplePositionFeedbackParam.strength[i] = pRequest->strength[i];
-          }
-          SetTriggerEffectCommand(processId, pRequest->controllerType, command);
-        }
-        break;
-      }
-      case ipc::Command_ClientTriggerEffectSlopeFeedback: {
-        if (pHeader->dataLen == sizeof(ipc::CommandDataClientTriggerEffectSlopeFeedback_t)) {
-          ipc::CommandDataClientTriggerEffectSlopeFeedback_t *pRequest = reinterpret_cast<ipc::CommandDataClientTriggerEffectSlopeFeedback_t *>(pData);
-          command.mode = SCE_PAD_TRIGGER_EFFECT_MODE_SLOPE_FEEDBACK;
-          command.commandData.slopeFeedbackParam.startPosition = pRequest->startPosition;
-          command.commandData.slopeFeedbackParam.endPosition = pRequest->endPosition;
-          command.commandData.slopeFeedbackParam.startStrength = pRequest->startStrength;
-          command.commandData.slopeFeedbackParam.endStrength = pRequest->endStrength;
-          SetTriggerEffectCommand(processId, pRequest->controllerType, command);
-        }
-        break;
-      }
-      case ipc::Command_ClientTriggerEffectMultiplePositionVibration: {
-        if (pHeader->dataLen == sizeof(ipc::CommandDataClientTriggerEffectMultiplePositionVibration_t)) {
-          ipc::CommandDataClientTriggerEffectMultiplePositionVibration_t *pRequest = reinterpret_cast<ipc::CommandDataClientTriggerEffectMultiplePositionVibration_t *>(pData);
-          command.mode = SCE_PAD_TRIGGER_EFFECT_MODE_MULTIPLE_POSITION_FEEDBACK;
-          command.commandData.multiplePositionVibrationParam.frequency = pRequest->frequency;
-          for (int i = 0; i < ipc::k_unTriggerEffectControlPoint; i++) {
-            command.commandData.multiplePositionVibrationParam.amplitude[i] = pRequest->amplitude[i];
-          }
-          SetTriggerEffectCommand(processId, pRequest->controllerType, command);
-        }
-        break;
-      }
+    }
+
+    if (std::memcmp(&finalLeft, &g_lastLeft, sizeof(TriggerEffectCommandPayload)) != 0) {
+      ApplyEffect(finalLeft);
+      g_lastLeft = finalLeft;
+    }
+    if (std::memcmp(&finalRight, &g_lastRight, sizeof(TriggerEffectCommandPayload)) != 0) {
+      ApplyEffect(finalRight);
+      g_lastRight = finalRight;
     }
   }
 
-  void TriggerEffectManager::SetTriggerEffectCommand(uint32_t processId, ipc::EVRControllerType controllerType, ScePadTriggerEffectCommand command) {
-    static AstonManager_t *pAstonManager = getAstonManager();
-
-    (void)processId;
+  void TriggerEffectManager::SetTriggerEffectCommand(VRControllerType controllerType, ScePadTriggerEffectCommand command) {
+    AstonManager_t *pAstonManager = getAstonManager();
 
     ScePadTriggerEffectParam param = {};
     switch (controllerType) {
-      case ipc::VRController_Left: {
+      case VRControllerType::Left: {
         param.triggerMask = SCE_PAD_TRIGGER_EFFECT_TRIGGER_MASK_L2;
         param.command[SCE_PAD_TRIGGER_EFFECT_PARAM_INDEX_FOR_L2] = command;
         break;
       }
-      case ipc::VRController_Right: {
+      case VRControllerType::Right: {
         param.triggerMask = SCE_PAD_TRIGGER_EFFECT_TRIGGER_MASK_R2;
         param.command[SCE_PAD_TRIGGER_EFFECT_PARAM_INDEX_FOR_R2] = command;
         break;
       }
-      case ipc::VRController_Both: {
+      case VRControllerType::Both: {
         param.triggerMask = SCE_PAD_TRIGGER_EFFECT_TRIGGER_MASK_L2 | SCE_PAD_TRIGGER_EFFECT_TRIGGER_MASK_R2;
         param.command[SCE_PAD_TRIGGER_EFFECT_PARAM_INDEX_FOR_L2] = command;
         param.command[SCE_PAD_TRIGGER_EFFECT_PARAM_INDEX_FOR_R2] = command;
@@ -149,19 +129,23 @@ namespace psvr2_toolkit {
     }
 
     if (pAstonManager) {
-      if (controllerType == ipc::VRController_Left || controllerType == ipc::VRController_Both) {
-        int leftPadHandle = pAstonManager->contexts[1]->handle;
-        if (leftPadHandle > -1) {
-          scePadSetTriggerEffect(leftPadHandle, &param);
+      if (controllerType == VRControllerType::Left || controllerType == VRControllerType::Both) {
+        if (pAstonManager->contexts[1]) {
+          int leftPadHandle = pAstonManager->contexts[1]->handle;
+          if (leftPadHandle > -1) {
+            scePadSetTriggerEffect(leftPadHandle, &param);
+          }
         }
       }
-      if (controllerType == ipc::VRController_Right || controllerType == ipc::VRController_Both) {
-        int rightPadHandle = pAstonManager->contexts[0]->handle;
-        if (rightPadHandle > -1) {
-          scePadSetTriggerEffect(rightPadHandle, &param);
+      if (controllerType == VRControllerType::Right || controllerType == VRControllerType::Both) {
+        if (pAstonManager->contexts[0]) {
+          int rightPadHandle = pAstonManager->contexts[0]->handle;
+          if (rightPadHandle > -1) {
+            scePadSetTriggerEffect(rightPadHandle, &param);
+          }
         }
       }
     }
-  }*/
+  }
 
 } // psvr2_toolkit

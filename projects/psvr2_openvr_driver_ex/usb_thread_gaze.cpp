@@ -2,7 +2,7 @@
 
 #include "hmd_driver_loader.h"
 #include "driver_hooks/hmd_device_hooks.h"
-#include "common/hmd2_gaze.h"
+// #include "common/hmd2_gaze.h" TODO: sort out header re-location
 #include "custom_share_manager.h"
 
 #include <cstdlib>
@@ -121,17 +121,16 @@ uint8_t CaesarUsbThreadGaze::getReadPipeId() {
 }
 
 int CaesarUsbThreadGaze::poll() {
-  static char buffer[0x200000];
-  int result = CaesarUsbThread__read(this, 0x85, buffer, sizeof(buffer));
+  static hmd2_gaze_status_t state;
+  int result = CaesarUsbThread__read(this, 0x85, reinterpret_cast<char*>(&state), sizeof(state));
   if (result < 0) {
     return -1;
   }
-
-  if (buffer[0] == GAZE_MAGIC_0 && buffer[1] == GAZE_MAGIC_1_STATE) {
-    hmd2_gaze_status_t *pGazeState = reinterpret_cast<hmd2_gaze_status_t *>(buffer);
-    HmdDeviceHooks::UpdateGaze(pGazeState, sizeof(hmd2_gaze_status_t));
+  
+  if (state.magic[0] == GAZE_MAGIC_0 && state.magic[1] == GAZE_MAGIC_1_STATE) {
+    HmdDeviceHooks::UpdateGaze(&state, sizeof(hmd2_gaze_status_t));
     CustomShareManager* pShareManager = CustomShareManager::getSingleton();
-    pShareManager->setGazeStatus(reinterpret_cast<unsigned char *>(buffer)); // TODO: fix casting.
+    pShareManager->setGazeStatus(&state);
   }
 
   return 0;
