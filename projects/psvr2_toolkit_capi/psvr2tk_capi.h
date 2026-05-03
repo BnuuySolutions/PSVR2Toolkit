@@ -1,5 +1,6 @@
 #include "common.h"
 #include "hmd2_gaze.h"
+#include "pad_trigger_effect.h"
 
 extern "C" {
   __declspec(dllexport) int CAPI_Initialize();
@@ -8,5 +9,5 @@ extern "C" {
   __declspec(dllexport) void CAPI_GetGazeImage(unsigned char* pGazeImage);
   __declspec(dllexport) void CAPI_WritePcm(VRControllerType controllerType, const unsigned char* pcm);
   __declspec(dllexport) void CAPI_WaitForPcmUpdate();
-  __declspec(dllexport) void CAPI_SendTriggerEffect(const TriggerEffectCommandPayload* payload);
+  __declspec(dllexport) void CAPI_SendTriggerEffect(VRControllerType controllerType, const ScePadTriggerEffectCommand& command);
 }

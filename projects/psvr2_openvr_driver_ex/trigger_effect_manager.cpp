@@ -11,8 +11,8 @@ namespace psvr2_toolkit {
   // State tracking for the 4 slots
   static TriggerEffectCommandPayload g_slotEffects[MAX_SLOTS][2];
   static bool g_slotAlive[MAX_SLOTS];
-  static TriggerEffectCommandPayload g_lastLeft = { VRControllerType::Left, TriggerEffectMode::Off };
-  static TriggerEffectCommandPayload g_lastRight = { VRControllerType::Right, TriggerEffectMode::Off };
+  static TriggerEffectCommandPayload g_lastLeft = { VRControllerType::Left, {} };
+  static TriggerEffectCommandPayload g_lastRight = { VRControllerType::Right, {} };
 
   AstonManager_t *(*getAstonManager)();
   int (*scePadSetTriggerEffect)(int handle, ScePadTriggerEffectParam *param);
@@ -49,11 +49,7 @@ namespace psvr2_toolkit {
   }
 
   void TriggerEffectManager::ApplyEffect(const TriggerEffectCommandPayload& payload) {
-    ScePadTriggerEffectCommand command = {};
-    command.mode = static_cast<ScePadTriggerEffectMode>(payload.mode);
-    
-    std::memcpy(static_cast<void*>(&command.commandData), static_cast<const void*>(&payload.commandData), sizeof(payload.commandData));
-    SetTriggerEffectCommand(payload.controllerType, command);
+    SetTriggerEffectCommand(payload.controllerType, payload.command);
   }
 
   void TriggerEffectManager::Update() {
@@ -77,8 +73,8 @@ namespace psvr2_toolkit {
     for (int i = 0; i < MAX_SLOTS; i++) {
       bool alive = pShareManager->isSlotAlive(i);
       if (g_slotAlive[i] && !alive) {
-        g_slotEffects[i][0].mode = TriggerEffectMode::Off;
-        g_slotEffects[i][1].mode = TriggerEffectMode::Off;
+        g_slotEffects[i][0].command.mode = ScePadTriggerEffectMode::SCE_PAD_TRIGGER_EFFECT_MODE_OFF;
+        g_slotEffects[i][1].command.mode = ScePadTriggerEffectMode::SCE_PAD_TRIGGER_EFFECT_MODE_OFF;
       }
       g_slotAlive[i] = alive;
     }
@@ -90,8 +86,8 @@ namespace psvr2_toolkit {
 
     for (int i = MAX_SLOTS - 1; i >= 0; i--) {
       if (g_slotAlive[i]) {
-        if (g_slotEffects[i][0].mode != TriggerEffectMode::Off) finalLeft = g_slotEffects[i][0];
-        if (g_slotEffects[i][1].mode != TriggerEffectMode::Off) finalRight = g_slotEffects[i][1];
+        if (g_slotEffects[i][0].command.mode != ScePadTriggerEffectMode::SCE_PAD_TRIGGER_EFFECT_MODE_OFF) finalLeft = g_slotEffects[i][0];
+        if (g_slotEffects[i][1].command.mode != ScePadTriggerEffectMode::SCE_PAD_TRIGGER_EFFECT_MODE_OFF) finalRight = g_slotEffects[i][1];
       }
     }
 

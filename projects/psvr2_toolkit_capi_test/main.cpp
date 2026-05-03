@@ -12,6 +12,7 @@
 #include <thread>
 #include "common.h"
 
+#include "pad_trigger_effect.h"
 #include "psvr2tk_capi.h"
 
 std::atomic<bool> g_appRunning = true;
@@ -205,12 +206,12 @@ int main(int argc, char* argv[]) {
       const char* controllerTypes[] = { "Left", "Right", "Both" };
       ImGui::Combo("Controller Type", &controllerType, controllerTypes, IM_ARRAYSIZE(controllerTypes));
       // Parameters based on mode
-      static TriggerEffectCommandPayload payload = {};
+      static ScePadTriggerEffectCommand payload = {};
       if (modeChanged) {
           payload = {}; // Reset payload when mode changes to avoid garbage values
       }
-      payload.controllerType = static_cast<VRControllerType>(controllerType);
-      payload.mode = static_cast<TriggerEffectMode>(mode);
+      
+      payload.mode = static_cast<ScePadTriggerEffectMode>(mode);
 
       auto SliderUint8 = [](const char* label, uint8_t* v, int v_min, int v_max) {
           uint8_t min = static_cast<uint8_t>(v_min);
@@ -219,32 +220,34 @@ int main(int argc, char* argv[]) {
       };
 
       switch (payload.mode) {
-        case TriggerEffectMode::Feedback:
+        case SCE_PAD_TRIGGER_EFFECT_MODE_OFF:
+          break;
+        case SCE_PAD_TRIGGER_EFFECT_MODE_FEEDBACK:
           SliderUint8("Position", &payload.commandData.feedbackParam.position, 0, 10);
           SliderUint8("Strength", &payload.commandData.feedbackParam.strength, 0, 10);
           break;
-        case TriggerEffectMode::Weapon:
+        case SCE_PAD_TRIGGER_EFFECT_MODE_WEAPON:
           SliderUint8("Start Position", &payload.commandData.weaponParam.startPosition, 0, 10);
           SliderUint8("End Position", &payload.commandData.weaponParam.endPosition, 0, 10);
           SliderUint8("Strength", &payload.commandData.weaponParam.strength, 0, 10);
           break;
-        case TriggerEffectMode::Vibration:
+        case SCE_PAD_TRIGGER_EFFECT_MODE_VIBRATION:
           SliderUint8("Position", &payload.commandData.vibrationParam.position, 0, 10);
           SliderUint8("Amplitude", &payload.commandData.vibrationParam.amplitude, 0, 10);
           SliderUint8("Frequency", &payload.commandData.vibrationParam.frequency, 0, 255);
           break;
-        case TriggerEffectMode::MultiplePositionFeedback:
+        case SCE_PAD_TRIGGER_EFFECT_MODE_MULTIPLE_POSITION_FEEDBACK:
           for (int i = 0; i < 10; i++) {
             SliderUint8(("Strength " + std::to_string(i)).c_str(), &payload.commandData.multiplePositionFeedbackParam.strength[i], 0, 10);
           }
           break;
-        case TriggerEffectMode::SlopeFeedback:
+        case SCE_PAD_TRIGGER_EFFECT_MODE_SLOPE_FEEDBACK:
           SliderUint8("Start Position", &payload.commandData.slopeFeedbackParam.startPosition, 0, 10);
           SliderUint8("End Position", &payload.commandData.slopeFeedbackParam.endPosition, 0, 10);
           SliderUint8("Start Strength", &payload.commandData.slopeFeedbackParam.startStrength, 0, 10);
           SliderUint8("End Strength", &payload.commandData.slopeFeedbackParam.endStrength, 0, 10);
           break;
-        case TriggerEffectMode::MultiplePositionVibration:
+        case SCE_PAD_TRIGGER_EFFECT_MODE_MULTIPLE_POSITION_VIBRATION:
           SliderUint8("Frequency", &payload.commandData.multiplePositionVibrationParam.frequency, 0, 255);
           for (int i = 0; i < 10; i++) {
             SliderUint8(("Amplitude " + std::to_string(i)).c_str(), &payload.commandData.multiplePositionVibrationParam.amplitude[i], 0, 10);
@@ -252,7 +255,7 @@ int main(int argc, char* argv[]) {
           break;
       }
       if (ImGui::Button("Send Trigger Effect")) {
-        CAPI_SendTriggerEffect(&payload);
+        CAPI_SendTriggerEffect(static_cast<VRControllerType>(controllerType), payload);
       }
     }
 
