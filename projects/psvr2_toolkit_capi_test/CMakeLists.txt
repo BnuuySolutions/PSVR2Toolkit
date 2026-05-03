@@ -15,3 +15,6 @@ target_link_libraries(psvr2_toolkit_capi_test PRIVATE
     imgui
     psvr2_toolkit_capi
 )
+
+target_include_directories(psvr2_toolkit_capi_test PUBLIC ${CMAKE_SOURCE_DIR}/projects/psvr2_toolkit_capi)
+target_include_directories(psvr2_toolkit_capi_test PUBLIC ${CMAKE_SOURCE_DIR}/include)

@@ -4,6 +4,8 @@
 #include "math_helpers.h"
 #include "sense_controller.h"
 #include "sense_crc.h"
+#include "trigger_effect_manager.h"
+#include "common.h"
 
 #include <algorithm>
 #include <array>
@@ -36,7 +38,7 @@ void SenseController::SetGeneratedHaptic(float freq, uint32_t amp, uint32_t samp
 }
 
 
-void SenseController::MixPCM(const std::array<int8_t, 32>& newPCMData) {
+void SenseController::MixPCM(const PCMBufferType& newPCMData) {
   std::scoped_lock<std::mutex> lock(controllerMutex);
 
   for (size_t i = 0; i < pcmData.size(); i++)
@@ -215,7 +217,7 @@ void SenseThread()
   QueryPerformanceFrequency(&frequency);
 
   // Duration we want to run every iteration (32/3000 or 0.010666 seconds)
-  LONGLONG duration = static_cast<LONGLONG>((32.0 / static_cast<double>(k_unSenseSampleRate)) * frequency.QuadPart);
+  LONGLONG duration = static_cast<LONGLONG>((static_cast<double>(k_unSenseChunkSize) / static_cast<double>(k_unSenseSampleRate)) * frequency.QuadPart);
 
   LARGE_INTEGER start;
   QueryPerformanceCounter(&start);
@@ -229,34 +231,37 @@ void SenseThread()
     if (pShareManager) {
       leftController.ResetPCM();
       rightController.ResetPCM();
-      for (int i = 0; i < MAX_PCM_SLOTS; i++) {
-        unsigned char pcmLeft[PCM_BUFFER_SIZE] = {0};
-        unsigned char pcmRight[PCM_BUFFER_SIZE] = {0};
+      for (int i = 0; i < MAX_SLOTS; i++) {
+        unsigned char pcmLeft[k_unSenseChunkSize] = {0};
+        unsigned char pcmRight[k_unSenseChunkSize] = {0};
         
         pShareManager->readPcm(i, pcmLeft, pcmRight);
         
         bool hasLeft = false;
         bool hasRight = false;
-        for (int j = 0; j < PCM_BUFFER_SIZE; j++) {
+        for (int j = 0; j < k_unSenseChunkSize; j++) {
           if (pcmLeft[j] != 0) hasLeft = true;
           if (pcmRight[j] != 0) hasRight = true;
         }
         
         if (hasLeft) {
-          std::array<int8_t, 32> pcmVec;
+          PCMBufferType pcmVec;
           std::copy(std::begin(pcmLeft), std::end(pcmLeft), pcmVec.begin());
           
           leftController.MixPCM(pcmVec);
         }
         
         if (hasRight) {
-          std::array<int8_t, 32> pcmVec;
+          PCMBufferType pcmVec;
           std::copy(std::begin(pcmRight), std::end(pcmRight), pcmVec.begin());
 
           rightController.MixPCM(pcmVec);
         }
       }
     }
+
+    // TODO: this should be moved out to support non-enhanced haptics path
+    TriggerEffectManager::Instance()->Update();
 
     leftController.SendToDevice();
     rightController.SendToDevice();

@@ -1,15 +1,14 @@
 #pragma once
 
 #include "cross_ipc.h"
-
-#define MAX_PCM_SLOTS 4
-#define PCM_BUFFER_SIZE 32 // TODO: we should have a header for commnn types and defines
+#include "common.h"
+#include "hmd2_gaze.h"
 
 struct GazeStatus {
-  unsigned char data[0x148];
+  hmd2_gaze_status_t data;
 
-  void set(const unsigned char* pGazeStatus);
-  void get(unsigned char* pGazeStatus) const;
+  void set(const hmd2_gaze_status_t* pGazeStatus);
+  void get(hmd2_gaze_status_t* pGazeStatus) const;
 };
 
 struct GazeImage {
@@ -20,11 +19,26 @@ struct GazeImage {
   int getFromCircularBuffer(unsigned char** gazeImageBuffer);
 };
 
+struct TriggerEffectCommand {
+  int slot;
+  TriggerEffectCommandPayload payload;
+};
+
+struct TriggerEffectBuffer {
+  int head;
+  int tail;
+  TriggerEffectCommand commands[256];
+
+  void push(int slot, const TriggerEffectCommandPayload& payload);
+  bool pop(TriggerEffectCommand& outCommand);
+};
+
 struct BufferData {
   GazeStatus gazeStatus;
   GazeImage gazeImage;
-  unsigned char pcmLeft[MAX_PCM_SLOTS][PCM_BUFFER_SIZE];
-  unsigned char pcmRight[MAX_PCM_SLOTS][PCM_BUFFER_SIZE];
+  unsigned char pcmLeft[MAX_SLOTS][k_unSenseChunkSize];
+  unsigned char pcmRight[MAX_SLOTS][k_unSenseChunkSize];
+  TriggerEffectBuffer triggerEffectBuffer;
 };
 
 class CustomShareManager {
@@ -32,8 +46,8 @@ public:
   static void createSingleton();
   static CustomShareManager *getSingleton();
 
-  void setGazeStatus(const unsigned char* pGazeStatus);
-  void getGazeStatus(unsigned char* pGazeStatus) const;
+  void setGazeStatus(const hmd2_gaze_status_t* pGazeStatus);
+  void getGazeStatus(hmd2_gaze_status_t* pGazeStatus) const;
 
   void setGazeImage(const unsigned char* pGazeImage);
 
@@ -42,10 +56,14 @@ public:
   void signalPcmUpdate();
   void readPcm(int slot, unsigned char* pcmLeft, unsigned char* pcmRight);
 
-  int claimPcmSlot();
-  void releasePcmSlot(int slot);
-  void writePcm(int slot, const unsigned char* pcmLeft, const unsigned char* pcmRight);
+  int claimSlot();
+  void releaseSlot(int slot);
+  bool isSlotAlive(int slot);
+  void writePcm(int slot, VRControllerType controllerType, const unsigned char* pcm);
   void waitForPcmUpdate(int slot);
+
+  void pushTriggerEffect(int slot, const TriggerEffectCommandPayload& payload);
+  bool popTriggerEffect(TriggerEffectCommand& outCommand);
 
 private:
   static CustomShareManager *m_pInstance;
@@ -57,9 +75,11 @@ private:
   IIpcEvent* m_gazeImageEvent;
   IIpcMutex* m_gazeImageMutex;
 
-  IIpcMutex* m_pcmOwnerMutex[MAX_PCM_SLOTS];
+  IIpcMutex* m_slotOwnerMutex[MAX_SLOTS];
 
-  IIpcEvent* m_pcmEvent[MAX_PCM_SLOTS];
+  IIpcEvent* m_pcmEvent[MAX_SLOTS];
+
+  IIpcMutex* m_triggerEffectMutex;
 
   IIpcSharedMemory* m_sharedMemory;
   BufferData* m_pBufferData;

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "common.h"
 #include "math_helpers.h"
 #include "driver_hooks/libpad_hooks.h"
 #include "write_file_async.h"
@@ -8,7 +9,6 @@
 #include <atomic>
 #include <mutex>
 
-constexpr uint32_t k_unSenseSampleRate = 3000;
 constexpr uint32_t k_unSenseSubsamples = 10000;
 constexpr uint32_t k_unSenseMaxSamplePosition = k_unSenseSampleRate * k_unSenseSubsamples;
 constexpr uint32_t k_unSenseHalfSamplePosition = k_unSenseMaxSamplePosition / 2;
@@ -80,7 +80,7 @@ struct SenseControllerPacket_t {
   uint8_t unkData1; // Enables or disables some stuff, but doesn't seem to change the layout?
   SenseControllerSettings_t settings;
   uint8_t packetNum; // Incremented every time we send a packet to this controller.
-  uint8_t hapticPCM[32]; // 3000hz, 8 bit signed PCM data. This means we must send PCM packets at a rate of 93.75 times per second.
+  uint8_t hapticPCM[k_unSenseChunkSize]; // 3000hz, 8 bit signed PCM data. This means we must send PCM packets at a rate of 93.75 times per second.
   uint8_t crc[4]; // uint8_t for alignment
 }; static_assert(sizeof(SenseControllerPacket_t) == 78, "Size of SenseControllerPacket_t is not 78 bytes!");
 
@@ -91,6 +91,8 @@ struct SenseControllerPCModePacket_t {
   uint8_t padding[9];
 }; static_assert(sizeof(SenseControllerPCModePacket_t) == 0x30, "Size of SenseControllerPacket_t is not 78 bytes!");
 #pragma pack(pop)
+
+typedef std::array<int8_t, k_unSenseChunkSize> PCMBufferType;
 
 // The official driver calculates the host timestamp this way.
 // It simply converts QueryPerformanceCounter to unsigned 64bit microseconds.
@@ -119,7 +121,7 @@ namespace psvr2_toolkit {
     static void Destroy();
 
     void SetGeneratedHaptic(float freq, uint32_t amp, uint32_t sampleCount);
-    void MixPCM(const std::array<int8_t, 32>& newPCMData);
+    void MixPCM(const PCMBufferType& newPCMData);
     void ResetPCM();
 
     const SenseControllerPCModePacket_t& GetTrackingControllerSettings() { return driverTrackingData; };
@@ -197,6 +199,7 @@ namespace psvr2_toolkit {
 
       this->lastSampleTimestamp = GetHostTimestamp();
     }
+
     void ClearTimestampOffset() {
       std::scoped_lock<std::mutex> lock(this->controllerMutex);
       this->hasTimestampOffset = false;
@@ -272,6 +275,6 @@ namespace psvr2_toolkit {
     uint32_t hapticAmp = 0;
     float hapticFreq = 0.0f;
 
-    std::array<int8_t, 32> pcmData;
+    PCMBufferType pcmData;
   };
 }
