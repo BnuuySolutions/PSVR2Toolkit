@@ -66,11 +66,6 @@ namespace psvr2_toolkit {
               inverseVerts.push_back(perimeter[i]);
               inverseVerts.push_back(perimeter[i + 1]);
             }
-            
-            // Close the fan gap from the last perimeter point back to the first
-            inverseVerts.push_back(center);
-            inverseVerts.push_back(perimeter.back());
-            inverseVerts.push_back(perimeter.front());
 
             hamHelpers.SetHiddenArea(eye, vr::k_eHiddenAreaMesh_Inverse, inverseVerts.data(), static_cast<uint32_t>(inverseVerts.size()));
           }
