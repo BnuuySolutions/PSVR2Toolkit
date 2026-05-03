@@ -42,8 +42,11 @@ extern "C" {
     if (g_slot >= 0) CustomShareManager::getSingleton()->waitForPcmUpdate(g_slot);
   }
 
-  void CAPI_SendTriggerEffect(const TriggerEffectCommandPayload* payload) {
-    if (g_slot >= 0) CustomShareManager::getSingleton()->pushTriggerEffect(g_slot, *payload);
+  void CAPI_SendTriggerEffect(VRControllerType controllerType, const ScePadTriggerEffectCommand& command) {
+    TriggerEffectCommandPayload payload;
+    payload.controllerType = controllerType;
+    payload.command = command;
+    if (g_slot >= 0) CustomShareManager::getSingleton()->pushTriggerEffect(g_slot, payload);
   }
 
 }
