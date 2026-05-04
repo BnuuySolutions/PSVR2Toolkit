@@ -1,7 +1,7 @@
 #include "usb_thread_gaze.h"
 
 #include "hmd_driver_loader.h"
-#include "hooks/hmd_device_hooks.h"
+#include "driver_hooks/hmd_device_hooks.h"
 #include "hmd2_gaze.h"
 #include "custom_share_manager.h"
 

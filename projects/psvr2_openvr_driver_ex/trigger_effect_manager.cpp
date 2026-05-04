@@ -2,19 +2,9 @@
 #include "hmd_driver_loader.h"
 #include "util.h"
 
-namespace psvr2_toolkit {
+#include "driver_interface/aston_manager.h"
 
-  struct AstonContext_t {
-    void *vfptr;
-    char unk1[0x28];
-    int handle; // libpad handle
-    char unk3[0xEFE8C];
-  };
-  struct AstonManager_t {
-    void *vfptr;
-    AstonContext_t *contexts[2]; // 0 = Right, 1 = Left
-    char unk2[8];
-  };
+namespace psvr2_toolkit {
 
   AstonManager_t *(*getAstonManager)();
   int (*scePadSetTriggerEffect)(int handle, ScePadTriggerEffectParam *param);
