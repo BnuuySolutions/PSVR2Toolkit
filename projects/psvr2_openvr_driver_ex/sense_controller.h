@@ -1,7 +1,7 @@
 #pragma once
 
 #include "math_helpers.h"
-#include "hooks/libpad_hooks.h"
+#include "driver_hooks/libpad_hooks.h"
 #include "write_file_async.h"
 
 #include <atomic>
