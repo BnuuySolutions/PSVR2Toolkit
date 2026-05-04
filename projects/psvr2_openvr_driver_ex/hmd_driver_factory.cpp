@@ -23,7 +23,7 @@ extern "C" __declspec(dllexport) void *HmdDriverFactory(const char *pInterfaceNa
     return result;
   }
 
-  MessageBoxW(nullptr, L"Loading original HMD driver failed, please report this to the developers!", L"PlayStation VR2 Toolkit (DriverEx)", MB_ICONERROR | MB_OK);
+  MessageBoxW(nullptr, L"Loading original HMD driver failed, please report this to the developers!", L"PlayStation VR2 Toolkit", MB_ICONERROR | MB_OK);
 
   if (pReturnCode) {
     *pReturnCode = vr::VRInitError_Init_InterfaceNotFound;
