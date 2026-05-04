@@ -1,14 +1,14 @@
 #include "device_provider_proxy.h"
 
 #include "config.h"
-#include "caesar_manager_hooks.h"
+#include "hooks/caesar_manager_hooks.h"
 #include "driver_context_proxy.h"
-#include "hmd_device_hooks.h"
+#include "hooks/hmd_device_hooks.h"
 #include "hmd_driver_loader.h"
 #include "hook_lib.h"
-#include "libpad_hooks.h"
+#include "hooks/libpad_hooks.h"
 #include "trigger_effect_manager.h"
-#include "usb_thread_hooks.h"
+#include "hooks/usb_thread_hooks.h"
 #include "util.h"
 #include "vr_settings.h"
 
