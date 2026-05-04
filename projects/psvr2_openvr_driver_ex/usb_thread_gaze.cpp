@@ -2,7 +2,7 @@
 
 #include "hmd_driver_loader.h"
 #include "driver_hooks/hmd_device_hooks.h"
-#include "hmd2_gaze.h"
+#include "common/hmd2_gaze.h"
 #include "custom_share_manager.h"
 
 #include <cstdlib>

@@ -16,6 +16,8 @@ add_library(psvr2_openvr_driver_ex SHARED
 
   driver_interface/aston_context.h
   driver_interface/aston_manager.h
+
+  common/hmd2_gaze.h
 )
 target_include_directories(psvr2_openvr_driver_ex PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
