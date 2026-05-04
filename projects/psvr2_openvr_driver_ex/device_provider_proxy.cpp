@@ -114,6 +114,7 @@ namespace psvr2_toolkit {
     // Remove signature checks.
     INSTALL_STUB_RET0(reinterpret_cast<void *>(pHmdDriverLoader->GetBaseAddress() + 0x134FF0)); // VrDialogManager::VerifyLibrary
 
+    // Remove dashboard and dialog process launch.
     INSTALL_STUB(reinterpret_cast<void*>(pHmdDriverLoader->GetBaseAddress() + 0x12F830)); // VrDialogManager::CreateDashboardProcess
     INSTALL_STUB(reinterpret_cast<void*>(pHmdDriverLoader->GetBaseAddress() + 0x130020)); // VrDialogManager::CreateDialogProcess
 
