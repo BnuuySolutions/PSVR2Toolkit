@@ -3,6 +3,8 @@
 #include <shlwapi.h>
 
 #define HMD_DLL_NAME L"driver_playstation_vr2_orig.dll"
+// Just in case people fuck up renaming a file, somehow.
+#define HMD_DLL_NAME_ALT L"driver_playstation_vr2_orig.dll.dll"
 
 extern "C" IMAGE_DOS_HEADER __ImageBase;
 
@@ -23,12 +25,10 @@ namespace psvr2_toolkit {
     : pfnHmdDriverFactory(nullptr)
     , m_hModule(nullptr)
   {
-    wchar_t pszHmdDllPath[MAX_PATH] = { 0 };
-    if (GetHmdDllPath(pszHmdDllPath)) {
-      m_hModule = LoadLibraryW(pszHmdDllPath);
-      if (m_hModule) {
-        pfnHmdDriverFactory = decltype(pfnHmdDriverFactory)(GetProcAddress(m_hModule, "HmdDriverFactory"));
-      }
+    // Attempt to load the HMD DLL with the default name.
+    // If we can't, try the alternative name.
+    if (!LoadHmdDll()) {
+      LoadHmdDll(true);
     }
   }
 
@@ -44,7 +44,20 @@ namespace psvr2_toolkit {
     return reinterpret_cast<uintptr_t>(m_hModule);
   }
 
-  bool HmdDriverLoader::GetHmdDllPath(wchar_t *pszHmdDllPath) {
+  bool HmdDriverLoader::LoadHmdDll(bool useAltName) {
+    wchar_t pszHmdDllPath[MAX_PATH] = { 0 };
+    if (GetHmdDllPath(pszHmdDllPath, useAltName)) {
+      m_hModule = LoadLibraryW(pszHmdDllPath);
+      if (m_hModule) {
+        pfnHmdDriverFactory = decltype(pfnHmdDriverFactory)(GetProcAddress(m_hModule, "HmdDriverFactory"));
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  bool HmdDriverLoader::GetHmdDllPath(wchar_t *pszHmdDllPath, bool useAltName) {
     if (!pszHmdDllPath) {
       return false;
     }
@@ -53,7 +66,7 @@ namespace psvr2_toolkit {
     DWORD dwLength = GetModuleFileNameW(reinterpret_cast<HINSTANCE>(&__ImageBase), pszPath, MAX_PATH);
     if (dwLength > 0 && dwLength < MAX_PATH) {
       if (PathRemoveFileSpecW(pszPath)) {
-        if (PathCombineW(pszHmdDllPath, pszPath, HMD_DLL_NAME)) {
+        if (PathCombineW(pszHmdDllPath, pszPath, !useAltName ? HMD_DLL_NAME : HMD_DLL_NAME_ALT)) {
           return true;
         }
       }
