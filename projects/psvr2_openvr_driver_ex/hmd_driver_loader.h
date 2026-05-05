@@ -23,7 +23,7 @@ namespace psvr2_toolkit {
     HMODULE m_hModule;
 
     bool LoadHmdDll(bool useAltName = false);
-    bool GetHmdDllPath(wchar_t *pszHmdDllPath, bool useAltName = false);
+    bool GetHmdDllPath(wchar_t *pszHmdDllPath, bool useAltName);
   };
 
 } // psvr2_toolkit
