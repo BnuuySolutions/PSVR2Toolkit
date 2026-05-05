@@ -71,7 +71,7 @@ typedef struct hmd2_gaze_foveated_gaze_t {
   hmd2_gaze_vec3_t gaze_dir_right_norm;
   hmd2_gaze_vec3_t gaze_dir_combined_norm;
 
-  float convergence_distance_mm; // I don't know it's like this, but this is correct.
+  float convergence_distance_mm; // I don't know why it's like this, but this is correct.
 } hmd2_gaze_foveated_gaze_t;
 
 typedef struct hmd2_gaze_status_t {
