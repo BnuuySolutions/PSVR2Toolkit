@@ -1,5 +1,6 @@
 #include "device_provider_proxy.h"
 
+#include "caesar_usb_thread.h"
 #include "config.h"
 #include "driver_hooks/caesar_manager_hooks.h"
 #include "driver_context_proxy.h"
@@ -40,7 +41,7 @@ namespace psvr2_toolkit {
 
   vr::EVRInitError DeviceProviderProxy::Init(vr::IVRDriverContext *pDriverContext) {
 #if _DEBUG
-    Sleep(8000);
+    Sleep(2000);
 #endif
 
     VR_INIT_SERVER_DRIVER_CONTEXT(pDriverContext);
@@ -119,9 +120,10 @@ namespace psvr2_toolkit {
     INSTALL_STUB(reinterpret_cast<void*>(pHmdDriverLoader->GetBaseAddress() + 0x130020)); // VrDialogManager::CreateDialogProcess
 
     CaesarManagerHooks::InstallHooks();
+    CaesarUsbThread::InstallHooks();
     HmdDeviceHooks::InstallHooks();
     LibpadHooks::InstallHooks();
-    UsbThreadHooks::InstallHooks();
+    //UsbThreadHooks::InstallHooks();
   }
 
   void DeviceProviderProxy::InitSystems() {

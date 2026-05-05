@@ -15,6 +15,7 @@ add_library(psvr2_openvr_driver_ex SHARED
   driver_interface/aston_context.h
   driver_interface/aston_manager.h
 
+  caesar_usb_thread.cpp
   device_provider_proxy.cpp
   driver_context_proxy.cpp
   driver_host_proxy.cpp
@@ -33,6 +34,7 @@ target_link_libraries(psvr2_openvr_driver_ex PRIVATE libcustomshare)
 # Link our external libraries
 target_link_libraries(psvr2_openvr_driver_ex PRIVATE PolyHook_2)
 target_link_libraries(psvr2_openvr_driver_ex PRIVATE openvr-headers)
+target_link_libraries(psvr2_openvr_driver_ex PRIVATE libusb)
 
 set_target_properties(psvr2_openvr_driver_ex PROPERTIES
   OUTPUT_NAME driver_playstation_vr2

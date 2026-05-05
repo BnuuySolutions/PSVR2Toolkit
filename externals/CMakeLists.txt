@@ -16,6 +16,7 @@ set(SDL_SENSOR OFF CACHE BOOL "" FORCE)
 set(SDL_DIALOG ON CACHE BOOL "" FORCE)
 set(SDL_TRAY ON CACHE BOOL "" FORCE)
 
+add_subdirectory(libusb-1.0)
 add_subdirectory(SDL)
 add_subdirectory(imgui)
 add_subdirectory(openvr)
