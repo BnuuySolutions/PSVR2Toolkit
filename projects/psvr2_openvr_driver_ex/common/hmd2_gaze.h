@@ -1,11 +1,17 @@
 #pragma once
 
-#include <cstdint>
+#include <stdint.h>
 
-typedef enum hmd2_gaze_bool_t {
+typedef enum hmd2_gaze_bool_t : uint32_t {
   HMD2_GAZE_BOOL_FALSE,
   HMD2_GAZE_BOOL_TRUE
 } hmd2_gaze_bool_t;
+
+typedef enum hmd2_gaze_enabled_eye_t : uint8_t {
+  HMD2_GAZE_ENABLED_EYE_LEFT,
+  HMD2_GAZE_ENABLED_EYE_RIGHT,
+  HMD2_GAZE_ENABLED_EYE_BOTH
+} hmd2_gaze_enabled_eye_t;
 
 typedef struct hmd2_gaze_vec2_t {
   float x, y;
@@ -14,6 +20,11 @@ typedef struct hmd2_gaze_vec2_t {
 typedef struct hmd2_gaze_vec3_t {
   float x, y, z;
 } hmd2_gaze_vec3_t;
+
+typedef struct hmd2_gaze_lens_config_t {
+  hmd2_gaze_vec3_t left;
+  hmd2_gaze_vec3_t right;
+} hmd2_gaze_lens_config_t;
 
 typedef struct hmd2_gaze_wearable_eye_t {
   hmd2_gaze_bool_t is_gaze_origin_valid;
@@ -35,69 +46,64 @@ typedef struct hmd2_gaze_wearable_eye_t {
   hmd2_gaze_bool_t blink;
 } hmd2_gaze_wearable_eye_t;
 
-struct Hmd2GazeCombined {
-  hmd2_gaze_bool_t isGazeOriginValid;
-  hmd2_gaze_vec3_t gazeOriginMm;
+typedef struct hmd2_gaze_wearable_data_t {
+  int64_t timestamp;
+  uint32_t frame_counter;
 
-  hmd2_gaze_bool_t isGazeDirValid;
-  hmd2_gaze_vec3_t gazeDirNorm;
+  hmd2_gaze_wearable_eye_t left;
+  hmd2_gaze_wearable_eye_t right;
 
-  hmd2_gaze_bool_t isValid;
-  uint32_t timestamp;
+  hmd2_gaze_bool_t is_gaze_origin_combined_valid;
+  hmd2_gaze_vec3_t gaze_origin_combined_mm;
 
-  hmd2_gaze_bool_t unk06;
-  float unk07;
+  hmd2_gaze_bool_t is_gaze_dir_combined_valid;
+  hmd2_gaze_vec3_t gaze_dir_combined_norm;
 
-  hmd2_gaze_bool_t unk08;
+  hmd2_gaze_bool_t is_convergence_distance_valid;
+} hmd2_gaze_wearable_data_t;
 
-  // All gazes seem to be repeated here?
-  // No obvious differences here.
-  hmd2_gaze_vec3_t leftGazeDirNormal;
-  hmd2_gaze_vec3_t rightGazeDirNormal;
-  hmd2_gaze_vec3_t combinedGazeDirNormal;
+typedef struct hmd2_gaze_foveated_gaze_t {
+  int64_t timestamp;
+  uint32_t frame_counter;
+  uint32_t tracking_state;
 
-  float unk09;
-};
+  hmd2_gaze_vec3_t gaze_dir_left_norm;
+  hmd2_gaze_vec3_t gaze_dir_right_norm;
+  hmd2_gaze_vec3_t gaze_dir_combined_norm;
 
-struct Hmd2GazeState {
-  char magic[2];
+  float convergence_distance_mm; // I don't know it's like this, but this is correct.
+} hmd2_gaze_foveated_gaze_t;
+
+typedef struct hmd2_gaze_status_t {
+  uint8_t magic[2];
   uint16_t version;
   uint32_t size;
 
-  float unk03; // 0.700
-  float unk04; // 0.700
+  // Exposure
+  float exp_l;
+  float exp_r;
 
-  uint32_t unk05; // 0xFFFFF
+  uint32_t led_status;
 
-  // Appears to be related to some sort of timestamp?
-  uint32_t timestamp06;
-  uint32_t timestamp07;
-  uint32_t timestamp08;
+  uint32_t exp_counter_l;
+  uint32_t exp_counter_r;
 
-  uint32_t unk09;
+  uint32_t led_counter;
 
-  float leftEyeXPosMm; // Example: -32.000 (64mm IPD)
+  int dsp_return_code;
 
-  uint32_t unk11;
-  uint32_t unk12;
+  hmd2_gaze_lens_config_t lens_config;
 
-  float rightEyeXPosMm; // Example: 32.000 (64mm IPD)
+  uint32_t user_calibration_id;
 
-  uint32_t unk14;
-  uint32_t unk15;
-  uint32_t unk16;
-  uint32_t unk17;
-  uint32_t unk18;
+  hmd2_gaze_vec3_t fr_gaze_origin;
 
-  float eyeZPosMm; // -27.000
+  hmd2_gaze_enabled_eye_t enabled_eye;
 
-  // More unknown garbage.
-  uint32_t unk20;
-  uint32_t timestamp21;
-  uint32_t unk22;
-  uint32_t timestamp23;
+  uint8_t motor_sequence;
+  uint8_t motor_strength;
 
-  hmd2_gaze_wearable_eye_t leftEye;
-  hmd2_gaze_wearable_eye_t rightEye;
-  Hmd2GazeCombined combined;
-};
+  hmd2_gaze_wearable_data_t wearable;
+  hmd2_gaze_foveated_gaze_t foveated;
+} hmd2_gaze_status_t;
+static_assert(sizeof(hmd2_gaze_status_t) == 0x148, "Size of hmd2_gaze_status_t is not 0x148 bytes!");

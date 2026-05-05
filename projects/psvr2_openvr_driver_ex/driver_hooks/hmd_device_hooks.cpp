@@ -164,17 +164,17 @@ namespace psvr2_toolkit {
         return;
       }
 
-      Hmd2GazeState* pGazeState = reinterpret_cast<Hmd2GazeState*>(pData);
+      hmd2_gaze_status_t* pGazeState = reinterpret_cast<hmd2_gaze_status_t*>(pData);
       vr::VREyeTrackingData_t eyeTrackingData {};
 
-    bool valid = pGazeState->combined.isGazeDirValid;
+    bool valid = pGazeState->wearable.is_gaze_dir_combined_valid;
 
     eyeTrackingData.bActive = valid;
     eyeTrackingData.bTracked = valid;
     eyeTrackingData.bValid = valid;
 
-    auto &origin = pGazeState->combined.gazeOriginMm;
-    auto &direction = pGazeState->combined.gazeDirNorm;
+    auto &origin = pGazeState->wearable.gaze_origin_combined_mm;
+    auto &direction = pGazeState->wearable.gaze_dir_combined_norm;
 
     eyeTrackingData.vGazeOrigin = vr::HmdVector3_t{ -origin.x / 1000.0f, origin.y / 1000.0f, -origin.z / 1000.0f };
     eyeTrackingData.vGazeTarget = vr::HmdVector3_t{ -direction.x, direction.y, -direction.z };
@@ -183,7 +183,7 @@ namespace psvr2_toolkit {
 
     CaesarManager__getIMUTimestampOffset(CaesarManager__getInstance(), &hmdToHostOffset);
 
-    double timeOffset = ((static_cast<int64_t>(pGazeState->combined.timestamp) + hmdToHostOffset) - GetHostTimestamp()) / 1e6;
+    double timeOffset = ((static_cast<int64_t>(pGazeState->wearable.timestamp) + hmdToHostOffset) - GetHostTimestamp()) / 1e6;
 
     (vr::VRDriverInput())->UpdateEyeTrackingComponent(eyeTrackingComponent, &eyeTrackingData, timeOffset);
 
