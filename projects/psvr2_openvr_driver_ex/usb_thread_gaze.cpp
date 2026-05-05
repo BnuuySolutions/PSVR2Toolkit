@@ -128,8 +128,8 @@ int CaesarUsbThreadGaze::poll() {
   }
 
   if (buffer[0] == GAZE_MAGIC_0 && buffer[1] == GAZE_MAGIC_1_STATE) {
-    Hmd2GazeState *pGazeState = reinterpret_cast<Hmd2GazeState *>(buffer);
-    HmdDeviceHooks::UpdateGaze(pGazeState, sizeof(Hmd2GazeState));
+    hmd2_gaze_status_t *pGazeState = reinterpret_cast<hmd2_gaze_status_t *>(buffer);
+    HmdDeviceHooks::UpdateGaze(pGazeState, sizeof(hmd2_gaze_status_t));
     CustomShareManager* pShareManager = CustomShareManager::getSingleton();
     pShareManager->setGazeStatus(reinterpret_cast<unsigned char *>(buffer)); // TODO: fix casting.
   }
