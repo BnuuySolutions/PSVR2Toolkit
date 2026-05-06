@@ -53,8 +53,6 @@ namespace psvr2_toolkit {
           std::vector<vr::HmdVector2_t> perimeter = HmdMath::ExtractInnerHAMPerimeter(standardVerts);
 
           if (perimeter.size() > 2) {
-            hamHelpers.SetHiddenArea(eye, vr::k_eHiddenAreaMesh_LineLoop, perimeter.data(), static_cast<uint32_t>(perimeter.size()));
-
             // Triangle Fan from optical center
             std::vector<vr::HmdVector2_t> inverseVerts;
             inverseVerts.reserve(perimeter.size() * 3);
@@ -68,6 +66,13 @@ namespace psvr2_toolkit {
             }
 
             hamHelpers.SetHiddenArea(eye, vr::k_eHiddenAreaMesh_Inverse, inverseVerts.data(), static_cast<uint32_t>(inverseVerts.size()));
+
+            // vrcompositor crashes if these are slightly out of bounds
+            for (auto& p : perimeter) {
+              p.v[0] = std::clamp(p.v[0], 0.0001f, 0.9999f);
+              p.v[1] = std::clamp(p.v[1], 0.0001f, 0.9999f);
+            }
+            hamHelpers.SetHiddenArea(eye, vr::k_eHiddenAreaMesh_LineLoop, perimeter.data(), static_cast<uint32_t>(perimeter.size()));
           }
         }
       }
