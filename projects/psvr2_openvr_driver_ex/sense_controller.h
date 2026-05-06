@@ -10,7 +10,7 @@
 #include <mutex>
 
 constexpr uint32_t k_unSenseSubsamples = 10000;
-constexpr uint32_t k_unSenseMaxSamplePosition = k_unSenseSampleRate * k_unSenseSubsamples;
+constexpr uint32_t k_unSenseMaxSamplePosition = k_senseSampleRate * k_unSenseSubsamples;
 constexpr uint32_t k_unSenseHalfSamplePosition = k_unSenseMaxSamplePosition / 2;
 constexpr uint8_t k_unSenseMaxHapticAmplitude = 127;
 
@@ -80,7 +80,7 @@ struct SenseControllerPacket_t {
   uint8_t unkData1; // Enables or disables some stuff, but doesn't seem to change the layout?
   SenseControllerSettings_t settings;
   uint8_t packetNum; // Incremented every time we send a packet to this controller.
-  uint8_t hapticPCM[k_unSenseChunkSize]; // 3000hz, 8 bit signed PCM data. This means we must send PCM packets at a rate of 93.75 times per second.
+  uint8_t hapticPCM[k_senseChunkSize]; // 3000hz, 8 bit signed PCM data. This means we must send PCM packets at a rate of 93.75 times per second.
   uint8_t crc[4]; // uint8_t for alignment
 }; static_assert(sizeof(SenseControllerPacket_t) == 78, "Size of SenseControllerPacket_t is not 78 bytes!");
 
@@ -92,7 +92,7 @@ struct SenseControllerPCModePacket_t {
 }; static_assert(sizeof(SenseControllerPCModePacket_t) == 0x30, "Size of SenseControllerPacket_t is not 78 bytes!");
 #pragma pack(pop)
 
-typedef std::array<int8_t, k_unSenseChunkSize> PCMBufferType;
+typedef std::array<int8_t, k_senseChunkSize> PCMBufferType;
 
 // The official driver calculates the host timestamp this way.
 // It simply converts QueryPerformanceCounter to unsigned 64bit microseconds.

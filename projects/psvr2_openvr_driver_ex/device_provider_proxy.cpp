@@ -1,5 +1,6 @@
 #include "device_provider_proxy.h"
 
+#include "command_thread.h"
 #include "caesar_usb_thread.h"
 #include "config.h"
 #include "driver_hooks/caesar_manager_hooks.h"
@@ -52,6 +53,7 @@ namespace psvr2_toolkit {
     }
 
     CustomShareManager::createSingleton();
+    CommandThread::Initialize();
 
     static DriverContextProxy *pDriverContextProxy = DriverContextProxy::Instance();
     pDriverContextProxy->SetDriverContext(pDriverContext);
@@ -63,6 +65,8 @@ namespace psvr2_toolkit {
     if (VRSettings::GetBool(STEAMVR_SETTINGS_USE_ENHANCED_HAPTICS, SETTING_USE_TOOLKIT_SYNC_DEFAULT_VALUE)) {
       SenseController::Destroy();
     }
+
+    CommandThread::Stop();
 
     m_pDeviceProvider->Cleanup();
 
@@ -123,7 +127,7 @@ namespace psvr2_toolkit {
     CaesarUsbThread::InstallHooks();
     HmdDeviceHooks::InstallHooks();
     LibpadHooks::InstallHooks();
-    //UsbThreadHooks::InstallHooks();
+    UsbThreadHooks::InstallHooks();
   }
 
   void DeviceProviderProxy::InitSystems() {

@@ -4,6 +4,10 @@
 #include "common.h"
 #include "hmd2_gaze.h"
 
+#include <mutex>
+
+constexpr int k_maxSlots = 4;
+
 struct GazeStatus {
   hmd2_gaze_status_t data;
 
@@ -33,12 +37,22 @@ struct TriggerEffectBuffer {
   bool pop(TriggerEffectCommand& outCommand);
 };
 
+struct CommandBuffer {
+  int head;
+  int tail;
+  DriverCommand commands[256];
+
+  DriverCommand* push(const DriverCommand& command);
+  DriverCommand* pop();
+};
+
 struct BufferData {
   GazeStatus gazeStatus;
   GazeImage gazeImage;
-  unsigned char pcmLeft[MAX_SLOTS][k_unSenseChunkSize];
-  unsigned char pcmRight[MAX_SLOTS][k_unSenseChunkSize];
+  unsigned char pcmLeft[k_maxSlots][k_senseChunkSize];
+  unsigned char pcmRight[k_maxSlots][k_senseChunkSize];
   TriggerEffectBuffer triggerEffectBuffer;
+  CommandBuffer commandBuffer;
 };
 
 class CustomShareManager {
@@ -65,9 +79,14 @@ public:
   void pushTriggerEffect(int slot, const TriggerEffectCommandPayload& payload);
   bool popTriggerEffect(TriggerEffectCommand& outCommand);
 
+  void submitCommand(int slot, DriverCommand& command);
+  DriverCommand* popCommand();
+  void fulfillCommand(DriverCommand* command);
+
 private:
   static CustomShareManager *m_pInstance;
   static bool m_initialized;
+  static std::mutex m_instanceMutex;
 
   IIpcEvent* m_gazeStatusEvent;
   IIpcMutex* m_gazeStatusMutex;
@@ -75,11 +94,14 @@ private:
   IIpcEvent* m_gazeImageEvent;
   IIpcMutex* m_gazeImageMutex;
 
-  IIpcMutex* m_slotOwnerMutex[MAX_SLOTS];
+  IIpcMutex* m_slotOwnerMutex[k_maxSlots];
 
-  IIpcEvent* m_pcmEvent[MAX_SLOTS];
+  IIpcEvent* m_pcmEvent[k_maxSlots];
+  IIpcEvent* m_commandEvent[k_maxSlots];
 
   IIpcMutex* m_triggerEffectMutex;
+
+  IIpcMutex* m_commandMutex;
 
   IIpcSharedMemory* m_sharedMemory;
   BufferData* m_pBufferData;

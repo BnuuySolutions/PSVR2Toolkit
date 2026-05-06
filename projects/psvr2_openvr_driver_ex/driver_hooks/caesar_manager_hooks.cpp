@@ -1,3 +1,4 @@
+#include "driver_interface/caesar_manager.h"
 #include "caesar_manager_hooks.h"
 
 #include "hmd_driver_loader.h"
@@ -7,24 +8,22 @@
 #include "util.h"
 
 namespace psvr2_toolkit {
+  CaesarUsbThreadGaze caesarUsbThreadGaze;
 
   void *(*Framework__Thread__start)(void *thisptr) = nullptr;
 
-  void *(*CaesarManager__initialize)(void *, void *, void *) = nullptr;
-  void *CaesarManager__initializeHook(void *thisptr, void *arg1, void *arg2) {
-    static CaesarUsbThreadGaze* pCaesarUsbThreadGaze = CaesarUsbThreadGaze::Instance();
-
+  void *(*CaesarManager__initialize)(CaesarManager *, void *, void *) = nullptr;
+  void *CaesarManager__initializeHook(CaesarManager *thisptr, void *arg1, void *arg2) {
     void* result = CaesarManager__initialize(thisptr, arg1, arg2);
-    (*(void (__fastcall **)(__int64, __int64))(*(__int64 *)pCaesarUsbThreadGaze + 24LL))((__int64)pCaesarUsbThreadGaze, 0);
-    Framework__Thread__start(pCaesarUsbThreadGaze);
+    Util::DriverLog("Starting thread");
+    caesarUsbThreadGaze.Start(0);
+    Framework__Thread__start(&caesarUsbThreadGaze);
     return result;
   }
 
   void (*CaesarManager__shutdown)(void *) = nullptr;
-  void CaesarManager__shutdownHook(void *thisptr) {
-    static CaesarUsbThreadGaze *pCaesarUsbThreadGaze = CaesarUsbThreadGaze::Instance();
-
-    (*(void(__fastcall **)(__int64))(*(__int64 *)pCaesarUsbThreadGaze + 16LL))((__int64)pCaesarUsbThreadGaze);
+  void CaesarManager__shutdownHook(CaesarManager *thisptr) {
+    caesarUsbThreadGaze.JoinThread();
 
     CaesarManager__shutdown(thisptr);
   }

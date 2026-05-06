@@ -2,6 +2,7 @@
 #include "psvr2_openvr_driver/openvr_ex/openvr_ex.h"
 #endif
 
+#include "driver_interface/caesar_manager.h"
 #include "driver_host_proxy.h"
 #include "common/hmd2_gaze.h"
 #include "hmd_device_hooks.h"
@@ -15,8 +16,6 @@
 #include <cstdint>
 
 namespace psvr2_toolkit {
-  void *(*CaesarManager__getInstance)();
-  uint64_t(*CaesarManager__getIMUTimestampOffset)(void *thisptr, int64_t *hmdToHostOffset);
   void *(*ShareManager__getInstance)();
   void (*ShareManager__getIntConfig)(void *thisPtr, uint32_t configId, int64_t *outValue);
   void (*ShareManager__setIntConfig)(void *thisPtr, uint32_t configId, int64_t *value);
@@ -186,7 +185,7 @@ namespace psvr2_toolkit {
 
     int64_t hmdToHostOffset;
 
-    CaesarManager__getIMUTimestampOffset(CaesarManager__getInstance(), &hmdToHostOffset);
+    CaesarManager::GetIMUTimestampOffset(CaesarManager::GetInstance(), &hmdToHostOffset);
 
     double timeOffset = ((static_cast<int64_t>(pGazeState->wearable.timestamp) + hmdToHostOffset) - GetHostTimestamp()) / 1e6;
 
@@ -212,8 +211,6 @@ namespace psvr2_toolkit {
                          reinterpret_cast<void *>(sie__psvr2__HmdDevice__DeactivateHook),
                          reinterpret_cast<void **>(&sie__psvr2__HmdDevice__Deactivate));
 
-    CaesarManager__getInstance = decltype(CaesarManager__getInstance)(pHmdDriverLoader->GetBaseAddress() + 0x124c90);
-    CaesarManager__getIMUTimestampOffset = decltype(CaesarManager__getIMUTimestampOffset)(pHmdDriverLoader->GetBaseAddress() + 0x1252e0);
     ShareManager__getInstance = decltype(ShareManager__getInstance)(pHmdDriverLoader->GetBaseAddress() + 0x15bbd0);
     ShareManager__getIntConfig = decltype(ShareManager__getIntConfig)(pHmdDriverLoader->GetBaseAddress() + 0x15d270);
     ShareManager__setIntConfig = decltype(ShareManager__setIntConfig)(pHmdDriverLoader->GetBaseAddress() + 0x15f3d0);
