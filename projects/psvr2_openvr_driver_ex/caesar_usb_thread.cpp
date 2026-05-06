@@ -44,7 +44,7 @@ namespace psvr2_toolkit {
   void CaesarUsbThread::OnDisconnect() {}
   int CaesarUsbThread::PollAndProcess() { return 0; }
 
-  int CaesarUsbThread::ReadPipe(uint8_t pipeId, char* buffer, size_t length) {
+  int CaesarUsbThread::TransferPipe(uint8_t pipeId, char* buffer, size_t length) {
     if (this->m_stopRequested != 0) {
       this->m_lastError = 0xfffffe74;
       return -1;
@@ -341,7 +341,7 @@ namespace psvr2_toolkit {
   }
 
   int CaesarUsbThread::ReadPipeHook(CaesarUsbThread* thisptr, uint8_t pipeId, char* buffer, size_t length) {
-    return thisptr->ReadPipe(pipeId, buffer, length);
+    return thisptr->TransferPipe(pipeId, buffer, length);
   }
 
   int CaesarUsbThread::ControlCommandHook(CaesarUsbThread* thisptr, uint8_t bIsSet, uint16_t reportId, void* buffer, uint16_t length, uint16_t value, uint16_t index, uint16_t subcmd) {
