@@ -4,6 +4,10 @@
 #include "custom_share_manager.h"
 #include "usb_thread_gaze.h"
 #include "util.h"
+#include <openvr_driver.h>
+#include <filesystem>
+#include <fstream>
+#include <vector>
 
 
 #define GAZE_MAGIC_0 0x47
@@ -24,8 +28,34 @@ uint8_t CaesarUsbThreadGaze::GetEndpoint() {
 }
 
 void CaesarUsbThreadGaze::OnConnected() {
+  vr::ETrackedPropertyError err;
+  vr::PropertyContainerHandle_t container = vr::VRDriverHandle();
+  uint32_t propSize = vr::VRProperties()->GetStringProperty(container, vr::Prop_UserConfigPath_String, nullptr, 0, &err);
+  
+  if (propSize > 0) {
+    std::string configPath(propSize - 1, '\0');
+    vr::VRProperties()->GetStringProperty(container, vr::Prop_UserConfigPath_String, configPath.data(), propSize, &err);
+
+    if (err == vr::TrackedProp_Success) {
+      std::filesystem::path dir(configPath);
+      std::filesystem::path filePath = dir / "calibration_blob_3.bin"; // This seems to be the only blob that matters.
+
+      std::ifstream inFile(filePath, std::ios::binary | std::ios::ate);
+      if (inFile.is_open()) {
+        std::streamsize size = inFile.tellg();
+        inFile.seekg(0, std::ios::beg);
+
+        std::vector<char> buffer(size);
+        if (inFile.read(buffer.data(), size)) {
+          this->TransferPipe(5, buffer.data(), size);
+        }
+      }
+    }
+  }
+
   // For some reason this doesn't really stick.
-  CaesarUsbThread::ControlCommandHook(this, true, 12, nullptr, 0, 0, 0, 1);
+  uint16_t subCommand = 1;
+  this->ControlCommand(true, 12, nullptr, 0, 0, 0, subCommand);
 
   //char data[8] = { 1, 0, 0, 0, 0x05, 0, 0, 0 };
   //CaesarUsbThread::ControlCommandHook(this, true, 0xb, data, 8, 0, 0, 1);
@@ -33,12 +63,13 @@ void CaesarUsbThreadGaze::OnConnected() {
 
 int CaesarUsbThreadGaze::PollAndProcess() {
   static hmd2_gaze_status_t state;
-  int result = CaesarUsbThread::ReadPipeHook(this, 0x85, reinterpret_cast<char*>(&state), sizeof(state));
+  int result = this->TransferPipe(GetEndpoint(), reinterpret_cast<char*>(&state), sizeof(state));
 
   if (result == 0) {
     // If we timed out, we should try sending the gaze enable again.
     // Entering and exiting passthrough, DP signal changes, and probably some other stuff seems to stop gaze.
-    CaesarUsbThread::ControlCommandHook(this, true, 12, nullptr, 0, 0, 0, 1);
+    uint16_t subCommand = 1;
+    this->ControlCommand(true, 12, nullptr, 0, 0, 0, subCommand);
     return 0;
   }
 

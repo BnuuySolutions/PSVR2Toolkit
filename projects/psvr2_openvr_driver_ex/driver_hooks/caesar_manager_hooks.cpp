@@ -15,7 +15,6 @@ namespace psvr2_toolkit {
   void *(*CaesarManager__initialize)(CaesarManager *, void *, void *) = nullptr;
   void *CaesarManager__initializeHook(CaesarManager *thisptr, void *arg1, void *arg2) {
     void* result = CaesarManager__initialize(thisptr, arg1, arg2);
-    Util::DriverLog("Starting thread");
     caesarUsbThreadGaze.Start(0);
     Framework__Thread__start(&caesarUsbThreadGaze);
     return result;
