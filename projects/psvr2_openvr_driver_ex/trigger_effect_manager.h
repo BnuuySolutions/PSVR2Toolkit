@@ -11,7 +11,7 @@ namespace psvr2_toolkit {
 
     static TriggerEffectManager *Instance();
 
-    bool Initialized();
+    bool IsInitialized();
     void Initialize();
 
     void Update();
@@ -21,7 +21,6 @@ namespace psvr2_toolkit {
 
     bool m_initialized;
 
-    void ApplyEffect(const TriggerEffectCommandPayload& payload);
     void SetTriggerEffectCommand(VRControllerType controllerType, ScePadTriggerEffectCommand command);
   };
 

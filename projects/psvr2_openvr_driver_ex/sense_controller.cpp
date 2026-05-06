@@ -217,7 +217,7 @@ void SenseThread()
   QueryPerformanceFrequency(&frequency);
 
   // Duration we want to run every iteration (32/3000 or 0.010666 seconds)
-  LONGLONG duration = static_cast<LONGLONG>((static_cast<double>(k_unSenseChunkSize) / static_cast<double>(k_unSenseSampleRate)) * frequency.QuadPart);
+  LONGLONG duration = static_cast<LONGLONG>((static_cast<double>(k_senseChunkSize) / static_cast<double>(k_senseSampleRate)) * frequency.QuadPart);
 
   LARGE_INTEGER start;
   QueryPerformanceCounter(&start);
@@ -231,15 +231,15 @@ void SenseThread()
     if (pShareManager) {
       leftController.ResetPCM();
       rightController.ResetPCM();
-      for (int i = 0; i < MAX_SLOTS; i++) {
-        unsigned char pcmLeft[k_unSenseChunkSize] = {0};
-        unsigned char pcmRight[k_unSenseChunkSize] = {0};
+      for (int i = 0; i < k_maxSlots; i++) {
+        unsigned char pcmLeft[k_senseChunkSize] = {0};
+        unsigned char pcmRight[k_senseChunkSize] = {0};
         
         pShareManager->readPcm(i, pcmLeft, pcmRight);
         
         bool hasLeft = false;
         bool hasRight = false;
-        for (int j = 0; j < k_unSenseChunkSize; j++) {
+        for (int j = 0; j < k_senseChunkSize; j++) {
           if (pcmLeft[j] != 0) hasLeft = true;
           if (pcmRight[j] != 0) hasRight = true;
         }
@@ -361,11 +361,11 @@ static void PollNextEvent(vr::VREvent_t* pEvent)
       senseHapticAmp = static_cast<uint8_t>(sqrtf(hapticEvent.fAmplitude) * k_unSenseMaxHapticAmplitude);
       if (hapticEvent.fDurationSeconds == 0.0f) {
         senseHapticFreq = std::max(80.0f, senseHapticFreq);
-        senseHapticSamplesLeft = static_cast<uint32_t>(k_unSenseSampleRate / senseHapticFreq);
+        senseHapticSamplesLeft = static_cast<uint32_t>(k_senseSampleRate / senseHapticFreq);
       }
       else
       {
-        senseHapticSamplesLeft = static_cast<uint32_t>(hapticEvent.fDurationSeconds * k_unSenseSampleRate);
+        senseHapticSamplesLeft = static_cast<uint32_t>(hapticEvent.fDurationSeconds * k_senseSampleRate);
       }
     }
 

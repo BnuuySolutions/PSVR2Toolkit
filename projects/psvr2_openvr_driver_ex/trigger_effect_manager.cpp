@@ -9,8 +9,8 @@
 namespace psvr2_toolkit {
 
   // State tracking for the 4 slots
-  static TriggerEffectCommandPayload g_slotEffects[MAX_SLOTS][2];
-  static bool g_slotAlive[MAX_SLOTS];
+  static TriggerEffectCommandPayload g_slotEffects[k_maxSlots][2];
+  static bool g_slotAlive[k_maxSlots];
   static TriggerEffectCommandPayload g_lastLeft = { VRControllerType::Left, {} };
   static TriggerEffectCommandPayload g_lastRight = { VRControllerType::Right, {} };
 
@@ -31,7 +31,7 @@ namespace psvr2_toolkit {
     return m_pInstance;
   }
 
-  bool TriggerEffectManager::Initialized() {
+  bool TriggerEffectManager::IsInitialized() {
     return m_initialized;
   }
 
@@ -48,17 +48,13 @@ namespace psvr2_toolkit {
     m_initialized = true;
   }
 
-  void TriggerEffectManager::ApplyEffect(const TriggerEffectCommandPayload& payload) {
-    SetTriggerEffectCommand(payload.controllerType, payload.command);
-  }
-
   void TriggerEffectManager::Update() {
     CustomShareManager* pShareManager = CustomShareManager::getSingleton();
     if (!pShareManager) return;
 
     TriggerEffectCommand cmd;
     while (pShareManager->popTriggerEffect(cmd)) {
-      if (cmd.slot >= 0 && cmd.slot < MAX_SLOTS) {
+      if (cmd.slot >= 0 && cmd.slot < k_maxSlots) {
         if (cmd.payload.controllerType == VRControllerType::Left || cmd.payload.controllerType == VRControllerType::Both) {
           g_slotEffects[cmd.slot][0] = cmd.payload;
           g_slotEffects[cmd.slot][0].controllerType = VRControllerType::Left;
@@ -70,7 +66,7 @@ namespace psvr2_toolkit {
       }
     }
 
-    for (int i = 0; i < MAX_SLOTS; i++) {
+    for (int i = 0; i < k_maxSlots; i++) {
       bool alive = pShareManager->isSlotAlive(i);
       if (g_slotAlive[i] && !alive) {
         g_slotEffects[i][0].command.mode = ScePadTriggerEffectMode::SCE_PAD_TRIGGER_EFFECT_MODE_OFF;
@@ -84,7 +80,7 @@ namespace psvr2_toolkit {
     TriggerEffectCommandPayload finalRight = {};
     finalRight.controllerType = VRControllerType::Right;
 
-    for (int i = MAX_SLOTS - 1; i >= 0; i--) {
+    for (int i = k_maxSlots - 1; i >= 0; i--) {
       if (g_slotAlive[i]) {
         if (g_slotEffects[i][0].command.mode != ScePadTriggerEffectMode::SCE_PAD_TRIGGER_EFFECT_MODE_OFF) finalLeft = g_slotEffects[i][0];
         if (g_slotEffects[i][1].command.mode != ScePadTriggerEffectMode::SCE_PAD_TRIGGER_EFFECT_MODE_OFF) finalRight = g_slotEffects[i][1];
@@ -92,11 +88,11 @@ namespace psvr2_toolkit {
     }
 
     if (std::memcmp(&finalLeft, &g_lastLeft, sizeof(TriggerEffectCommandPayload)) != 0) {
-      ApplyEffect(finalLeft);
+      SetTriggerEffectCommand(finalLeft.controllerType, finalLeft.command);
       g_lastLeft = finalLeft;
     }
     if (std::memcmp(&finalRight, &g_lastRight, sizeof(TriggerEffectCommandPayload)) != 0) {
-      ApplyEffect(finalRight);
+      SetTriggerEffectCommand(finalRight.controllerType, finalRight.command);
       g_lastRight = finalRight;
     }
   }

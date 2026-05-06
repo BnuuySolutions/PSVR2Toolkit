@@ -16,6 +16,7 @@ add_library(psvr2_openvr_driver_ex SHARED
   driver_interface/aston_manager.h
 
   caesar_usb_thread.cpp
+  command_thread.cpp
   device_provider_proxy.cpp
   driver_context_proxy.cpp
   driver_host_proxy.cpp

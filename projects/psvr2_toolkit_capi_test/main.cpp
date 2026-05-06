@@ -14,6 +14,7 @@
 
 #include "pad_trigger_effect.h"
 #include "psvr2tk_capi.h"
+#include "psvr2tk_capi_private.h"
 
 std::atomic<bool> g_appRunning = true;
 std::mutex g_hapticsMutex;
@@ -24,11 +25,11 @@ float g_toneAmplitude = 0.5f;
 
 void HapticsThreadFunc() {
     double phase = 0.0;
-    unsigned char buf[k_unSenseChunkSize];
+    unsigned char buf[k_senseChunkSize];
 
     while (g_appRunning) {
         // Pause thread until it's time to provide the next 32 samples (~93.75Hz)
-        CAPI_WaitForPcmUpdate();
+        psvr2_toolkit_wait_for_pcm();
 
         bool playL, playR;
         float freq, amp;
@@ -43,7 +44,7 @@ void HapticsThreadFunc() {
         // Calculate sine wave phase increment assuming a 3000 Hz sample rate
         double phaseInc = 2.0 * 3.14159265358979323846 * freq / 3000.0;
 
-        for (int i = 0; i < k_unSenseChunkSize; ++i) {
+        for (int i = 0; i < k_senseChunkSize; ++i) {
             buf[i] = static_cast<unsigned char>(static_cast<int8_t>(sin(phase) * 127.0f * amp));
             phase = fmod(phase + phaseInc, 2.0 * 3.14159265358979323846);
         }
@@ -62,7 +63,7 @@ void HapticsThreadFunc() {
             continue;
         }
 
-        CAPI_WritePcm(controllerType, buf);
+        psvr2_toolkit_write_pcm(controllerType, buf);
     }
 }
 
@@ -118,7 +119,7 @@ int main(int argc, char* argv[]) {
   ImGui_ImplSDLGPU3_Init(&init_info);
 
   // Initialize our CAPI
-  if (CAPI_Initialize() < 0) {
+  if (psvr2_toolkit_init() < 0) {
       std::cerr << "Failed to initialize CAPI! Are 4 applications already running?" << std::endl;
       // Continue anyway for the sake of the test app
   }
@@ -164,8 +165,8 @@ int main(int argc, char* argv[]) {
     }
 
     // Fetch the latest data from the CAPI
-    CAPI_GetGazeStatus(&gazeStatus);
-    CAPI_GetGazeImage(gazeImage.data());
+    psvr2_toolkit_gaze_status(&gazeStatus);
+    psvr2_toolkit_gaze_image(gazeImage.data());
 
     // Convert and upload texture data
     void* mapped_ptr = SDL_MapGPUTransferBuffer(gpu_device, transferBuffer, false);
@@ -189,14 +190,17 @@ int main(int argc, char* argv[]) {
     ImGui::Begin("Gaze Info");
 
     if (ImGui::CollapsingHeader("Haptics", ImGuiTreeNodeFlags_DefaultOpen)) {
+      ImGui::PushID("HapticsSection");
       std::scoped_lock<std::mutex> lock(g_hapticsMutex);
       ImGui::Checkbox("Play Tone Left", &g_playToneLeft);
       ImGui::Checkbox("Play Tone Right", &g_playToneRight);
       ImGui::SliderFloat("Frequency (Hz)", &g_toneFrequency, 10.0f, 1000.0f);
       ImGui::SliderFloat("Amplitude", &g_toneAmplitude, 0.0f, 1.0f);
+      ImGui::PopID();
     }
 
     if (ImGui::CollapsingHeader("Trigger Effects", ImGuiTreeNodeFlags_DefaultOpen)) {
+      ImGui::PushID("TriggerEffectsSection");
       // Mode dropdown
       static int mode = 0;
       const char* modes[] = { "Off", "Feedback", "Weapon", "Vibration", "MultiplePositionFeedback", "SlopeFeedback", "MultiplePositionVibration" };
@@ -255,11 +259,44 @@ int main(int argc, char* argv[]) {
           break;
       }
       if (ImGui::Button("Send Trigger Effect")) {
-        CAPI_SendTriggerEffect(static_cast<VRControllerType>(controllerType), payload);
+        psvr2_toolkit_set_trigger_effect(static_cast<VRControllerType>(controllerType), payload);
       }
+      ImGui::PopID();
     }
 
-    if (ImGui::CollapsingHeader("Gaze Status Bytes", ImGuiTreeNodeFlags_DefaultOpen)) {
+    if (ImGui::CollapsingHeader("Calibration / Gaze Commands", ImGuiTreeNodeFlags_DefaultOpen)) {
+      ImGui::PushID("CalibrationSection");
+      
+      static GazeCalibrationCommand gazeCmd = { };
+      static GazeCalibrationCommand gazeRes = { };
+      static bool hasResult = false;
+      
+      ImGui::InputScalar("SubCommand", ImGuiDataType_U16, &gazeCmd.status);
+      ImGui::InputFloat3("X / Y / Z", &gazeCmd.payload.x);
+      ImGui::InputScalar("Result / Enabled Eye", ImGuiDataType_U8, &gazeCmd.payload.result);
+      
+      if (ImGui::Button("Send Gaze SET Command")) {
+        gazeRes = psvr2_toolkit_private_send_gaze_set_command(gazeCmd);
+        hasResult = true;
+      }
+      ImGui::SameLine();
+      if (ImGui::Button("Send Gaze GET Command")) {
+        gazeRes = psvr2_toolkit_private_send_gaze_get_command(gazeCmd);
+        hasResult = true;
+      }
+      
+      ImGui::Separator();
+      ImGui::Text("Latest Gaze Result:");
+      if (hasResult) {
+        ImGui::Text("Status: %u", gazeRes.status);
+        ImGui::Text("Position: (%.2f, %.2f, %.2f)", gazeRes.payload.x, gazeRes.payload.y, gazeRes.payload.z);
+        ImGui::Text("Result Code: %u (%s)", gazeRes.payload.result, gazeRes.payload.result == 0 ? "OK" : "Failed");
+      }
+      
+      ImGui::PopID();
+    }
+
+    if (ImGui::CollapsingHeader("Gaze Status", ImGuiTreeNodeFlags_DefaultOpen)) {
       ImGui::Text("Magic: %c%c", gazeStatus.magic[0], gazeStatus.magic[1]);
       ImGui::Text("Version: %u", gazeStatus.version);
       ImGui::Text("Size: %u", gazeStatus.size);
@@ -365,7 +402,7 @@ int main(int argc, char* argv[]) {
   SDL_DestroyWindow(window);
   SDL_Quit();
 
-  CAPI_Deinitialize();
+  psvr2_toolkit_deinit();
 
   return 0;
 }

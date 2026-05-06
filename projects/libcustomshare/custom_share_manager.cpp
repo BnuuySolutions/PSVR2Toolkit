@@ -2,6 +2,7 @@
 
 #include <cstdio>
 #include <cstring>
+#include <mutex>
 
 void GazeStatus::set(const hmd2_gaze_status_t* pGazeStatus) {
   std::memcpy(&data, pGazeStatus, sizeof(data));
@@ -44,22 +45,43 @@ bool TriggerEffectBuffer::pop(TriggerEffectCommand& outCommand) {
   return true;
 }
 
+DriverCommand* CommandBuffer::push(const DriverCommand& command) {
+  int next_head = (head + 1) % 256;
+  if (next_head == tail) return nullptr;
+  DriverCommand* ptr = &commands[head];
+  *ptr = command;
+  ptr->isFulfilled = false;
+  head = next_head;
+  return ptr;
+}
+
+DriverCommand* CommandBuffer::pop() {
+  if (head == tail) return nullptr;
+  DriverCommand* ptr = &commands[tail];
+  tail = (tail + 1) % 256;
+  return ptr;
+}
+
 CustomShareManager *CustomShareManager::m_pInstance = nullptr;
 bool CustomShareManager::m_initialized = false;
+std::mutex CustomShareManager::m_instanceMutex;
 
 void CustomShareManager::createSingleton() {
+  std::lock_guard<std::mutex> lock(m_instanceMutex);
   m_initialized = true;
 
   CustomShareManager *pInstance = m_pInstance;
   if (!m_pInstance) {
     pInstance = new CustomShareManager;
+  
+    pInstance->initialize();
     m_pInstance = pInstance;
   }
-
-  pInstance->initialize();
 }
 
 CustomShareManager *CustomShareManager::getSingleton() {
+  std::lock_guard<std::mutex> lock(m_instanceMutex);
+  
   CustomShareManager *pInstance = m_pInstance;
   if (!m_pInstance) {
     pInstance = new CustomShareManager;
@@ -76,16 +98,21 @@ void CustomShareManager::initialize() {
   m_gazeImageEvent = CreateIpcEvent("CUSTOM_SHARE_VRT2_WIN_GAZE_IMAGE_EVT");
   m_gazeImageMutex = CreateIpcMutex("CUSTOM_SHARE_VRT2_WIN_GAZE_IMAGE_MTX");
 
-  for (int i = 0; i < MAX_SLOTS; i++) {
+  for (int i = 0; i < k_maxSlots; i++) {
     char name[128];
     snprintf(name, sizeof(name), "CUSTOM_SHARE_VRT2_WIN_SLOT_OWNER_MTX_%d", i);
     m_slotOwnerMutex[i] = CreateIpcMutex(name);
 
     snprintf(name, sizeof(name), "CUSTOM_SHARE_VRT2_WIN_PCM_EVT_%d", i);
     m_pcmEvent[i] = CreateIpcEvent(name);
+
+    snprintf(name, sizeof(name), "CUSTOM_SHARE_VRT2_WIN_CMD_EVT_%d", i);
+    m_commandEvent[i] = CreateIpcEvent(name);
   }
 
   m_triggerEffectMutex = CreateIpcMutex("CUSTOM_SHARE_VRT2_WIN_TRIGGER_EFFECT_MTX");
+
+  m_commandMutex = CreateIpcMutex("CUSTOM_SHARE_VRT2_WIN_COMMAND_MTX");
 
   m_sharedMemory = CreateIpcSharedMemory("CUSTOM_SHARE_VRT2_WIN", sizeof(BufferData));
   m_pBufferData = static_cast<BufferData*>(m_sharedMemory->map());
@@ -121,18 +148,18 @@ int CustomShareManager::getGazeImageBuffer(unsigned char** gazeImageBuffer) {
 void CustomShareManager::signalPcmUpdate() {
   std::memset(m_pBufferData->pcmLeft, 0, sizeof(m_pBufferData->pcmLeft));
   std::memset(m_pBufferData->pcmRight, 0, sizeof(m_pBufferData->pcmRight));
-  for (int i = 0; i < MAX_SLOTS; i++) {
+  for (int i = 0; i < k_maxSlots; i++) {
     m_pcmEvent[i]->set();
   }
 }
 
 void CustomShareManager::readPcm(int slot, unsigned char* pcmLeft, unsigned char* pcmRight) {
-  if (pcmLeft) std::memcpy(pcmLeft, m_pBufferData->pcmLeft[slot], k_unSenseChunkSize);
-  if (pcmRight) std::memcpy(pcmRight, m_pBufferData->pcmRight[slot], k_unSenseChunkSize);
+  if (pcmLeft) std::memcpy(pcmLeft, m_pBufferData->pcmLeft[slot], k_senseChunkSize);
+  if (pcmRight) std::memcpy(pcmRight, m_pBufferData->pcmRight[slot], k_senseChunkSize);
 }
 
 int CustomShareManager::claimSlot() {
-  for (int i = 0; i < MAX_SLOTS; i++) {
+  for (int i = 0; i < k_maxSlots; i++) {
     if (m_slotOwnerMutex[i]->try_lock()) {
       return i; // Successfully claimed
     }
@@ -141,13 +168,13 @@ int CustomShareManager::claimSlot() {
 }
 
 void CustomShareManager::releaseSlot(int slot) {
-  if (slot >= 0 && slot < MAX_SLOTS) {
+  if (slot >= 0 && slot < k_maxSlots) {
     m_slotOwnerMutex[slot]->unlock();
   }
 }
 
 bool CustomShareManager::isSlotAlive(int slot) {
-  if (slot < 0 || slot >= MAX_SLOTS) return false;
+  if (slot < 0 || slot >= k_maxSlots) return false;
   if (m_slotOwnerMutex[slot]->try_lock()) {
     m_slotOwnerMutex[slot]->unlock();
     return false;
@@ -156,12 +183,12 @@ bool CustomShareManager::isSlotAlive(int slot) {
 }
 
 void CustomShareManager::writePcm(int slot, VRControllerType controllerType, const unsigned char* pcm) {
-  if (slot < 0 || slot >= MAX_SLOTS) return;
+  if (slot < 0 || slot >= k_maxSlots) return;
   if (controllerType == VRControllerType::Left || controllerType == VRControllerType::Both) {
-    std::memcpy(m_pBufferData->pcmLeft[slot], pcm, k_unSenseChunkSize);
+    std::memcpy(m_pBufferData->pcmLeft[slot], pcm, k_senseChunkSize);
   }
   if (controllerType == VRControllerType::Right || controllerType == VRControllerType::Both) {
-    std::memcpy(m_pBufferData->pcmRight[slot], pcm, k_unSenseChunkSize);
+    std::memcpy(m_pBufferData->pcmRight[slot], pcm, k_senseChunkSize);
   }
 }
 
@@ -180,4 +207,35 @@ bool CustomShareManager::popTriggerEffect(TriggerEffectCommand& outCommand) {
   bool result = m_pBufferData->triggerEffectBuffer.pop(outCommand);
   m_triggerEffectMutex->unlock();
   return result;
+}
+
+void CustomShareManager::submitCommand(int slot, DriverCommand& command) {
+  if (slot < 0 || slot >= k_maxSlots) return;
+  command.slot = slot;
+
+  m_commandMutex->lock();
+  DriverCommand* ptr = m_pBufferData->commandBuffer.push(command);
+  m_commandMutex->unlock();
+
+  if (!ptr) return; // Buffer full
+
+  while (!ptr->isFulfilled) {
+    m_commandEvent[slot]->wait();
+  }
+
+  command = *ptr;
+}
+
+DriverCommand* CustomShareManager::popCommand() {
+  m_commandMutex->lock();
+  DriverCommand* result = m_pBufferData->commandBuffer.pop();
+  m_commandMutex->unlock();
+  return result;
+}
+
+void CustomShareManager::fulfillCommand(DriverCommand* command) {
+  command->isFulfilled = true;
+  if (command->slot >= 0 && command->slot < k_maxSlots) {
+    m_commandEvent[command->slot]->set();
+  }
 }
