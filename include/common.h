@@ -74,10 +74,15 @@ struct HeadsetRumbleCommand {
   uint8_t rumbleHz;
 };
 
+struct UsbConnectionCommand {
+  bool isConnected;
+};
+
 enum class DriverCommandType : uint32_t {
   GazeCalibrationSet = 0,
   GazeCalibrationGet = 1,
-  HeadsetRumbleSet = 2
+  HeadsetRumbleSet = 2,
+  UsbConnectionStateSet = 3
 };
 
 struct DriverCommand {
@@ -86,6 +91,7 @@ struct DriverCommand {
   union {
     GazeCalibrationCommand gazeCalibration;
     HeadsetRumbleCommand headsetRumble;
+    UsbConnectionCommand usbConnection;
   };
 };
 #pragma pack(pop)

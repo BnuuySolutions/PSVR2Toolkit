@@ -306,6 +306,15 @@ int main(int argc, char* argv[]) {
       ImGui::PopID();
     }
 
+    if (ImGui::CollapsingHeader("USB Connection", ImGuiTreeNodeFlags_DefaultOpen)) {
+      ImGui::PushID("UsbConnectionSection");
+      static bool isUsbConnected = true;
+      if (ImGui::Checkbox("USB Connected", &isUsbConnected)) {
+        psvr2_toolkit_private_set_usb_connection_state(isUsbConnected);
+      }
+      ImGui::PopID();
+    }
+
     if (ImGui::CollapsingHeader("Gaze Status", ImGuiTreeNodeFlags_DefaultOpen)) {
       ImGui::Text("Magic: %c%c", gazeStatus.magic[0], gazeStatus.magic[1]);
       ImGui::Text("Version: %u", gazeStatus.version);

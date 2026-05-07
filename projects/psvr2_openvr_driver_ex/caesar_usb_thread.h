@@ -56,6 +56,7 @@ namespace psvr2_toolkit {
     uint32_t m_lastError = 0;
 
     static void ActivateInterfaceHelper(CaesarUsbThread* thisptr);
+    static void SetUsbConnectionState(bool connected);
 
     // Hooks have to go here. We also put implementations here, or else we go in a loop with vtables.
     // And we have to basically not touch vtables to pull this off.

@@ -81,7 +81,7 @@ public:
   bool popTriggerEffect(TriggerEffectCommand& outCommand);
 
   void submitCommand(DriverCommand& command);
-  DriverCommand* popCommand();
+  DriverCommand* popCommand(uint32_t timeoutMs);
   void fulfillCommand(DriverCommand* command);
 
 private:
