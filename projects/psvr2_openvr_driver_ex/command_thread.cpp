@@ -29,33 +29,47 @@ namespace psvr2_toolkit {
   void CommandThread::ThreadLoop() {
     while (m_running) {
       DriverCommand* command = CustomShareManager::getSingleton()->popCommand();
-      if (command) {
-        if (command->type == DriverCommandType::GazeCalibrationSet) {
-          CaesarManager* caesarManager = CaesarManager::GetInstance();
-          if (caesarManager && caesarManager->imuStatusThread) {
+      CaesarManager* caesarManager = CaesarManager::GetInstance();
+
+      if (command && caesarManager && caesarManager->imuStatusThread) {
+        switch (command->type) {
+          case DriverCommandType::GazeCalibrationSet:
+          {
             caesarManager->imuStatusThread->ControlCommand(
               true,
-              0xd,
+              0x0D,
               &command->gazeCalibration.payload,
               sizeof(GazeCalibrationPacket),
               0,
               0,
               reinterpret_cast<uint16_t&>(command->gazeCalibration.reportMode)
             );
+
+            break;
           }
-        }
-        else if (command->type == DriverCommandType::GazeCalibrationGet) {
-          CaesarManager* caesarManager = CaesarManager::GetInstance();
-          if (caesarManager && caesarManager->imuStatusThread) {
+          case DriverCommandType::GazeCalibrationGet:
+          {
             caesarManager->imuStatusThread->ControlCommand(
               false,
-              0x8d,
+              0x8D,
               &command->gazeCalibration.payload,
               sizeof(GazeCalibrationPacket),
               0,
               0,
               reinterpret_cast<uint16_t&>(command->gazeCalibration.status)
             );
+          }
+          case DriverCommandType::HeadsetRumbleSet:
+          {
+            caesarManager->imuStatusThread->ControlCommand(
+              true,
+              0x08,
+              &command->headsetRumble.rumbleHz,
+              1,
+              0,
+              0,
+              1);
+            break;
           }
         }
 

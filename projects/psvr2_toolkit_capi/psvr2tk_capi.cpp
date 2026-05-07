@@ -8,6 +8,8 @@
 extern "C" {
 
   static int g_slot = -1;
+  static int g_lastGazeStatusCounter = -1;
+  static int g_lastGazeImageCounter = -1;
 
   int psvr2_toolkit_init() {
     CustomShareManager::createSingleton();
@@ -22,18 +24,19 @@ extern "C" {
     }
   }
 
-  void psvr2_toolkit_gaze_status(hmd2_gaze_status_t* pGazeStatus) {
-    CustomShareManager::getSingleton()->getGazeStatus(pGazeStatus);
+  bool psvr2_toolkit_gaze_status(hmd2_gaze_status_t* pGazeStatus, uint32_t timeoutMs) {
+    return CustomShareManager::getSingleton()->getGazeStatus(pGazeStatus, &g_lastGazeStatusCounter, timeoutMs);
   }
 
-  void psvr2_toolkit_gaze_image(unsigned char* pGazeImage) {
+  bool psvr2_toolkit_gaze_image(unsigned char* pGazeImage, uint32_t timeoutMs) {
     unsigned char* ptr = nullptr;
-    CustomShareManager::getSingleton()->getGazeImageBuffer(&ptr);
+    bool isNew = CustomShareManager::getSingleton()->getGazeImageBuffer(&ptr, &g_lastGazeImageCounter, timeoutMs);
     if (ptr) {
       // TODO: size shouldn't be 0x200100?
       // Also thinking of just making this API return a pointer instead to avoid a copy.
       std::memcpy(pGazeImage, ptr, 0x200100);
     }
+    return isNew;
   }
 
   void psvr2_toolkit_write_pcm(VRControllerType controllerType, const unsigned char* pcm) {
@@ -41,7 +44,7 @@ extern "C" {
   }
 
   void psvr2_toolkit_wait_for_pcm() {
-    if (g_slot >= 0) CustomShareManager::getSingleton()->waitForPcmUpdate(g_slot);
+    CustomShareManager::getSingleton()->waitForPcmUpdate();
   }
 
   void psvr2_toolkit_set_trigger_effect(VRControllerType controllerType, const ScePadTriggerEffectCommand& command) {
@@ -51,11 +54,18 @@ extern "C" {
     if (g_slot >= 0) CustomShareManager::getSingleton()->pushTriggerEffect(g_slot, payload);
   }
 
+  void psvr2_toolkit_set_hmd_rumble(uint8_t rumbleHz) {
+    DriverCommand drvCmd = {};
+    drvCmd.type = DriverCommandType::HeadsetRumbleSet;
+    drvCmd.headsetRumble.rumbleHz = rumbleHz;
+    CustomShareManager::getSingleton()->submitCommand(drvCmd);
+  }
+
   GazeCalibrationCommand psvr2_toolkit_private_send_gaze_set_command(GazeCalibrationCommand command) {
     DriverCommand drvCmd = {};
     drvCmd.type = DriverCommandType::GazeCalibrationSet;
     drvCmd.gazeCalibration = command;
-    CustomShareManager::getSingleton()->submitCommand(g_slot, drvCmd);
+    CustomShareManager::getSingleton()->submitCommand(drvCmd);
     return drvCmd.gazeCalibration;
   }
 
@@ -63,7 +73,7 @@ extern "C" {
     DriverCommand drvCmd = {};
     drvCmd.type = DriverCommandType::GazeCalibrationGet;
     drvCmd.gazeCalibration = command;
-    CustomShareManager::getSingleton()->submitCommand(g_slot, drvCmd);
+    CustomShareManager::getSingleton()->submitCommand(drvCmd);
     return drvCmd.gazeCalibration;
   }
 }
