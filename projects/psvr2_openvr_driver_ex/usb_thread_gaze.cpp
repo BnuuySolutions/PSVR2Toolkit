@@ -54,8 +54,7 @@ void CaesarUsbThreadGaze::OnConnected() {
   }
 
   // For some reason this doesn't really stick.
-  uint16_t subCommand = 1;
-  this->ControlCommand(true, 12, nullptr, 0, 0, 0, subCommand);
+  this->ControlCommand(true, 12, nullptr, 0, 0, 0, 1);
 
   //char data[8] = { 1, 0, 0, 0, 0x05, 0, 0, 0 };
   //CaesarUsbThread::ControlCommandHook(this, true, 0xb, data, 8, 0, 0, 1);
@@ -68,8 +67,7 @@ int CaesarUsbThreadGaze::PollAndProcess() {
   if (result == 0) {
     // If we timed out, we should try sending the gaze enable again.
     // Entering and exiting passthrough, DP signal changes, and probably some other stuff seems to stop gaze.
-    uint16_t subCommand = 1;
-    this->ControlCommand(true, 12, nullptr, 0, 0, 0, subCommand);
+    this->ControlCommand(true, 12, nullptr, 0, 0, 0, 1);
     return 0;
   }
 

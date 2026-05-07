@@ -70,17 +70,22 @@ struct GazeCalibrationCommand {
   GazeCalibrationPacket payload;
 };
 
+struct HeadsetRumbleCommand {
+  uint8_t rumbleHz;
+};
+
 enum class DriverCommandType : uint32_t {
   GazeCalibrationSet = 0,
-  GazeCalibrationGet = 1
+  GazeCalibrationGet = 1,
+  HeadsetRumbleSet = 2
 };
 
 struct DriverCommand {
   DriverCommandType type;
   volatile bool isFulfilled;
-  int slot;
   union {
     GazeCalibrationCommand gazeCalibration;
+    HeadsetRumbleCommand headsetRumble;
   };
 };
 #pragma pack(pop)

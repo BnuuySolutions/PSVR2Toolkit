@@ -2,13 +2,16 @@
 #include "windows_ipc.h"
 
 extern "C" {
-    IIpcMutex* CreateIpcMutex(const char* name) {
-        return new WindowsIpcMutex(name);
-    }
-    IIpcEvent* CreateIpcEvent(const char* name) {
-        return new WindowsIpcEvent(name);
-    }
-    IIpcSharedMemory* CreateIpcSharedMemory(const char* name, size_t size) {
-        return new WindowsIpcSharedMemory(name, size);
-    }
+IIpcMutex *CreateIpcMutex(const char *name) {
+  return new WindowsIpcMutex(name);
+}
+IIpcEvent *CreateIpcEvent(const char *name) {
+  return new WindowsIpcEvent(name);
+}
+IIpcSharedMemory *CreateIpcSharedMemory(const char *name, size_t size) {
+  return new WindowsIpcSharedMemory(name, size);
+}
+IIpcBroadcast *CreateIpcBroadcast(const char *name) {
+  return new WindowsIpcBroadcast(name);
+}
 }

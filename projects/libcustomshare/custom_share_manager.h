@@ -10,6 +10,7 @@ constexpr int k_maxSlots = 4;
 
 struct GazeStatus {
   hmd2_gaze_status_t data;
+  int counter;
 
   void set(const hmd2_gaze_status_t* pGazeStatus);
   void get(hmd2_gaze_status_t* pGazeStatus) const;
@@ -61,11 +62,11 @@ public:
   static CustomShareManager *getSingleton();
 
   void setGazeStatus(const hmd2_gaze_status_t* pGazeStatus);
-  void getGazeStatus(hmd2_gaze_status_t* pGazeStatus) const;
+  bool getGazeStatus(hmd2_gaze_status_t* pGazeStatus, int* lastCounter = nullptr, uint32_t timeoutMs = 0);
 
   void setGazeImage(const unsigned char* pGazeImage);
 
-  int getGazeImageBuffer(unsigned char** gazeImageBuffer);
+  bool getGazeImageBuffer(unsigned char** gazeImageBuffer, int* lastCounter = nullptr, uint32_t timeoutMs = 0);
 
   void signalPcmUpdate();
   void readPcm(int slot, unsigned char* pcmLeft, unsigned char* pcmRight);
@@ -74,12 +75,12 @@ public:
   void releaseSlot(int slot);
   bool isSlotAlive(int slot);
   void writePcm(int slot, VRControllerType controllerType, const unsigned char* pcm);
-  void waitForPcmUpdate(int slot);
+  void waitForPcmUpdate();
 
   void pushTriggerEffect(int slot, const TriggerEffectCommandPayload& payload);
   bool popTriggerEffect(TriggerEffectCommand& outCommand);
 
-  void submitCommand(int slot, DriverCommand& command);
+  void submitCommand(DriverCommand& command);
   DriverCommand* popCommand();
   void fulfillCommand(DriverCommand* command);
 
@@ -88,16 +89,16 @@ private:
   static bool m_initialized;
   static std::mutex m_instanceMutex;
 
-  IIpcEvent* m_gazeStatusEvent;
+  IIpcBroadcast* m_gazeStatusBroadcast;
   IIpcMutex* m_gazeStatusMutex;
 
-  IIpcEvent* m_gazeImageEvent;
+  IIpcBroadcast* m_gazeImageBroadcast;
   IIpcMutex* m_gazeImageMutex;
 
   IIpcMutex* m_slotOwnerMutex[k_maxSlots];
 
-  IIpcEvent* m_pcmEvent[k_maxSlots];
-  IIpcEvent* m_commandEvent[k_maxSlots];
+  IIpcBroadcast* m_pcmBroadcast;
+  IIpcBroadcast* m_commandBroadcast;
 
   IIpcMutex* m_triggerEffectMutex;
 

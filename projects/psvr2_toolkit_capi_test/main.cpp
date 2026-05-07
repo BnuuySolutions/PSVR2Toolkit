@@ -165,8 +165,8 @@ int main(int argc, char* argv[]) {
     }
 
     // Fetch the latest data from the CAPI
-    psvr2_toolkit_gaze_status(&gazeStatus);
-    psvr2_toolkit_gaze_image(gazeImage.data());
+    psvr2_toolkit_gaze_status(&gazeStatus, 0);
+    psvr2_toolkit_gaze_image(gazeImage.data(), 0);
 
     // Convert and upload texture data
     void* mapped_ptr = SDL_MapGPUTransferBuffer(gpu_device, transferBuffer, false);
@@ -189,13 +189,23 @@ int main(int argc, char* argv[]) {
     ImGui::SetNextWindowSize(ImVec2(1280, 720), ImGuiCond_FirstUseEver);
     ImGui::Begin("Gaze Info");
 
-    if (ImGui::CollapsingHeader("Haptics", ImGuiTreeNodeFlags_DefaultOpen)) {
+    if (ImGui::CollapsingHeader("Controller Haptics", ImGuiTreeNodeFlags_DefaultOpen)) {
       ImGui::PushID("HapticsSection");
       std::scoped_lock<std::mutex> lock(g_hapticsMutex);
       ImGui::Checkbox("Play Tone Left", &g_playToneLeft);
       ImGui::Checkbox("Play Tone Right", &g_playToneRight);
       ImGui::SliderFloat("Frequency (Hz)", &g_toneFrequency, 10.0f, 1000.0f);
       ImGui::SliderFloat("Amplitude", &g_toneAmplitude, 0.0f, 1.0f);
+      ImGui::PopID();
+    }
+
+    if (ImGui::CollapsingHeader("HMD Rumble", ImGuiTreeNodeFlags_DefaultOpen)) {
+      ImGui::PushID("HMDRumbleSection");
+      static int hmdRumbleHz = 0;
+      ImGui::SliderInt("Frequency (Hz)", &hmdRumbleHz, 0, 255);
+      if (ImGui::Button("Send HMD Rumble")) {
+        psvr2_toolkit_set_hmd_rumble(static_cast<uint8_t>(hmdRumbleHz));
+      }
       ImGui::PopID();
     }
 

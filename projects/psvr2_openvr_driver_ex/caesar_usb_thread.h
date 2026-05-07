@@ -25,6 +25,10 @@ namespace psvr2_toolkit {
 
     int TransferPipe(uint8_t pipeId, char* buffer, size_t length);
     int ControlCommand(uint8_t bIsSet, uint16_t reportId, void* buffer, uint16_t length, uint16_t value, uint16_t index, uint16_t& subcmd);
+    int ControlCommand(uint8_t bIsSet, uint16_t reportId, void* buffer, uint16_t length, uint16_t value, uint16_t index, uint16_t&& subcmd) {
+      uint16_t temp = subcmd;
+      return ControlCommand(bIsSet, reportId, buffer, length, value, index, temp);
+    }
     int GetDescriptor(libusb_device_descriptor* pDest);
 
     void* m_pThreadData;
