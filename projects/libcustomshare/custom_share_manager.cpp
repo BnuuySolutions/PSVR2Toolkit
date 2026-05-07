@@ -264,6 +264,8 @@ void CustomShareManager::submitCommand(DriverCommand& command) {
 
   if (!ptr) return; // Buffer full
 
+  m_commandBroadcast->notify_all();
+
   while (!ptr->isFulfilled) {
     m_commandBroadcast->wait();
   }
@@ -271,11 +273,20 @@ void CustomShareManager::submitCommand(DriverCommand& command) {
   command = *ptr;
 }
 
-DriverCommand* CustomShareManager::popCommand() {
-  m_commandMutex->lock();
-  DriverCommand* result = m_pBufferData->commandBuffer.pop();
-  m_commandMutex->unlock();
-  return result;
+DriverCommand* CustomShareManager::popCommand(uint32_t timeoutMs) {
+  auto start = std::chrono::steady_clock::now();
+  while (true) {
+    m_commandMutex->lock();
+    DriverCommand* result = m_pBufferData->commandBuffer.pop();
+    m_commandMutex->unlock();
+
+    if (result) return result;
+    
+    auto now = std::chrono::steady_clock::now();
+    uint32_t elapsed = static_cast<uint32_t>(std::chrono::duration_cast<std::chrono::milliseconds>(now - start).count());
+    if (elapsed >= timeoutMs) return nullptr;
+    m_commandBroadcast->wait(timeoutMs - elapsed);
+  }
 }
 
 void CustomShareManager::fulfillCommand(DriverCommand* command) {

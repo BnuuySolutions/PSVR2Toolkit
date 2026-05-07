@@ -14,6 +14,7 @@ namespace psvr2_toolkit {
   static libusb_context* g_usbCtx = INVALID_CONTEXT_HANDLE;
   static libusb_device_handle* g_devHandle = INVALID_DEVICE_HANDLE;
   static std::mutex g_devHandleMutex;
+  static bool g_usbSimulatedDisconnect = false;
 
   void (*CaesarUsbThread::orig_destructor)(CaesarUsbThread* thisptr, bool shouldFree) = nullptr;
   void (*CaesarUsbThread::orig_threadLoop)(CaesarUsbThread* thisptr) = nullptr;
@@ -44,8 +45,19 @@ namespace psvr2_toolkit {
   void CaesarUsbThread::OnDisconnect() {}
   int CaesarUsbThread::PollAndProcess() { return 0; }
 
+  void CaesarUsbThread::SetUsbConnectionState(bool connected) {
+    std::lock_guard<std::mutex> lock(g_devHandleMutex);
+    g_usbSimulatedDisconnect = !connected;
+    if (g_usbSimulatedDisconnect && IS_HANDLE_VALID(g_devHandle)) {
+      // Wait for active libusb transfers to timeout and interfaces to be released
+      Sleep(1500);
+      libusb_close(g_devHandle);
+      g_devHandle = INVALID_DEVICE_HANDLE;
+    }
+  }
+
   int CaesarUsbThread::TransferPipe(uint8_t pipeId, char* buffer, size_t length) {
-    if (this->m_stopRequested != 0) {
+    if (this->m_stopRequested != 0 || g_usbSimulatedDisconnect) {
       this->m_lastError = 0xfffffe74;
       return -1;
     }
@@ -89,7 +101,7 @@ namespace psvr2_toolkit {
   }
 
   int CaesarUsbThread::ControlCommand(uint8_t bIsSet, uint16_t reportId, void* buffer, uint16_t length, uint16_t value, uint16_t index, uint16_t& subcmd) {
-    if (this->m_stopRequested != 0) {
+    if (this->m_stopRequested != 0 || g_usbSimulatedDisconnect) {
       this->m_lastError = 0xfffffdd4;
       Util::DriverLog("Stop requested. Report ID: {}", reportId);
       return -1;
@@ -149,7 +161,7 @@ namespace psvr2_toolkit {
   }
 
   int CaesarUsbThread::GetDescriptor(libusb_device_descriptor* pDest) {
-    if (!IS_HANDLE_VALID(this->m_devHandle)) {
+    if (g_usbSimulatedDisconnect || !IS_HANDLE_VALID(this->m_devHandle)) {
       Util::DriverLog("No dev for descriptor");
       return 1;
     }
@@ -174,6 +186,12 @@ namespace psvr2_toolkit {
 
     {
       std::lock_guard<std::mutex> lock(g_devHandleMutex);
+      if (g_usbSimulatedDisconnect) {
+        // Do not attempt to use the device if disconnect is simulated
+        thisptr->m_devHandle = INVALID_DEVICE_HANDLE;
+        return;
+      }
+
       if (IS_HANDLE_VALID(g_devHandle)) {
         // Ping the device to see if it's still physically responding.
         uint16_t device_status = 0;

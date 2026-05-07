@@ -76,4 +76,11 @@ extern "C" {
     CustomShareManager::getSingleton()->submitCommand(drvCmd);
     return drvCmd.gazeCalibration;
   }
+
+  void psvr2_toolkit_private_set_usb_connection_state(bool connected) {
+    DriverCommand drvCmd = {};
+    drvCmd.type = DriverCommandType::UsbConnectionStateSet;
+    drvCmd.usbConnection.isConnected = connected;
+    CustomShareManager::getSingleton()->submitCommand(drvCmd);
+  }
 }
