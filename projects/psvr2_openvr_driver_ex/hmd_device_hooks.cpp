@@ -43,27 +43,35 @@ namespace psvr2_toolkit {
     // Tell SteamVR to allow night mode setting.
     vr::VRProperties()->SetBoolProperty(ulPropertyContainer, vr::Prop_DisplayAllowNightMode_Bool, true);
 
-    // Tell SteamVR we support brightness controls.
-    vr::VRProperties()->SetBoolProperty(ulPropertyContainer, vr::Prop_DisplaySupportsAnalogGain_Bool, true);
-    vr::VRProperties()->SetFloatProperty(ulPropertyContainer, vr::Prop_DisplayMinAnalogGain_Float, 0.0f);
-    vr::VRProperties()->SetFloatProperty(ulPropertyContainer, vr::Prop_DisplayMaxAnalogGain_Float, 1.0f);
+    // Enable SteamVR brightness control if: opted in with setting, or settings overlay is disabled, or running on Wine
+    bool enableSteamVRBrightness =
+      VRSettings::GetBool(STEAMVR_SETTINGS_ENABLE_STEAMVR_BRIGHTNESS, SETTING_ENABLE_STEAMVR_BRIGHTNESS_DEFAULT_VALUE) ||
+      VRSettings::GetBool(STEAMVR_SETTINGS_DISABLE_OVERLAY, SETTING_DISABLE_OVERLAY_DEFAULT_VALUE) ||
+      Util::IsRunningOnWine();
 
-    // Fill in brightness from PSVR2 config to SteamVR settings key.
-    // Also, "analogGain" is stored as a gamma corrected value.
-    ShareManager__getIntConfig(ShareManager__getInstance(), 2, &currentBrightness);
-    vr::VRSettings()->SetFloat(vr::k_pch_SteamVR_Section, "analogGain", powf(static_cast<float>(currentBrightness) / 31.0f, 2.2f));
+    if (enableSteamVRBrightness) {
+      // Tell SteamVR we support brightness controls.
+      vr::VRProperties()->SetBoolProperty(ulPropertyContainer, vr::Prop_DisplaySupportsAnalogGain_Bool, true);
+      vr::VRProperties()->SetFloatProperty(ulPropertyContainer, vr::Prop_DisplayMinAnalogGain_Float, 0.0f);
+      vr::VRProperties()->SetFloatProperty(ulPropertyContainer, vr::Prop_DisplayMaxAnalogGain_Float, 1.0f);
 
-    // Set event handler for when brightness ("analogGain") changes.
-    DriverHostProxy::Instance()->AddEventHandler([](vr::VREvent_t* event) {
-      if (event->eventType == vr::EVREventType::VREvent_SteamVRSectionSettingChanged) {
-        float currentFloatBrightness = powf(vr::VRSettings()->GetFloat(vr::k_pch_SteamVR_Section, "analogGain"), 1 / 2.2f);
-        if (static_cast<int64_t>(ceilf(currentFloatBrightness * 31.0f)) != currentBrightness)
-        {
-          currentBrightness = static_cast<int64_t>(ceilf(currentFloatBrightness * 31.0f));
-          ShareManager__setIntConfig(ShareManager__getInstance(), 2, &currentBrightness);
+      // Fill in brightness from PSVR2 config to SteamVR settings key.
+      // Also, "analogGain" is stored as a gamma corrected value.
+      ShareManager__getIntConfig(ShareManager__getInstance(), 2, &currentBrightness);
+      vr::VRSettings()->SetFloat(vr::k_pch_SteamVR_Section, "analogGain", powf(static_cast<float>(currentBrightness) / 31.0f, 2.2f));
+
+      // Set event handler for when brightness ("analogGain") changes.
+      DriverHostProxy::Instance()->AddEventHandler([](vr::VREvent_t* event) {
+        if (event->eventType == vr::EVREventType::VREvent_SteamVRSectionSettingChanged) {
+          float currentFloatBrightness = powf(vr::VRSettings()->GetFloat(vr::k_pch_SteamVR_Section, "analogGain"), 1 / 2.2f);
+          if (static_cast<int64_t>(ceilf(currentFloatBrightness * 31.0f)) != currentBrightness)
+          {
+            currentBrightness = static_cast<int64_t>(ceilf(currentFloatBrightness * 31.0f));
+            ShareManager__setIntConfig(ShareManager__getInstance(), 2, &currentBrightness);
+          }
         }
-      }
-    });
+        });
+    }
 
     // Tell SteamVR our dashboard scale.
     vr::VRProperties()->SetFloatProperty(ulPropertyContainer, vr::Prop_DashboardScale_Float, .9f);
