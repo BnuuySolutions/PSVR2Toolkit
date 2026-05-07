@@ -1,4 +1,4 @@
-# Heads up! This is the legacy PlayStation VR2 Toolkit codebase (pre-["next"](https://github.com/BnuuySolutions/PSVR2Toolkit/pull/37) update), no support is provided if you decide to build/use this code.
+## Heads up! This is the legacy PlayStation VR2 Toolkit codebase (pre-["next"](https://github.com/BnuuySolutions/PSVR2Toolkit/pull/37) update), no support is provided if you decide to build/use this code.
 
 > [!WARNING]
 > If you have paid for PlayStation VR2 Toolkit, you have been scammed and you should immediately request a refund. PlayStation VR2 Toolkit is entirely free and **is intended for NON-COMMERCIAL use only**, we do not attempt to profit off of it. Additionally, eye tracking data from PlayStation VR2 Toolkit **must not** be used in commercial environments and/or for commercial purposes. \
