@@ -4,6 +4,7 @@
 #include "custom_share_manager.h"
 #include "usb_thread_gaze.h"
 #include "util.h"
+
 #include <openvr_driver.h>
 #include <filesystem>
 #include <fstream>
@@ -38,7 +39,7 @@ void CaesarUsbThreadGaze::OnConnected() {
 
     if (err == vr::TrackedProp_Success) {
       std::filesystem::path dir(configPath);
-      std::filesystem::path filePath = dir / "calibration_blob_3.bin"; // This seems to be the only blob that matters.
+      std::filesystem::path filePath = dir / "gaze_calibration_blob.bin";
 
       std::ifstream inFile(filePath, std::ios::binary | std::ios::ate);
       if (inFile.is_open()) {
@@ -53,7 +54,7 @@ void CaesarUsbThreadGaze::OnConnected() {
     }
   }
 
-  // For some reason this doesn't really stick.
+  // Gaze stream enable. For some reason this doesn't really stick.
   this->ControlCommand(true, 12, nullptr, 0, 0, 0, 1);
 
   //char data[8] = { 1, 0, 0, 0, 0x05, 0, 0, 0 };
