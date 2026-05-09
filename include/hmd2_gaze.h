@@ -10,7 +10,8 @@ typedef enum hmd2_gaze_bool_t : uint32_t {
 typedef enum hmd2_gaze_enabled_eye_t : uint8_t {
   HMD2_GAZE_ENABLED_EYE_LEFT,
   HMD2_GAZE_ENABLED_EYE_RIGHT,
-  HMD2_GAZE_ENABLED_EYE_BOTH
+  HMD2_GAZE_ENABLED_EYE_BOTH,
+  HMD2_GAZE_ENABLED_EYE_NONE
 } hmd2_gaze_enabled_eye_t;
 
 typedef struct hmd2_gaze_vec2_t {

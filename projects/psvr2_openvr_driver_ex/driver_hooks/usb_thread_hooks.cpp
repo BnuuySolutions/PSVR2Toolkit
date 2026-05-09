@@ -1,5 +1,6 @@
 #include "usb_thread_hooks.h"
 
+#include "hmd2_gaze.h"
 #include "hmd_driver_loader.h"
 #include "hook_lib.h"
 #include "util.h"
@@ -44,6 +45,17 @@ namespace psvr2_toolkit {
     uint32_t size;
     uint32_t offset;
   };
+  
+  struct Hmd2GazeCalibHeader {
+    char magic[2];
+    uint16_t struct_version;
+    uint16_t data_version;
+    uint16_t data_id;
+    uint32_t payload_size;
+    uint32_t calib_id;
+    hmd2_gaze_enabled_eye_t calib_eye;
+    uint8_t padding[12];
+  };
 #pragma pack(pop)
 
   int customHandleData(char* buffer, uint32_t bufferSize) {
@@ -75,27 +87,42 @@ namespace psvr2_toolkit {
             return -1;
           }
 
-          if (item->id == 0x3 || item->id == 0x4) {
+          if (item->id == 0x3) do {
+            char* data = buffer + item->offset;
+            Hmd2GazeCalibHeader* calibHeader = reinterpret_cast<Hmd2GazeCalibHeader*>(data);
+
+            // Avoid saving any blank or invalid calibration data
+            if (calibHeader->calib_eye != hmd2_gaze_enabled_eye_t::HMD2_GAZE_ENABLED_EYE_BOTH
+                || calibHeader->calib_id == 0) {
+              break;
+            }
+
             vr::ETrackedPropertyError err;
             vr::PropertyContainerHandle_t container = vr::VRDriverHandle();
             uint32_t propSize = vr::VRProperties()->GetStringProperty(container, vr::Prop_UserConfigPath_String, nullptr, 0, &err);
             
-            if (propSize > 0) {
-              std::string configPath(propSize - 1, '\0');
-              vr::VRProperties()->GetStringProperty(container, vr::Prop_UserConfigPath_String, configPath.data(), propSize, &err);
-
-              if (err == vr::TrackedProp_Success) {
-                std::filesystem::path dir(configPath);
-                std::filesystem::path filePath = dir / (std::string("calibration_blob_") + std::to_string(item->id) + ".bin");
-
-                std::ofstream outFile(filePath, std::ios::binary);
-                if (outFile.is_open()) {
-                  outFile.write(buffer + item->offset, item->size);
-                  outFile.close();
-                }
-              }
+            if (propSize == 0) {
+              break;
             }
-          }
+
+            std::string configPath(propSize - 1, '\0');
+            vr::VRProperties()->GetStringProperty(container, vr::Prop_UserConfigPath_String, configPath.data(), propSize, &err);
+
+            if (err != vr::TrackedProp_Success) {
+              break;
+            }
+
+            std::filesystem::path dir(configPath);
+            std::filesystem::path filePath = dir / std::string("gaze_calibration_blob.bin");
+
+            std::ofstream outFile(filePath, std::ios::binary);
+            if (!outFile.is_open()) {
+              break;
+            }
+
+            outFile.write(data, item->size);
+            outFile.close();
+          } while (false);
         }
       }
 
