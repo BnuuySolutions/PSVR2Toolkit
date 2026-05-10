@@ -136,20 +136,28 @@ namespace psvr2_toolkit {
         this->lastTrackedTimestamp = timestamp;
       }
     }
+    
     bool GetTrackingState(uint64_t& outLastTrackedTimestamp) {
       std::scoped_lock<std::mutex> lock(this->controllerMutex);
       outLastTrackedTimestamp = this->lastTrackedTimestamp;
       return this->isTracking;
     }
+
     void SetLibpadSyncs(LibpadTimeSync* timeSync, LibpadLedSync* ledSync) {
       std::scoped_lock<std::mutex> lock(this->controllerMutex);
       this->timeSync = timeSync;
       this->ledSync = ledSync;
     }
+
     void GetLibpadSyncs(LibpadTimeSync*& outTimeSync, LibpadLedSync*& outLedSync) {
       std::scoped_lock<std::mutex> lock(this->controllerMutex);
       outTimeSync = this->timeSync;
       outLedSync = this->ledSync;
+    }
+
+    bool IsConnected() {
+      std::scoped_lock<std::mutex> lock(this->controllerMutex);
+      return this->padHandle != -1;
     }
 
     int32_t GetLatencyOffset() {

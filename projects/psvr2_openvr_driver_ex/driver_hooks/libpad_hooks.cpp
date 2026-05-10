@@ -3,12 +3,12 @@
 #include "hmd_driver_loader.h"
 #include "hook_lib.h"
 #include "sense_controller.h"
-#include "usb_thread_gaze.h"
-#include "usb_thread_hooks.h"
 #include "util.h"
 #include "vr_settings.h"
 
 #include <cstdint>
+#include <hidsdi.h>
+#include <hidpi.h>
 
 namespace psvr2_toolkit {
 
@@ -363,7 +363,7 @@ namespace psvr2_toolkit {
       f9Pressed = false;
     }
 
-    if (senseController.GetHandle() == NULL) {
+    if (!senseController.IsConnected()) {
       if (ctx.state != CalibrationState::Idle) {
         resetCalibration();
         ctx.state = CalibrationState::Idle;
@@ -628,13 +628,34 @@ namespace psvr2_toolkit {
 
     HidDeviceDescriptor *result = libpad_CreateHidDevice(device, name, deviceType);
 
+    bool isBluetooth = false; 
+
+    if (device->controllerFileHandle && device->controllerFileHandle != INVALID_HANDLE_VALUE) {
+      PHIDP_PREPARSED_DATA preparsedData;
+      
+      if (HidD_GetPreparsedData(device->controllerFileHandle, &preparsedData)) {
+        HIDP_CAPS caps;
+        
+        if (HidP_GetCaps(preparsedData, &caps) == HIDP_STATUS_SUCCESS) {
+          // Sony Sense BT reports are 78 bytes.
+          isBluetooth = (caps.InputReportByteLength == 78);
+          
+          Util::DriverLog("Detected Connection: {} (Report Size: {})", 
+                          isBluetooth ? "Bluetooth" : "USB", 
+                          caps.InputReportByteLength);
+        }
+        
+        HidD_FreePreparsedData(preparsedData);
+      }
+    }
+
     if (deviceType == k_libpadDeviceTypeSenseLeft)
     {
-      SenseController::GetLeftController().SetHandle(device->controllerFileHandle, result->padHandle);
+      SenseController::GetLeftController().SetHandle(isBluetooth ? device->controllerFileHandle : NULL, result->padHandle);
     }
     else if (deviceType == k_libpadDeviceTypeSenseRight)
     {
-      SenseController::GetRightController().SetHandle(device->controllerFileHandle, result->padHandle);
+      SenseController::GetRightController().SetHandle(isBluetooth ? device->controllerFileHandle : NULL, result->padHandle);
     }
 
     return result;
@@ -658,12 +679,14 @@ namespace psvr2_toolkit {
   int32_t(*libpad_SendOutputReport)(int32_t device, const uint8_t *buffer, uint16_t size) = nullptr;
   int32_t libpad_SendOutputReportHook(int32_t device, const uint8_t *buffer, uint16_t size) {
     if (size != sizeof(SenseControllerPCModePacket_t)) {
-      Util::DriverLog("libpad_SendOutputReportHook called with unexpected size: {}", size);
       return libpad_SendOutputReport(device, buffer, size);
     }
 
     try {
       SenseController &controller = SenseController::GetControllerByPadHandle(device);
+      if (controller.GetHandle() == NULL) {
+        return libpad_SendOutputReport(device, buffer, size);
+      }
       controller.SetTrackingControllerSettings(reinterpret_cast<const SenseControllerPCModePacket_t *>(buffer));
     }
     catch (const std::runtime_error &) {
