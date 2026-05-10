@@ -84,9 +84,12 @@ void SenseController::SetHandle(void* handle, int padHandle) {
     this->padHandle = padHandle;
   }
 
-  if (handle != nullptr)
+  if (padHandle != -1)
   {
-    this->SetGeneratedHaptic(800.0f, k_unSenseMaxHapticAmplitude, 1500);
+    if (handle != nullptr)
+    {
+      this->SetGeneratedHaptic(800.0f, k_unSenseMaxHapticAmplitude, 1500);
+    }
     this->ClearTimestampOffset();
   }
 }
