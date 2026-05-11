@@ -23,6 +23,7 @@ namespace psvr2_toolkit {
   static std::shared_mutex g_pendingOperationsMutex;
 
   static std::atomic<bool> g_libusbThreadRunning{false};
+  static std::thread g_libusbThread;
 
   namespace {
     void LibusbEventThread() {
@@ -149,6 +150,7 @@ namespace psvr2_toolkit {
     std::unique_lock<std::mutex> waitLock(state.mutex);
     while (!state.completed) {
       if (!cancel_requested && (this->m_stopRequested != 0 || g_usbSimulatedDisconnect)) {
+        OutputDebugStringA("Cancelling\n");
         libusb_cancel_transfer(transfer);
         cancel_requested = true;
       }
@@ -238,6 +240,7 @@ namespace psvr2_toolkit {
     std::unique_lock<std::mutex> waitLock(state.mutex);
     while (!state.completed) {
       if (!cancel_requested && (this->m_stopRequested != 0 || g_usbSimulatedDisconnect)) {
+        OutputDebugStringA("Cancelling\n");
         libusb_cancel_transfer(transfer);
         cancel_requested = true;
       }
@@ -316,7 +319,8 @@ namespace psvr2_toolkit {
               bool cancel_requested = false;
               std::unique_lock<std::mutex> waitLock(state.mutex);
               while (!state.completed) {
-                if (!cancel_requested && g_usbSimulatedDisconnect) {
+                if (!cancel_requested && (thisptr->m_stopRequested != 0 || g_usbSimulatedDisconnect)) {
+                  OutputDebugStringA("Cancelling\n");
                   libusb_cancel_transfer(transfer);
                   cancel_requested = true;
                 }
@@ -448,6 +452,9 @@ namespace psvr2_toolkit {
 
   void CaesarUsbThread::JoinThreadHook(CaesarUsbThread* thisptr) {
     OutputDebugStringA("Joining interface thread");
+
+    thisptr->m_stopRequested = 1;
+
     if (orig_joinThread) {
         orig_joinThread(thisptr);
     }
@@ -517,7 +524,7 @@ namespace psvr2_toolkit {
     libusb_init(&g_usbCtx);
 
     g_libusbThreadRunning = true;
-    std::thread(LibusbEventThread).detach();
+    g_libusbThread = std::thread(LibusbEventThread);
 
     HookLib::InstallHook(reinterpret_cast<void*>(baseAddr + 0x1225a0),
                          reinterpret_cast<void*>(DestructorHook),
@@ -594,6 +601,17 @@ namespace psvr2_toolkit {
     Util::SetInstructionNOPAtAddress(reinterpret_cast<void*>(baseAddr + 0x123aee), 5);
     Util::SetInstructionNOPAtAddress(reinterpret_cast<void*>(baseAddr + 0x123b3e), 5);
     
+  }
+
+  void CaesarUsbThread::Stop() {
+    if (g_libusbThreadRunning) {
+      g_libusbThreadRunning = false;
+      if (g_libusbThread.joinable()) {
+        g_libusbThread.join();
+      }
+      libusb_exit(g_usbCtx);
+      g_usbCtx = INVALID_CONTEXT_HANDLE;
+    }
   }
 
 } // namespace psvr2_toolkit

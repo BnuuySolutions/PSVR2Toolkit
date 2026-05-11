@@ -75,6 +75,7 @@ namespace psvr2_toolkit {
     static int GetDescriptorHook(CaesarUsbThread* thisptr, libusb_device_descriptor* pDest);
 
     static void InstallHooks();
+    static void Stop();
 
   private:
     static void (*orig_destructor)(CaesarUsbThread* thisptr, bool shouldFree);
