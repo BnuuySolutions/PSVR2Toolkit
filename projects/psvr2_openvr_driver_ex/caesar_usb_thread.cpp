@@ -97,6 +97,8 @@ namespace psvr2_toolkit {
       if (result == LIBUSB_ERROR_TIMEOUT) {
         return 0;
       }
+      
+      Util::DriverLog("[Error] {} transfer failed. (libusb_error={})", isBulk ? "Bulk" : "Interrupt", result);
       this->m_lastError = result;
       return -1; // Only return -1 for actual fatal USB errors
     }
@@ -219,6 +221,7 @@ namespace psvr2_toolkit {
         bool device_present = (result >= 0);
 
         if (!device_present) {
+          Util::DriverLog("[Error] Control transfer ping failed. (libusb_error={})", result);
           Util::DriverLog("Device disconnected. Closing existing handle.");
 
           // Wait for all pending operations to finish with an exclusive lock
