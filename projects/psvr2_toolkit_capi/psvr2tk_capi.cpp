@@ -6,7 +6,6 @@
 #include "custom_share_manager.h"
 
 extern "C" {
-
   static int g_slot = -1;
   static int g_lastGazeStatusCounter = -1;
   static int g_lastGazeImageCounter = -1;

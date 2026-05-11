@@ -1,7 +1,4 @@
 #include "common.h"
-#include "hmd2_gaze.h"
-#include "pad_trigger_effect.h"
-#include <stdbool.h>
 
 extern "C" {
   PSVR2TK_EXPORT int psvr2_toolkit_init();

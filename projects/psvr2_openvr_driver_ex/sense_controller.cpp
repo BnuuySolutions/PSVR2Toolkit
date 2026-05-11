@@ -37,7 +37,6 @@ void SenseController::SetGeneratedHaptic(float freq, uint32_t amp, uint32_t samp
   this->hapticSamplesLeft = sampleCount;
 }
 
-
 void SenseController::MixPCM(const PCMBufferType& newPCMData) {
   std::scoped_lock<std::mutex> lock(controllerMutex);
 
@@ -93,8 +92,6 @@ void SenseController::SetHandle(void* handle, int padHandle) {
     this->ClearTimestampOffset();
   }
 }
-
-uint32_t offset = 0;
 
 void SenseController::SendToDevice() {
   SenseControllerPacket_t buffer;

@@ -11,6 +11,11 @@ add_library(libcrossipc SHARED
   ${PLATFORM_IPC_SOURCES}
 )
 
+# If on unix, just name it "crossipc", since "lib" will be prepended
+if(UNIX)
+  set_target_properties(libcrossipc PROPERTIES OUTPUT_NAME crossipc)
+endif()
+
 target_include_directories(libcrossipc PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
 if(UNIX)

@@ -9,6 +9,7 @@
 
 #define MAX_CLIENTS 12
 
+
 class WindowsIpcMutex : public IIpcMutex {
 public:
   explicit WindowsIpcMutex(const char *name);
