@@ -1,3 +1,5 @@
+#if defined(_WIN32)
+
 #include <cstdio>
 #include <cstring>
 #include <stdexcept>
@@ -249,3 +251,5 @@ void WindowsIpcBroadcast::notify_all() {
   }
   ReleaseMutex(m_hMutex);
 }
+
+#endif // _WIN32

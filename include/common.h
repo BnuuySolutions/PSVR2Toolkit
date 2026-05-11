@@ -5,6 +5,14 @@
 #include "hmd2_gaze.h"
 #include "pad_trigger_effect.h"
 
+#ifndef PSVR2TK_EXPORT
+  #ifdef _WIN32
+    #define PSVR2TK_EXPORT __declspec(dllexport)
+  #else
+    #define PSVR2TK_EXPORT __attribute__((visibility("default")))
+  #endif
+#endif
+
 constexpr int k_senseChunkSize = 32;
 constexpr int k_senseSampleRate = 3000;
 

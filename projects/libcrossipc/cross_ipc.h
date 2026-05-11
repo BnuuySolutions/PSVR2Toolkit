@@ -2,14 +2,18 @@
 #include <cstddef>
 #include <cstdint>
 
-#ifdef _WIN32
-#ifdef libcrossipc_EXPORTS
-#define CROSS_IPC_API __declspec(dllexport)
-#else
-#define CROSS_IPC_API __declspec(dllimport)
+#if (defined(_WIN32) && !defined(__WINE__))
+  #define WINDOWS_IPC
 #endif
+
+#ifdef WINDOWS_IPC
+  #ifdef libcrossipc_EXPORTS
+    #define CROSS_IPC_API __declspec(dllexport)
+  #else
+    #define CROSS_IPC_API __declspec(dllimport)
+  #endif
 #else
-#define CROSS_IPC_API __attribute__((visibility("default")))
+  #define CROSS_IPC_API __attribute__((visibility("default"))) __cdecl
 #endif
 
 class IIpcMutex {
@@ -47,4 +51,21 @@ CROSS_IPC_API IIpcEvent *CreateIpcEvent(const char *name);
 CROSS_IPC_API IIpcSharedMemory *CreateIpcSharedMemory(const char *name,
                                                       size_t size);
 CROSS_IPC_API IIpcBroadcast *CreateIpcBroadcast(const char *name);
+
+CROSS_IPC_API void DestroyIpcMutex(IIpcMutex *mutex);
+CROSS_IPC_API void IpcMutex_Lock(IIpcMutex *mutex);
+CROSS_IPC_API bool IpcMutex_TryLock(IIpcMutex *mutex);
+CROSS_IPC_API void IpcMutex_Unlock(IIpcMutex *mutex);
+
+CROSS_IPC_API void DestroyIpcEvent(IIpcEvent *event);
+CROSS_IPC_API void IpcEvent_Set(IIpcEvent *event);
+CROSS_IPC_API bool IpcEvent_Wait(IIpcEvent *event, uint32_t timeoutMs);
+
+CROSS_IPC_API void DestroyIpcSharedMemory(IIpcSharedMemory *shm);
+CROSS_IPC_API void *IpcSharedMemory_Map(IIpcSharedMemory *shm);
+CROSS_IPC_API void IpcSharedMemory_Unmap(IIpcSharedMemory *shm);
+
+CROSS_IPC_API void DestroyIpcBroadcast(IIpcBroadcast *broadcast);
+CROSS_IPC_API bool IpcBroadcast_Wait(IIpcBroadcast *broadcast, uint32_t timeoutMs);
+CROSS_IPC_API void IpcBroadcast_NotifyAll(IIpcBroadcast *broadcast);
 }
