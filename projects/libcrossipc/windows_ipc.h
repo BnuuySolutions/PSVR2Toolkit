@@ -1,3 +1,7 @@
+#pragma once
+
+#if defined(_WIN32)
+
 #include <string>
 #include <windows.h>
 
@@ -77,3 +81,5 @@ private:
 
   CachedClient m_cachedClients[MAX_CLIENTS];
 };
+
+#endif // _WIN32
