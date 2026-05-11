@@ -6,6 +6,7 @@
 #include "linux_ipc.h"
 #endif
 
+
 extern "C" {
 IIpcMutex *CreateIpcMutex(const char *name) {
 #ifdef WINDOWS_IPC

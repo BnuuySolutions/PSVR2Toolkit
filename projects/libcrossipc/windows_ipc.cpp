@@ -5,8 +5,8 @@
 #include <stdexcept>
 #include <string>
 
-
 #include "windows_ipc.h"
+
 
 WindowsIpcMutex::WindowsIpcMutex(const char *name) {
   m_hMutex = CreateMutexA(NULL, FALSE, name);

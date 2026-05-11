@@ -2,10 +2,11 @@
 
 #if defined(__linux__)
 
-#include "cross_ipc.h"
 #include <string>
 #include <pthread.h>
 #include <atomic>
+
+#include "cross_ipc.h"
 
 class LinuxIpcMutex : public IIpcMutex {
 private:
