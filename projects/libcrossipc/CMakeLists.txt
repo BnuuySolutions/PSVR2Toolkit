@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 4.3)
+cmake_minimum_required(VERSION 3.10)
 
 if(WIN32)
   set(PLATFORM_IPC_SOURCES windows_ipc.cpp)
