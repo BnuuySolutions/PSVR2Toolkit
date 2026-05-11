@@ -68,9 +68,13 @@ namespace psvr2_toolkit {
     }
 
     CommandThread::Stop();
-
+    
     m_pDeviceProvider->Cleanup();
 
+    // The cleanup call above handles joining all CaesarUsbThread instances.
+    // We're taking care of tearing down global stuff like the libusb event thread.
+    CaesarUsbThread::Stop();
+    
     VR_CLEANUP_SERVER_DRIVER_CONTEXT();
   }
 
