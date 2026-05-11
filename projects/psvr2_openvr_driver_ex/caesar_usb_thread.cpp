@@ -4,9 +4,12 @@
 #include "libusb-1.0/libusb.h"
 #include "util.h"
 
+#include <atomic>
+#include <condition_variable>
 #include <debugapi.h>
 #include <mutex>
 #include <shared_mutex>
+#include <thread>
 
 #define IS_HANDLE_VALID(handle) (reinterpret_cast<uint64_t>(handle) != -1) 
 
@@ -18,6 +21,39 @@ namespace psvr2_toolkit {
   static bool g_usbSimulatedDisconnect = false;
 
   static std::shared_mutex g_pendingOperationsMutex;
+
+  static std::atomic<bool> g_libusbThreadRunning{false};
+
+  namespace {
+    void LibusbEventThread() {
+      while (g_libusbThreadRunning) {
+        struct timeval tv = {0, 100000}; // 100ms
+        libusb_handle_events_timeout_completed(g_usbCtx, &tv, nullptr);
+      }
+    }
+
+    struct AsyncTransferState {
+      std::mutex mutex;
+      std::condition_variable cv;
+      int completed;
+      int transferred;
+      int status;
+
+      AsyncTransferState() : completed(0), transferred(0), status(0) {}
+    };
+
+    void LIBUSB_CALL AsyncTransferCallback(struct libusb_transfer* transfer) {
+      auto* state = static_cast<AsyncTransferState*>(transfer->user_data);
+      {
+        std::lock_guard<std::mutex> lock(state->mutex);
+        state->transferred = transfer->actual_length;
+        state->status = transfer->status;
+        state->completed = 1;
+        state->cv.notify_all();
+      }
+      libusb_free_transfer(transfer);
+    }
+  }
 
   void (*CaesarUsbThread::orig_destructor)(CaesarUsbThread* thisptr, bool shouldFree) = nullptr;
   void (*CaesarUsbThread::orig_threadLoop)(CaesarUsbThread* thisptr) = nullptr;
@@ -72,35 +108,64 @@ namespace psvr2_toolkit {
 
     bool isBulk = this->GetInterface() != 7;
 
-    int transferred = 0;
-    int result = 0;
-
-    if (isBulk) {
-      result = libusb_bulk_transfer(
-        this->m_devHandle,
-        pipeId,
-        (unsigned char*)buffer,
-        static_cast<int>(length),
-        &transferred,
-        1000);
-    } else {
-      result = libusb_interrupt_transfer(
-        this->m_devHandle,
-        pipeId,
-        (unsigned char*)buffer,
-        static_cast<int>(length),
-        &transferred,
-        1000);
+    libusb_transfer* transfer = libusb_alloc_transfer(0);
+    if (!transfer) {
+      this->m_lastError = LIBUSB_ERROR_NO_MEM;
+      return -1;
     }
 
-    if (result != 0) {
-      if (result == LIBUSB_ERROR_TIMEOUT) {
-        return 0;
+    AsyncTransferState state;
+
+    if (isBulk) {
+      libusb_fill_bulk_transfer(
+        transfer,
+        this->m_devHandle,
+        pipeId,
+        (unsigned char*)buffer,
+        static_cast<int>(length),
+        AsyncTransferCallback,
+        &state,
+        0);
+    } else {
+      libusb_fill_interrupt_transfer(
+        transfer,
+        this->m_devHandle,
+        pipeId,
+        (unsigned char*)buffer,
+        static_cast<int>(length),
+        AsyncTransferCallback,
+        &state,
+        0);
+    }
+
+    int submit_result = libusb_submit_transfer(transfer);
+    if (submit_result < 0) {
+      libusb_free_transfer(transfer);
+      this->m_lastError = submit_result;
+      return -1;
+    }
+
+    bool cancel_requested = false;
+    std::unique_lock<std::mutex> waitLock(state.mutex);
+    while (!state.completed) {
+      if (!cancel_requested && (this->m_stopRequested != 0 || g_usbSimulatedDisconnect)) {
+        libusb_cancel_transfer(transfer);
+        cancel_requested = true;
       }
-      
-      Util::DriverLog("[Error] {} transfer failed. (libusb_error={})", isBulk ? "Bulk" : "Interrupt", result);
-      this->m_lastError = result;
-      return -1; // Only return -1 for actual fatal USB errors
+      state.cv.wait_for(waitLock, std::chrono::milliseconds(100));
+    }
+
+    int result = state.status;
+    int transferred = state.transferred;
+
+    if (result != LIBUSB_TRANSFER_COMPLETED) {
+      if (result == LIBUSB_TRANSFER_TIMED_OUT || result == LIBUSB_TRANSFER_CANCELLED) {
+        if (transferred == 0) return 0;
+      } else {
+        Util::DriverLog("[Error] {} transfer failed. (libusb_transfer_status={})", isBulk ? "Bulk" : "Interrupt", result);
+        this->m_lastError = result;
+        return -1; // Only return -1 for actual fatal USB errors
+      }
     }
 
     return transferred;
@@ -146,24 +211,54 @@ namespace psvr2_toolkit {
       memcpy(payload.data, buffer, length);
     }
 
-    int result = libusb_control_transfer(
-      this->m_devHandle,
-      bmRequestType,
-      bRequest,
-      wValue,
-      wIndex,
-      reinterpret_cast<unsigned char*>(&payload),
-      wLength,
-      1000);
+    int total_length = LIBUSB_CONTROL_SETUP_SIZE + wLength;
+    unsigned char* control_buf = new unsigned char[total_length];
+    libusb_fill_control_setup(control_buf, bmRequestType, bRequest, wValue, wIndex, wLength);
+    memcpy(control_buf + LIBUSB_CONTROL_SETUP_SIZE, &payload, wLength);
 
-    if (result < 0) {
-      Util::DriverLog("[Error] {} Report failed. (libusb_error={})", bIsSet != 0 ? "Set" : "Get", result);
-      this->m_lastError = result;
+    libusb_transfer* transfer = libusb_alloc_transfer(0);
+    if (!transfer) {
+      delete[] control_buf;
+      this->m_lastError = LIBUSB_ERROR_NO_MEM;
       return -1;
-    } else if (bIsSet == 0 && buffer && length > 0) {
-      subcmd = payload.subcmd; // Doubles as a result, mostly for gaze.
-      memcpy(buffer, payload.data, length);
     }
+
+    AsyncTransferState state;
+    libusb_fill_control_transfer(transfer, this->m_devHandle, control_buf, AsyncTransferCallback, &state, 0);
+
+    int submit_result = libusb_submit_transfer(transfer);
+    if (submit_result < 0) {
+      libusb_free_transfer(transfer);
+      delete[] control_buf;
+      this->m_lastError = submit_result;
+      return -1;
+    }
+
+    bool cancel_requested = false;
+    std::unique_lock<std::mutex> waitLock(state.mutex);
+    while (!state.completed) {
+      if (!cancel_requested && (this->m_stopRequested != 0 || g_usbSimulatedDisconnect)) {
+        libusb_cancel_transfer(transfer);
+        cancel_requested = true;
+      }
+      state.cv.wait_for(waitLock, std::chrono::milliseconds(100));
+    }
+
+    int result;
+    if (state.status == LIBUSB_TRANSFER_COMPLETED) {
+      result = state.transferred;
+      if (bIsSet == 0 && buffer && length > 0) {
+        memcpy(&payload, control_buf + LIBUSB_CONTROL_SETUP_SIZE, wLength);
+        subcmd = payload.subcmd; // Doubles as a result, mostly for gaze.
+        memcpy(buffer, payload.data, length);
+      }
+    } else {
+      Util::DriverLog("[Error] {} Report failed. (libusb_transfer_status={})", bIsSet != 0 ? "Set" : "Get", state.status);
+      this->m_lastError = state.status;
+      result = -1;
+    }
+
+    delete[] control_buf;
     return result;
   }
 
@@ -206,16 +301,39 @@ namespace psvr2_toolkit {
         int result = 0;
         {
           std::shared_lock<std::shared_mutex> pingLock(g_pendingOperationsMutex);
-          result = libusb_control_transfer(
-              g_devHandle,
-              LIBUSB_REQUEST_TYPE_STANDARD,
-              LIBUSB_REQUEST_GET_STATUS,
-              0,
-              0,
-              reinterpret_cast<unsigned char*>(&device_status),
-              sizeof(device_status),
-              100
-          );
+          
+          unsigned char control_buf[LIBUSB_CONTROL_SETUP_SIZE + sizeof(device_status)];
+          libusb_fill_control_setup(control_buf, LIBUSB_ENDPOINT_IN, LIBUSB_REQUEST_GET_STATUS, 0, 0, sizeof(device_status));
+          memcpy(control_buf + LIBUSB_CONTROL_SETUP_SIZE, &device_status, sizeof(device_status));
+
+          libusb_transfer* transfer = libusb_alloc_transfer(0);
+          if (transfer) {
+            AsyncTransferState state;
+            libusb_fill_control_transfer(transfer, g_devHandle, control_buf, AsyncTransferCallback, &state, 0);
+
+            int submit_result = libusb_submit_transfer(transfer);
+            if (submit_result >= 0) {
+              bool cancel_requested = false;
+              std::unique_lock<std::mutex> waitLock(state.mutex);
+              while (!state.completed) {
+                if (!cancel_requested && g_usbSimulatedDisconnect) {
+                  libusb_cancel_transfer(transfer);
+                  cancel_requested = true;
+                }
+                state.cv.wait_for(waitLock, std::chrono::milliseconds(100));
+              }
+              if (state.status == LIBUSB_TRANSFER_COMPLETED) {
+                result = state.transferred;
+              } else {
+                result = -1;
+              }
+            } else {
+              result = -1;
+              libusb_free_transfer(transfer);
+            }
+          } else {
+            result = -1;
+          }
         }
 
         bool device_present = (result >= 0);
@@ -311,9 +429,6 @@ namespace psvr2_toolkit {
             thisptr->m_devHandle = INVALID_DEVICE_HANDLE;
           }
           thisptr->m_winUsbActive = 0;
-
-          // Wait a bit before we try again.
-          Sleep(500);
         }
       }
     }
@@ -400,6 +515,9 @@ namespace psvr2_toolkit {
     uintptr_t baseAddr = pHmdDriverLoader->GetBaseAddress();
 
     libusb_init(&g_usbCtx);
+
+    g_libusbThreadRunning = true;
+    std::thread(LibusbEventThread).detach();
 
     HookLib::InstallHook(reinterpret_cast<void*>(baseAddr + 0x1225a0),
                          reinterpret_cast<void*>(DestructorHook),
