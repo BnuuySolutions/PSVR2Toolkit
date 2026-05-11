@@ -1,6 +1,17 @@
+#ifdef _WIN32
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <windows.h>
+#pragma comment(lib, "ws2_32.lib")
+#else
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <unistd.h>
+#include <cerrno>
+#include <cstring>
+#endif
+
 #include <iostream>
 #include <thread>
 #include <map>
@@ -12,7 +23,26 @@
 #include "pad_trigger_effect.h"
 #include "ipc_protocol.h"
 
-#pragma comment(lib, "ws2_32.lib")
+#ifndef _WIN32
+typedef int SOCKET;
+#define INVALID_SOCKET (-1)
+#define SOCKET_ERROR (-1)
+#define closesocket close
+typedef struct sockaddr_in SOCKADDR_IN;
+typedef struct sockaddr SOCKADDR;
+#endif
+
+#ifndef MSG_NOSIGNAL
+#define MSG_NOSIGNAL 0
+#endif
+
+inline int GetSocketError() {
+#ifdef _WIN32
+    return WSAGetLastError();
+#else
+    return errno;
+#endif
+}
 
 namespace psvr2_toolkit {
   namespace ipc {
@@ -36,12 +66,14 @@ namespace psvr2_toolkit {
       void Initialize() {
         if (m_initialized) return;
 
+#ifdef _WIN32
         WSADATA wsaData = {};
         int result = WSAStartup(MAKEWORD(2, 2), &wsaData);
         if (result != 0) {
           printf("[IPC_SERVER] WSAStartup failed. Result = %d\n", result);
           return;
         }
+#endif
 
         m_initialized = true;
         m_doGaze = true;
@@ -53,7 +85,7 @@ namespace psvr2_toolkit {
 
         m_socket = socket(AF_INET, SOCK_STREAM, 0);
         if (m_socket == INVALID_SOCKET) {
-          printf("[IPC_SERVER] Creating socket failed. LastError = %d\n", WSAGetLastError());
+          printf("[IPC_SERVER] Creating socket failed. LastError = %d\n", GetSocketError());
           return;
         }
 
@@ -61,14 +93,19 @@ namespace psvr2_toolkit {
         m_serverAddr.sin_addr.s_addr = htonl(INADDR_ANY);
         m_serverAddr.sin_port = htons(IPC_SERVER_PORT);
 
+#ifndef _WIN32
+        int opt = 1;
+        setsockopt(m_socket, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+#endif
+
         if (bind(m_socket, reinterpret_cast<SOCKADDR*>(&m_serverAddr), sizeof(m_serverAddr)) == SOCKET_ERROR) {
-          printf("[IPC_SERVER] Bind failed. LastError = %d\n", WSAGetLastError());
+          printf("[IPC_SERVER] Bind failed. LastError = %d\n", GetSocketError());
           closesocket(m_socket);
           return;
         }
 
         if (listen(m_socket, SOMAXCONN) == SOCKET_ERROR) {
-          printf("[IPC_SERVER] Listen failed. LastError = %d\n", WSAGetLastError());
+          printf("[IPC_SERVER] Listen failed. LastError = %d\n", GetSocketError());
           closesocket(m_socket);
           return;
         }
@@ -85,7 +122,9 @@ namespace psvr2_toolkit {
         closesocket(m_socket);
         if (m_receiveThread.joinable()) m_receiveThread.join();
         if (m_gazeThread.joinable()) m_gazeThread.join();
+#ifdef _WIN32
         WSACleanup();
+#endif
       }
 
     private:
@@ -122,11 +161,15 @@ namespace psvr2_toolkit {
       void ReceiveLoop() {
         while (m_running) {
           SOCKADDR_IN clientAddr = {};
+#ifdef _WIN32
           int clientAddrLen = sizeof(clientAddr);
+#else
+          socklen_t clientAddrLen = sizeof(clientAddr);
+#endif
 
           SOCKET clientSocket = accept(m_socket, reinterpret_cast<SOCKADDR*>(&clientAddr), &clientAddrLen);
           if (clientSocket == INVALID_SOCKET) {
-            int error = WSAGetLastError();
+            int error = GetSocketError();
             if (m_running) {
                 printf("[IPC_SERVER] Accept failed. LastError = %d\n", error);
             } else {
@@ -163,9 +206,9 @@ namespace psvr2_toolkit {
               }
             } else {
               if (pid != 0) {
-                printf("[IPC_SERVER] Receive failed for client on port %d (PID %d). LastError = %d\n", clientPort, pid, WSAGetLastError());
+                printf("[IPC_SERVER] Receive failed for client on port %d (PID %d). LastError = %d\n", clientPort, pid, GetSocketError());
               } else {
-                printf("[IPC_SERVER] Receive failed for client on port %d. LastError = %d\n", clientPort, WSAGetLastError());
+                printf("[IPC_SERVER] Receive failed for client on port %d. LastError = %d\n", clientPort, GetSocketError());
               }
             }
             {
@@ -423,7 +466,7 @@ namespace psvr2_toolkit {
           memcpy(pBuffer + sizeof(CommandHeader_t), pData, actualDataLen);
         }
 
-        send(clientSocket, pBuffer, actualBufferLen, 0);
+        send(clientSocket, pBuffer, actualBufferLen, MSG_NOSIGNAL);
       }
     };
 
