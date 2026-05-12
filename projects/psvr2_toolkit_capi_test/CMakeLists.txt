@@ -13,7 +13,7 @@ target_include_directories(psvr2_toolkit_capi_test PRIVATE
 target_link_libraries(psvr2_toolkit_capi_test PRIVATE
     SDL3::SDL3
     imgui
-    psvr2_toolkit_capi
+    psvr2_toolkit_capi_loader
 )
 
 target_include_directories(psvr2_toolkit_capi_test PUBLIC ${CMAKE_SOURCE_DIR}/projects/psvr2_toolkit_capi)
