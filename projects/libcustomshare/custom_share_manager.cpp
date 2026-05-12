@@ -4,6 +4,12 @@
 #include <cstdio>
 #include <cstring>
 #include <mutex>
+#include <filesystem>
+#include <fstream>
+#include "util.h"
+#ifdef _WIN32
+#include <windows.h>
+#endif
 
 void GazeStatus::set(const hmd2_gaze_status_t* pGazeStatus) {
   std::memcpy(&data, pGazeStatus, sizeof(data));
@@ -114,6 +120,30 @@ void CustomShareManager::initialize() {
 
   m_sharedMemory = CreateIpcSharedMemory("CUSTOM_SHARE_VRT2_WIN", sizeof(BufferData));
   m_pBufferData = static_cast<BufferData*>(IpcSharedMemory_Map(m_sharedMemory));
+
+#ifdef _WIN32
+  try {
+    std::filesystem::path temp_folder = GetSystemTempFolder();
+    std::filesystem::path path_file = temp_folder / "psvr2tk_capi_path.txt";
+
+    HMODULE hModule = NULL;
+    GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                       (LPCSTR)&CustomShareManager::createSingleton, &hModule);
+    if (hModule != NULL) {
+      char path[MAX_PATH];
+      if (GetModuleFileNameA(hModule, path, MAX_PATH) > 0) {
+        std::filesystem::path dllPath(path);
+        std::filesystem::path capiPath = dllPath.parent_path();
+
+        std::ofstream outFile(path_file);
+        if (outFile.is_open()) {
+          outFile << capiPath.string();
+        }
+      }
+    }
+  } catch (...) {
+  }
+#endif
 }
 
 void CustomShareManager::setGazeStatus(const hmd2_gaze_status_t* pGazeStatus) {

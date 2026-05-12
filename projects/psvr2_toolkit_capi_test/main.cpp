@@ -1,4 +1,5 @@
 #include <SDL3/SDL.h>
+#include <SDL3/SDL_loadso.h>
 #include <imgui.h>
 #include <imgui_impl_sdl3.h>
 #include "hmd2_gaze.h"
@@ -13,8 +14,8 @@
 #include "common.h"
 
 #include "pad_trigger_effect.h"
-#include "psvr2tk_capi.h"
-#include "psvr2tk_capi_private.h"
+#include "psvr2tk_capi_loader.h"
+#include "psvr2tk_capi_private_loader.h"
 
 std::atomic<bool> g_appRunning = true;
 std::mutex g_hapticsMutex;
@@ -119,7 +120,11 @@ int main(int argc, char* argv[]) {
   ImGui_ImplSDLGPU3_Init(&init_info);
 
   // Initialize our CAPI
-  if (psvr2_toolkit_init() < 0) {
+  SDL_SharedObject* handle = static_cast<SDL_SharedObject*>(psvr2_toolkit_loader_get_module_handle());
+  psvr2_toolkit_loader_init_functions(handle);
+  psvr2_toolkit_private_loader_init_functions(handle);
+  
+  if (handle && psvr2_toolkit_init() < 0) {
       std::cerr << "Failed to initialize CAPI! Are 4 applications already running?" << std::endl;
       // Continue anyway for the sake of the test app
   }
