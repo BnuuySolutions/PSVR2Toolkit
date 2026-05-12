@@ -1,10 +1,10 @@
 #pragma once
 
+#include <string>
+#include <stdexcept>
+
 #ifdef _WIN32
 #include <windows.h>
-
-#include <stdexcept>
-#include <string>
 
 inline bool IsRunningInWine() {
   static bool is_running_in_wine = false;

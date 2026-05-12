@@ -120,8 +120,10 @@ void CustomShareManager::initialize() {
 
   m_sharedMemory = CreateIpcSharedMemory("CUSTOM_SHARE_VRT2_WIN", sizeof(BufferData));
   m_pBufferData = static_cast<BufferData*>(IpcSharedMemory_Map(m_sharedMemory));
+}
 
 #ifdef _WIN32
+void CustomShareManager::setupCAPIPath() {
   try {
     std::filesystem::path temp_folder = GetSystemTempFolder();
     std::filesystem::path path_file = temp_folder / "psvr2tk_capi_path.txt";
@@ -137,14 +139,19 @@ void CustomShareManager::initialize() {
 
         std::ofstream outFile(path_file);
         if (outFile.is_open()) {
-          outFile << capiPath.string();
+          if (IsRunningInWine()) {
+            outFile << WineGetUnixFileName(capiPath.string());
+          }
+          else {
+            outFile << capiPath.string();
+          }
         }
       }
     }
   } catch (...) {
   }
-#endif
 }
+#endif
 
 void CustomShareManager::setGazeStatus(const hmd2_gaze_status_t* pGazeStatus) {
   IpcMutex_Lock(m_gazeStatusMutex);

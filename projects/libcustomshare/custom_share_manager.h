@@ -61,6 +61,10 @@ public:
   static void createSingleton();
   static CustomShareManager *getSingleton();
 
+#ifdef _WIN32
+  void setupCAPIPath();
+#endif
+
   void setGazeStatus(const hmd2_gaze_status_t* pGazeStatus);
   bool getGazeStatus(hmd2_gaze_status_t* pGazeStatus, int* lastCounter = nullptr, uint32_t timeoutMs = 0);
 

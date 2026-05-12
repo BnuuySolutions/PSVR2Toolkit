@@ -37,6 +37,10 @@ static void psvr2_toolkit_loader_initialize() {
         std::filesystem::path capiPath(dir_path);
 #ifdef _WIN32
         capiPath /= "psvr2_toolkit_capi.dll";
+        if (IsRunningInWine()) {
+          capiPath = WineGetDosFileName(capiPath.string());
+        }
+        
         g_psvr2tk_module_path = capiPath.string();
         g_psvr2tk_module_handle = LoadLibraryExA(g_psvr2tk_module_path.c_str(), NULL, LOAD_WITH_ALTERED_SEARCH_PATH);
 #else
