@@ -3,7 +3,6 @@
 #include "driver_interface/caesar_manager.h"
 #include "custom_share_manager.h"
 #include "usb_thread_gaze.h"
-#include "util.h"
 
 #include <openvr_driver.h>
 #include <filesystem>
@@ -11,10 +10,10 @@
 #include <vector>
 
 
-#define GAZE_MAGIC_0 0x47
-#define GAZE_MAGIC_1_CAL 0x43
-#define GAZE_MAGIC_1_RAW 0x52
-#define GAZE_MAGIC_1_STATE 0x53
+#define GAZE_MAGIC_0 'G'
+#define GAZE_MAGIC_1_CAL 'C'
+#define GAZE_MAGIC_1_RAW 'R'
+#define GAZE_MAGIC_1_STATE 'S'
 
 using namespace psvr2_toolkit;
 
@@ -55,7 +54,7 @@ void CaesarUsbThreadGaze::OnConnected() {
   }
 
   // Gaze stream enable. For some reason this doesn't really stick.
-  this->ControlCommand(true, 12, nullptr, 0, 0, 0, 1);
+  this->ControlCommand(true, 0x0C, nullptr, 0, 0, 0, 1);
 
   //char data[8] = { 1, 0, 0, 0, 0x05, 0, 0, 0 };
   //CaesarUsbThread::ControlCommandHook(this, true, 0xb, data, 8, 0, 0, 1);
@@ -63,12 +62,12 @@ void CaesarUsbThreadGaze::OnConnected() {
 
 int CaesarUsbThreadGaze::PollAndProcess() {
   static hmd2_gaze_status_t state;
-  int result = this->TransferPipe(GetEndpoint(), reinterpret_cast<char*>(&state), sizeof(state));
+  int result = this->TransferPipe(GetEndpoint(), reinterpret_cast<char*>(&state), sizeof(state), 500);
 
   if (result == 0) {
     // If we timed out, we should try sending the gaze enable again.
     // Entering and exiting passthrough, DP signal changes, and probably some other stuff seems to stop gaze.
-    this->ControlCommand(true, 12, nullptr, 0, 0, 0, 1);
+    this->ControlCommand(true, 0x0C, nullptr, 0, 0, 0, 1);
     return 0;
   }
 

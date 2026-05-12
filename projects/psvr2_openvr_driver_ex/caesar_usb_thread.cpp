@@ -16,7 +16,7 @@
 namespace psvr2_toolkit {
 
   static libusb_context* g_usbCtx = INVALID_CONTEXT_HANDLE;
-  static libusb_device_handle* g_devHandle = INVALID_DEVICE_HANDLE;
+  static std::atomic<libusb_device_handle*> g_devHandle{INVALID_DEVICE_HANDLE};
   static std::mutex g_devHandleMutex;
   static bool g_usbSimulatedDisconnect = false;
 
@@ -88,21 +88,21 @@ namespace psvr2_toolkit {
   void CaesarUsbThread::SetUsbConnectionState(bool connected) {
     std::lock_guard<std::mutex> lock(g_devHandleMutex);
     g_usbSimulatedDisconnect = !connected;
-    if (g_usbSimulatedDisconnect && IS_HANDLE_VALID(g_devHandle)) {
+    if (g_usbSimulatedDisconnect && IS_HANDLE_VALID(g_devHandle.load())) {
       // Wait for all pending operations to finish with an exclusive lock
       std::unique_lock<std::shared_mutex> opsLock(g_pendingOperationsMutex);
-      libusb_close(g_devHandle);
+      libusb_close(g_devHandle.load());
       g_devHandle = INVALID_DEVICE_HANDLE;
     }
   }
 
-  int CaesarUsbThread::TransferPipe(uint8_t pipeId, char* buffer, size_t length) {
+  int CaesarUsbThread::TransferPipe(uint8_t pipeId, char* buffer, size_t length, uint64_t timeoutMs) {
     std::shared_lock<std::shared_mutex> lock(g_pendingOperationsMutex);
     if (this->m_stopRequested != 0 || g_usbSimulatedDisconnect) {
       this->m_lastError = 0xfffffe74;
       return -1;
     }
-    if (!IS_HANDLE_VALID(this->m_devHandle)) {
+    if (!IS_HANDLE_VALID(this->m_devHandle) || this->m_devHandle != g_devHandle.load()) {
       this->m_lastError = 0xfffffe79;
       return -1;
     }
@@ -126,7 +126,7 @@ namespace psvr2_toolkit {
         static_cast<int>(length),
         AsyncTransferCallback,
         &state,
-        0);
+        timeoutMs);
     } else {
       libusb_fill_interrupt_transfer(
         transfer,
@@ -136,7 +136,7 @@ namespace psvr2_toolkit {
         static_cast<int>(length),
         AsyncTransferCallback,
         &state,
-        0);
+        timeoutMs);
     }
 
     int submit_result = libusb_submit_transfer(transfer);
@@ -173,14 +173,14 @@ namespace psvr2_toolkit {
     return transferred;
   }
 
-  int CaesarUsbThread::ControlCommand(uint8_t bIsSet, uint16_t reportId, void* buffer, uint16_t length, uint16_t value, uint16_t index, uint16_t& subcmd) {
+  int CaesarUsbThread::ControlCommand(uint8_t bIsSet, uint16_t reportId, void* buffer, uint16_t length, uint16_t value, uint16_t index, uint16_t& subcmd, uint64_t timeoutMs) {
     std::shared_lock<std::shared_mutex> lock(g_pendingOperationsMutex);
     if (this->m_stopRequested != 0 || g_usbSimulatedDisconnect) {
       this->m_lastError = 0xfffffdd4;
       Util::DriverLog("Stop requested. Report ID: {}", reportId);
       return -1;
     }
-    if (!IS_HANDLE_VALID(this->m_devHandle)) {
+    if (!IS_HANDLE_VALID(this->m_devHandle) || this->m_devHandle != g_devHandle.load()) {
       this->m_lastError = 0xfffffdcd;
       Util::DriverLog("No dev {}. Report ID: {}", (uint64_t)this, reportId);
       return -1;
@@ -226,7 +226,7 @@ namespace psvr2_toolkit {
     }
 
     AsyncTransferState state;
-    libusb_fill_control_transfer(transfer, this->m_devHandle, control_buf, AsyncTransferCallback, &state, 0);
+    libusb_fill_control_transfer(transfer, this->m_devHandle, control_buf, AsyncTransferCallback, &state, timeoutMs);
 
     int submit_result = libusb_submit_transfer(transfer);
     if (submit_result < 0) {
@@ -267,7 +267,7 @@ namespace psvr2_toolkit {
 
   int CaesarUsbThread::GetDescriptor(libusb_device_descriptor* pDest) {
     std::shared_lock<std::shared_mutex> lock(g_pendingOperationsMutex);
-    if (g_usbSimulatedDisconnect || !IS_HANDLE_VALID(this->m_devHandle)) {
+    if (g_usbSimulatedDisconnect || !IS_HANDLE_VALID(this->m_devHandle) || this->m_devHandle != g_devHandle.load()) {
       Util::DriverLog("No dev for descriptor");
       return 1;
     }
@@ -298,7 +298,7 @@ namespace psvr2_toolkit {
         return;
       }
 
-      if (IS_HANDLE_VALID(g_devHandle)) {
+      if (IS_HANDLE_VALID(g_devHandle.load())) {
         // Ping the device to see if it's still physically responding.
         uint16_t device_status = 0;
         int result = 0;
@@ -312,7 +312,7 @@ namespace psvr2_toolkit {
           libusb_transfer* transfer = libusb_alloc_transfer(0);
           if (transfer) {
             AsyncTransferState state;
-            libusb_fill_control_transfer(transfer, g_devHandle, control_buf, AsyncTransferCallback, &state, 0);
+            libusb_fill_control_transfer(transfer, g_devHandle.load(), control_buf, AsyncTransferCallback, &state, 0);
 
             int submit_result = libusb_submit_transfer(transfer);
             if (submit_result >= 0) {
@@ -348,12 +348,12 @@ namespace psvr2_toolkit {
 
           // Wait for all pending operations to finish with an exclusive lock
           std::unique_lock<std::shared_mutex> opsLock(g_pendingOperationsMutex);
-          libusb_close(g_devHandle);
+          libusb_close(g_devHandle.load());
           g_devHandle = INVALID_DEVICE_HANDLE;
         }
       }
 
-      if (!IS_HANDLE_VALID(g_devHandle) && IS_HANDLE_VALID(g_usbCtx)) {
+      if (!IS_HANDLE_VALID(g_devHandle.load()) && IS_HANDLE_VALID(g_usbCtx)) {
         g_devHandle = libusb_open_device_with_vid_pid(g_usbCtx, 0x054C, 0x0cde);
         if (g_devHandle == nullptr) {
           g_devHandle = INVALID_DEVICE_HANDLE;
@@ -361,7 +361,7 @@ namespace psvr2_toolkit {
       }
     }
 
-    thisptr->m_devHandle = g_devHandle;
+    thisptr->m_devHandle = g_devHandle.load();
 
     Util::DriverLog("Opened {} with handle {}", interfaceNum, (uint64_t)thisptr->m_devHandle);
 
@@ -392,7 +392,7 @@ namespace psvr2_toolkit {
     if (thisptr->m_winUsbActive != 0) {
       if (IS_HANDLE_VALID(thisptr->m_devHandle)) {
         std::lock_guard<std::mutex> lock(g_devHandleMutex);
-        if (thisptr->m_devHandle == g_devHandle && IS_HANDLE_VALID(g_devHandle)) {
+        if (thisptr->m_devHandle == g_devHandle.load() && IS_HANDLE_VALID(g_devHandle.load())) {
           libusb_release_interface(thisptr->m_devHandle, thisptr->GetInterface());
         }
         thisptr->m_devHandle = INVALID_DEVICE_HANDLE;
@@ -427,7 +427,7 @@ namespace psvr2_toolkit {
 
           if (IS_HANDLE_VALID(thisptr->m_devHandle)) {
             std::lock_guard<std::mutex> lock(g_devHandleMutex);
-            if (thisptr->m_devHandle == g_devHandle && IS_HANDLE_VALID(g_devHandle)) {
+            if (thisptr->m_devHandle == g_devHandle.load() && IS_HANDLE_VALID(g_devHandle.load())) {
               libusb_release_interface(thisptr->m_devHandle, thisptr->GetInterface());
             }
             thisptr->m_devHandle = INVALID_DEVICE_HANDLE;
@@ -439,7 +439,7 @@ namespace psvr2_toolkit {
 
     if (IS_HANDLE_VALID(thisptr->m_devHandle)) {
       std::lock_guard<std::mutex> lock(g_devHandleMutex);
-      if (thisptr->m_devHandle == g_devHandle && IS_HANDLE_VALID(g_devHandle)) {
+      if (thisptr->m_devHandle == g_devHandle.load() && IS_HANDLE_VALID(g_devHandle.load())) {
         libusb_release_interface(thisptr->m_devHandle, thisptr->GetInterface());
       }
       thisptr->m_devHandle = INVALID_DEVICE_HANDLE;
