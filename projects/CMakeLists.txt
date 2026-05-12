@@ -8,6 +8,9 @@ add_subdirectory(psvr2_toolkit_capi_loader)
 add_subdirectory(psvr2_toolkit_capi_test)
 add_subdirectory(psvr2_toolkit_app)
 add_subdirectory(psvr2_toolkit_legacy_ipc_server)
+if (WIN32)
+  add_subdirectory(psvr2_toolkit_redir)
+endif()
 
 if(NOT CMAKE_HOST_WIN32)
     # Also build libcrossipc as separate project to make the winedll
