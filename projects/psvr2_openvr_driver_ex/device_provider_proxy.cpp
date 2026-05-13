@@ -12,6 +12,7 @@
 #include "driver_hooks/libpad_hooks.h"
 #include "trigger_effect_manager.h"
 #include "driver_hooks/usb_thread_hooks.h"
+#include "driver_hooks/share_manager_hooks.h"
 #include "util.h"
 #include "vr_settings.h"
 
@@ -121,7 +122,6 @@ namespace psvr2_toolkit {
 
   void DeviceProviderProxy::InitPatches() {
     static HmdDriverLoader *pHmdDriverLoader = HmdDriverLoader::Instance();
-    static bool isRunningOnWine = Util::IsRunningOnWine();
 
     // Remove signature checks.
     INSTALL_STUB_RET0(reinterpret_cast<void *>(pHmdDriverLoader->GetBaseAddress() + 0x134FF0)); // VrDialogManager::VerifyLibrary
@@ -136,6 +136,7 @@ namespace psvr2_toolkit {
     HmdDeviceHooks::InstallHooks();
     LibpadHooks::InstallHooks();
     UsbThreadHooks::InstallHooks();
+    ShareManagerHooks::InstallHooks();
   }
 
   void DeviceProviderProxy::InitSystems() {
