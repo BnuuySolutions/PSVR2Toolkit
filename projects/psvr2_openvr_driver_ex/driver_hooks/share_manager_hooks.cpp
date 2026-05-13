@@ -17,23 +17,32 @@ namespace psvr2_toolkit {
 
   void ShareManager__sub_18015E2A0Hook(void *thisptr) {
     // This function is run on startup, it sets a DWORD to 0.
+    // Appears to use mutex/event SHARE_VRT2_WIN_TELEMETRY_DEV_INFO.
     // TODO: Reverse this.
   }
 
   // Hopefully no register stomping...
   void ShareManager__sub_18015E990Hook(void *thisptr, void* a2) {
     // This function is run inside CaesarUsbThreadImuStatus::initialize, it appears to copy a buffer.
+    // Uses mutex/event SHARE_VRT2_WIN_CALIB.
     // TODO: Reverse this.
   }
 
   void ShareManager__sub_18015F330Hook(void *thisptr, void* a2) {
     // This function is run inside CaesarUsbThreadImuStatus::initialize, it sets a few variables.
+    // Uses mutex/event SHARE_VRT2_WIN_FW_INFO.
     // TODO: Reverse this.
   }
 
   // Some config thing.
   void ShareManager__sub_18015B950Hook(void *thisptr, int configId, int *outval) {
     // This function is run inside CaesarUsbThreadImuStatus::initialize, it gets a config variable.
+    // TODO: Reverse this.
+  }
+
+  void ShareManager__sub_18015DFF0Hook(void *thisptr, void* a2) {
+    // This function is run inside multiple places, it appears to copy a buffer.
+    // Uses mutex/event SHARE_VRT2_WIN_DEBUG_DATA.
     // TODO: Reverse this.
   }
 
@@ -63,6 +72,10 @@ namespace psvr2_toolkit {
     // ShareManager::sub_18015B950
     HookLib::InstallHook(reinterpret_cast<void *>(pHmdDriverLoader->GetBaseAddress() + 0x15B950),
                          reinterpret_cast<void *>(ShareManager__sub_18015B950Hook));
+
+    // ShareManager::sub_18015DFF0
+    HookLib::InstallHook(reinterpret_cast<void *>(pHmdDriverLoader->GetBaseAddress() + 0x15DFF0),
+                         reinterpret_cast<void *>(ShareManager__sub_18015DFF0Hook));
   }
 
 }
