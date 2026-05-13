@@ -19,7 +19,7 @@
 #include <cstdint>
 #include <mutex>
 
-#include "psvr2tk_capi.h"
+#include "psvr2tk_capi_loader.h"
 #include "pad_trigger_effect.h"
 #include "ipc_protocol.h"
 
@@ -476,6 +476,7 @@ namespace psvr2_toolkit {
 } // psvr2_toolkit
 
 int main() {
+  psvr2_toolkit_loader_init_functions(psvr2_toolkit_loader_get_module_handle());
   if (psvr2_toolkit_init() < 0) {
     std::cerr << "Failed to initialize PSVR2 CAPI!" << std::endl;
     return -1;
