@@ -15,6 +15,10 @@ namespace psvr2_toolkit {
     return 0xCAFEBABE;
   }
 
+  void ShareManager__destroySingletonHook() {
+    // ...
+  }
+
   void ShareManager__sub_18015E2A0Hook(void *thisptr) {
     // This function is run on startup, it sets a DWORD to 0.
     // Appears to use mutex/event SHARE_VRT2_WIN_TELEMETRY_DEV_INFO.
@@ -180,6 +184,90 @@ namespace psvr2_toolkit {
     // TODO: Reverse this.
   }
 
+  void ShareManager__sub_18015D730Hook(void *thisptr, void* a2, int a3) {
+    // This function is run inside multiple places, it does some weird stuff.
+    // Uses mutex/event SHARE_VRT2_WIN_TELEMETRY_DEV_INFO.
+    // TODO: Reverse this.
+  }
+
+  void ShareManager__sub_18015A250Hook(void *thisptr, int a2, void* a3) {
+    // This function is run inside multiple places, it appears to write the pose into share buffer?
+    // Appears to use mutex/event SHARE_VRT2_WIN_POSE_HMD/SHARE_VRT2_WIN_POSE_CONT_(R/L)?
+    // TODO: Reverse this.
+  }
+
+  void ShareManager__sub_18015E260Hook(void *thisptr, int a2) {
+    // This function is run inside sub_18011D0C0, it appears to try acquiring libpad access?
+    // Appears to use mutex/event SHARE_VRT2_WIN_LIBPAD_ACCESS?
+    // TODO: Reverse this.
+  }
+
+  bool ShareManager__sub_18015C610Hook(void *thisptr, int a2) {
+    // This function is run inside sub_18011BAE0, it does some more libpad stuff...
+    // TODO: Reverse this.
+    return false; // It appears returning false will prevent libpad from opening device.
+  }
+
+  bool ShareManager__sub_180159940Hook(void *thisptr) {
+    // This function is run inside sub_18011D0C0, it appears to try acquiring libpad access?
+    // Appears to use mutex/event SHARE_VRT2_WIN_LIBPAD_REQUEST_STEAM_VR_PLUGIN?
+    // TODO: Reverse this.
+    return true; // It appears returning true will prevent libpad from opening device.
+  }
+
+  void ShareManager__sub_18015F1D0Hook(void *thisptr, void* a2) {
+    // This function is run inside sub_1801617C0, it appears to try logging stuff?
+    // Appears to use mutex/event SHARE_VRT2_WIN_CONT_LED_INFO?
+    // TODO: Reverse this.
+  }
+
+  void ShareManager__sub_18015DB30Hook(void *thisptr, void* a2) {
+    // This function is run inside sub_180132890, no clue what it does?
+    // Appears to use mutex/event SHARE_VRT2_WIN_STATUS?
+    // TODO: Reverse this.
+  }
+
+  void ShareManager__sub_18015DF60Hook(void *thisptr, void* a2) {
+    // This function is run inside sub_180132890, no clue what it does?
+    // Appears to use mutex/event SHARE_VRT2_WIN_APPLICATION?
+    // TODO: Reverse this.
+  }
+
+  void ShareManager__sub_18015FF00Hook(void *thisptr, void* a2) {
+    // This function is run inside sub_180132890, no clue what it does?
+    // Appears to use mutex/event SHARE_VRT2_WIN_APPLICATION?
+    // TODO: Reverse this.
+  }
+
+  void ShareManager__sub_18015DF00Hook(void *thisptr, void* a2) {
+    // This function is run inside sub_180133960, no clue what it does?
+    // Appears to use mutex/event SHARE_VRT2_WIN_INITIAL_SETUP_INFO?
+    // TODO: Reverse this.
+  }
+
+  void ShareManager__sub_18015CA50Hook(void *thisptr, void* a2, int a3) {
+    // This function is run inside sub_180133960, no clue what it does?
+    // Appears to use mutex/event SHARE_VRT2_WIN_BLUETOOTH_QUALITY_INFO?
+    // TODO: Reverse this.
+  }
+
+  void ShareManager__sub_18015FA80Hook(void *thisptr, void* a2) {
+    // This function is run inside sub_1801AC4E0, no clue what it does?
+    // Appears to use mutex/event SHARE_VRT2_WIN_PLAYAREA_RESULT?
+    // TODO: Reverse this.
+  }
+
+  void ShareManager__sub_18015F470Hook(void *thisptr, int a2, void* a3) {
+    // This function is run inside multiple places, appears to write to config?
+    // TODO: Reverse this.
+  }
+
+  int ShareManager__sub_180159DC0Hook(void *thisptr, int a2, void* a3, void* a4) {
+    // This function is run inside sub_18011F1B0, no clue what it does?
+    // TODO: Reverse this.
+    return -1;
+  }
+
   void ShareManagerHooks::InstallHooks() {
     static HmdDriverLoader *pHmdDriverLoader = HmdDriverLoader::Instance();
 
@@ -192,6 +280,10 @@ namespace psvr2_toolkit {
     // ShareManager::getSingleton
     HookLib::InstallHook(reinterpret_cast<void *>(pHmdDriverLoader->GetBaseAddress() + 0x15BBD0),
                          reinterpret_cast<void *>(ShareManager__getSingletonHook));
+
+    // ShareManager::destroySingleton
+    HookLib::InstallHook(reinterpret_cast<void *>(pHmdDriverLoader->GetBaseAddress() + 0x15E360),
+                         reinterpret_cast<void *>(ShareManager__destroySingletonHook));
 
     // ShareManager::sub_18015E2A0
     HookLib::InstallHook(reinterpret_cast<void *>(pHmdDriverLoader->GetBaseAddress() + 0x15E2A0),
@@ -300,6 +392,62 @@ namespace psvr2_toolkit {
     // ShareManager::sub_18015E4A0
     HookLib::InstallHook(reinterpret_cast<void *>(pHmdDriverLoader->GetBaseAddress() + 0x15E4A0),
                          reinterpret_cast<void *>(ShareManager__sub_18015E4A0Hook));
+
+    // ShareManager::sub_18015D730
+    HookLib::InstallHook(reinterpret_cast<void *>(pHmdDriverLoader->GetBaseAddress() + 0x15D730),
+                         reinterpret_cast<void *>(ShareManager__sub_18015D730Hook));
+
+    // ShareManager::sub_18015A250
+    HookLib::InstallHook(reinterpret_cast<void *>(pHmdDriverLoader->GetBaseAddress() + 0x15A250),
+                         reinterpret_cast<void *>(ShareManager__sub_18015A250Hook));
+
+    // ShareManager::sub_18015E260
+    HookLib::InstallHook(reinterpret_cast<void *>(pHmdDriverLoader->GetBaseAddress() + 0x15E260),
+                         reinterpret_cast<void *>(ShareManager__sub_18015E260Hook));
+
+    // ShareManager::sub_18015C610
+    HookLib::InstallHook(reinterpret_cast<void *>(pHmdDriverLoader->GetBaseAddress() + 0x15C610),
+                         reinterpret_cast<void *>(ShareManager__sub_18015C610Hook));
+
+    // ShareManager::sub_180159940
+    HookLib::InstallHook(reinterpret_cast<void *>(pHmdDriverLoader->GetBaseAddress() + 0x159940),
+                         reinterpret_cast<void *>(ShareManager__sub_180159940Hook));
+
+    // ShareManager::sub_18015F1D0
+    HookLib::InstallHook(reinterpret_cast<void *>(pHmdDriverLoader->GetBaseAddress() + 0x15F1D0),
+                         reinterpret_cast<void *>(ShareManager__sub_18015F1D0Hook));
+
+    // ShareManager::sub_18015DB30
+    HookLib::InstallHook(reinterpret_cast<void *>(pHmdDriverLoader->GetBaseAddress() + 0x15DB30),
+                         reinterpret_cast<void *>(ShareManager__sub_18015DB30Hook));
+
+    // ShareManager::sub_18015DF60
+    HookLib::InstallHook(reinterpret_cast<void *>(pHmdDriverLoader->GetBaseAddress() + 0x15DF60),
+                         reinterpret_cast<void *>(ShareManager__sub_18015DF60Hook));
+
+    // ShareManager::sub_18015FF00
+    HookLib::InstallHook(reinterpret_cast<void *>(pHmdDriverLoader->GetBaseAddress() + 0x15FF00),
+                         reinterpret_cast<void *>(ShareManager__sub_18015FF00Hook));
+
+    // ShareManager::sub_18015DF00
+    HookLib::InstallHook(reinterpret_cast<void *>(pHmdDriverLoader->GetBaseAddress() + 0x15DF00),
+                         reinterpret_cast<void *>(ShareManager__sub_18015DF00Hook));
+
+    // ShareManager::sub_18015CA50
+    HookLib::InstallHook(reinterpret_cast<void *>(pHmdDriverLoader->GetBaseAddress() + 0x15CA50),
+                         reinterpret_cast<void *>(ShareManager__sub_18015CA50Hook));
+
+    // ShareManager::sub_18015FA80
+    HookLib::InstallHook(reinterpret_cast<void *>(pHmdDriverLoader->GetBaseAddress() + 0x15FA80),
+                         reinterpret_cast<void *>(ShareManager__sub_18015FA80Hook));
+
+    // ShareManager::sub_18015F470
+    HookLib::InstallHook(reinterpret_cast<void *>(pHmdDriverLoader->GetBaseAddress() + 0x15F470),
+                         reinterpret_cast<void *>(ShareManager__sub_18015F470Hook));
+
+    // ShareManager::sub_180159DC0
+    HookLib::InstallHook(reinterpret_cast<void *>(pHmdDriverLoader->GetBaseAddress() + 0x159DC0),
+                         reinterpret_cast<void *>(ShareManager__sub_180159DC0Hook));
   }
 
 }
