@@ -46,6 +46,18 @@ namespace psvr2_toolkit {
     // TODO: Reverse this.
   }
 
+  void ShareManager__sub_18015FFA0Hook(void *thisptr, void* a2) {
+    // This function is run inside multiple places, it appears to copy a buffer.
+    // Uses mutex/event SHARE_VRT2_WIN_DEBUG_DATA.
+    // TODO: Reverse this.
+  }
+
+  void ShareManager__sub_18015F850Hook(void *thisptr, void* a2) {
+    // This function is run inside multiple places, it sets a few variables.
+    // Uses mutex/event SHARE_VRT2_WIN_IR_CAM_SETTING.
+    // TODO: Reverse this.
+  }
+
   void ShareManagerHooks::InstallHooks() {
     static HmdDriverLoader *pHmdDriverLoader = HmdDriverLoader::Instance();
 
@@ -76,6 +88,14 @@ namespace psvr2_toolkit {
     // ShareManager::sub_18015DFF0
     HookLib::InstallHook(reinterpret_cast<void *>(pHmdDriverLoader->GetBaseAddress() + 0x15DFF0),
                          reinterpret_cast<void *>(ShareManager__sub_18015DFF0Hook));
+
+    // ShareManager::sub_18015FFA0
+    HookLib::InstallHook(reinterpret_cast<void *>(pHmdDriverLoader->GetBaseAddress() + 0x15FFA0),
+                         reinterpret_cast<void *>(ShareManager__sub_18015FFA0Hook));
+
+    // ShareManager::sub_18015F850
+    HookLib::InstallHook(reinterpret_cast<void *>(pHmdDriverLoader->GetBaseAddress() + 0x15F850),
+                         reinterpret_cast<void *>(ShareManager__sub_18015F850Hook));
   }
 
 }
