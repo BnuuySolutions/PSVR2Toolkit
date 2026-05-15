@@ -1,4 +1,4 @@
-#if defined(__linux__)
+#ifdef __linux__
 
 #include <climits>
 #include <fcntl.h>
@@ -236,7 +236,7 @@ struct LinuxIpcBroadcast::BroadcastData {
 };
 
 LinuxIpcBroadcast::LinuxIpcBroadcast(const char *name)
-    : m_name(name), m_fd(-1), m_data(nullptr), m_last_val(0) {
+    : m_name(name), m_fd(-1), m_data(nullptr) {
   std::string shmName = "/" + m_name + "_BCAST_SHM";
   m_fd = shm_open(shmName.c_str(), O_CREAT | O_EXCL | O_RDWR, 0666);
   bool initialize = false;
@@ -268,8 +268,6 @@ LinuxIpcBroadcast::LinuxIpcBroadcast(const char *name)
   if (initialize) {
     m_data->futex_word.store(0, std::memory_order_relaxed);
   }
-
-  m_last_val = m_data->futex_word.load(std::memory_order_acquire);
 }
 
 LinuxIpcBroadcast::~LinuxIpcBroadcast() {
@@ -281,10 +279,6 @@ LinuxIpcBroadcast::~LinuxIpcBroadcast() {
 
 bool LinuxIpcBroadcast::wait(uint32_t timeoutMs) {
   uint32_t current = m_data->futex_word.load(std::memory_order_acquire);
-  if (current != m_last_val) {
-    m_last_val = current;
-    return true;
-  }
 
   struct timespec ts;
   struct timespec *ts_ptr = nullptr;
@@ -296,11 +290,12 @@ bool LinuxIpcBroadcast::wait(uint32_t timeoutMs) {
 
   syscall(SYS_futex, &m_data->futex_word, FUTEX_WAIT, current, ts_ptr, nullptr, 0);
 
-  current = m_data->futex_word.load(std::memory_order_acquire);
-  if (current != m_last_val) {
-    m_last_val = current;
+  uint32_t currentAfterWait = m_data->futex_word.load(std::memory_order_acquire);
+  if (current != currentAfterWait) {
     return true;
   }
+
+  // We timed out
   return false;
 }
 
@@ -309,4 +304,4 @@ void LinuxIpcBroadcast::notify_all() {
   syscall(SYS_futex, &m_data->futex_word, FUTEX_WAKE, INT_MAX, nullptr, nullptr, 0);
 }
 
-#endif
+#endif // __linux__

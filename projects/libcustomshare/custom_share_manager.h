@@ -6,7 +6,7 @@
 
 #include <mutex>
 
-constexpr int k_maxSlots = 4;
+constexpr int k_maxSlots = 8;
 
 struct GazeStatus {
   hmd2_gaze_status_t data;

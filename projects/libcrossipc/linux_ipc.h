@@ -1,6 +1,6 @@
 #pragma once
 
-#if defined(__linux__)
+#ifdef __linux__
 
 #include <string>
 #include <pthread.h>
@@ -56,7 +56,6 @@ private:
     int m_fd;
     struct BroadcastData;
     BroadcastData *m_data;
-    uint32_t m_last_val;
 
 public:
     LinuxIpcBroadcast(const char *name);
@@ -65,4 +64,4 @@ public:
     void notify_all() override;
 };
 
-#endif
+#endif // __linux__
