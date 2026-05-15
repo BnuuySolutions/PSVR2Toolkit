@@ -1,13 +1,11 @@
 #pragma once
 
-#if defined(_WIN32)
+#ifdef _WIN32
 
 #include <string>
 #include <windows.h>
 
 #include "cross_ipc.h"
-
-#define MAX_CLIENTS 12
 
 
 class WindowsIpcMutex : public IIpcMutex {
@@ -48,19 +46,8 @@ private:
   void *m_pBuffer;
 };
 
-struct BroadcastWaiter {
-  char eventName[128];
-  DWORD clientPid;
-  bool active;
-};
-
 struct BroadcastSharedData {
-  BroadcastWaiter waiters[MAX_CLIENTS];
-};
-
-struct CachedClient {
-  HANDLE hEvent;
-  HANDLE hProcess;
+  uint32_t counter;
 };
 
 class WindowsIpcBroadcast : public IIpcBroadcast {
@@ -77,10 +64,8 @@ private:
   HANDLE m_hFileMapping;
   BroadcastSharedData *m_pData;
 
-  HANDLE m_hLocalEvent;
-  int m_slot;
-
-  CachedClient m_cachedClients[MAX_CLIENTS];
+  static constexpr uint32_t NUM_EVENTS = 4;
+  HANDLE m_hEvents[NUM_EVENTS];
 };
 
 #endif // _WIN32

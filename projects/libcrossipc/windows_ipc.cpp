@@ -1,4 +1,4 @@
-#if defined(_WIN32)
+#ifdef _WIN32
 
 #include <cstdio>
 #include <cstring>
@@ -110,12 +110,7 @@ void WindowsIpcSharedMemory::unmap() {
 }
 
 WindowsIpcBroadcast::WindowsIpcBroadcast(const char *name)
-    : m_baseName(name), m_slot(-1) {
-  for (int i = 0; i < MAX_CLIENTS; i++) {
-    m_cachedClients[i].hEvent = NULL;
-    m_cachedClients[i].hProcess = NULL;
-  }
-
+    : m_baseName(name) {
   std::string mutexName = m_baseName + "_BCAST_MTX";
   std::string shmName = m_baseName + "_BCAST_SHM";
 
@@ -128,7 +123,6 @@ WindowsIpcBroadcast::WindowsIpcBroadcast(const char *name)
   m_hFileMapping =
       CreateFileMappingA(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0,
                          sizeof(BroadcastSharedData), shmName.c_str());
-  bool alreadyExists = (GetLastError() == ERROR_ALREADY_EXISTS);
   if (!m_hFileMapping) {
     throw std::runtime_error("CreateFileMappingA failed on broadcast. Error: " +
                              std::to_string(GetLastError()));
@@ -141,51 +135,21 @@ WindowsIpcBroadcast::WindowsIpcBroadcast(const char *name)
                              std::to_string(GetLastError()));
   }
 
-  if (!alreadyExists) {
-    memset(m_pData, 0, sizeof(BroadcastSharedData));
-  }
-
-  char evtName[128];
-  snprintf(evtName, sizeof(evtName), "%s_EVT_%lu_%p", m_baseName.c_str(),
-           GetCurrentProcessId(), this);
-
-  m_hLocalEvent = CreateEventA(NULL, FALSE, FALSE, evtName);
-  if (!m_hLocalEvent) {
-    throw std::runtime_error("CreateEventA failed on broadcast. Error: " +
-                             std::to_string(GetLastError()));
-  }
-
-  WaitForSingleObject(m_hMutex, INFINITE);
-  for (int i = 0; i < MAX_CLIENTS; i++) {
-    if (!m_pData->waiters[i].active) {
-      m_slot = i;
-      memcpy(m_pData->waiters[i].eventName, evtName,
-             sizeof(m_pData->waiters[i].eventName));
-      m_pData->waiters[i].clientPid = GetCurrentProcessId();
-      m_pData->waiters[i].active = true;
-      break;
+  for (uint32_t i = 0; i < NUM_EVENTS; i++) {
+    std::string eventName = m_baseName + "_BCAST_EVT_" + std::to_string(i);
+    m_hEvents[i] = CreateEventA(NULL, TRUE, i == 0 ? FALSE : TRUE, eventName.c_str());
+    if (!m_hEvents[i]) {
+      throw std::runtime_error("CreateEventA failed on broadcast. Error: " +
+                               std::to_string(GetLastError()));
     }
   }
-  ReleaseMutex(m_hMutex);
 }
 
 WindowsIpcBroadcast::~WindowsIpcBroadcast() {
-  if (m_slot != -1 && m_hMutex) {
-    WaitForSingleObject(m_hMutex, INFINITE);
-    m_pData->waiters[m_slot].active = false;
-    ReleaseMutex(m_hMutex);
+  for (uint32_t i = 0; i < NUM_EVENTS; i++) {
+    if (m_hEvents[i])
+      CloseHandle(m_hEvents[i]);
   }
-
-  if (m_hLocalEvent)
-    CloseHandle(m_hLocalEvent);
-
-  for (int i = 0; i < MAX_CLIENTS; i++) {
-    if (m_cachedClients[i].hEvent)
-      CloseHandle(m_cachedClients[i].hEvent);
-    if (m_cachedClients[i].hProcess)
-      CloseHandle(m_cachedClients[i].hProcess);
-  }
-
   if (m_pData)
     UnmapViewOfFile(m_pData);
   if (m_hFileMapping)
@@ -195,60 +159,56 @@ WindowsIpcBroadcast::~WindowsIpcBroadcast() {
 }
 
 bool WindowsIpcBroadcast::wait(uint32_t timeoutMs) {
-  if (m_hLocalEvent) {
-    DWORD result = WaitForSingleObject(m_hLocalEvent, timeoutMs);
-    if (result == WAIT_FAILED) {
-      throw std::runtime_error(
-          "WaitForSingleObject failed on broadcast. Error: " +
-          std::to_string(GetLastError()));
-    }
-    return result == WAIT_OBJECT_0;
+  if (timeoutMs == 0) {
+    return false;
   }
-  return false;
+
+  DWORD waitRes = WaitForSingleObject(m_hMutex, INFINITE);
+  if (waitRes != WAIT_OBJECT_0) {
+    throw std::runtime_error(
+        "WaitForSingleObject failed on mutex in broadcast wait start. Error: " +
+        std::to_string(GetLastError()));
+  }
+
+  uint32_t startCount = m_pData->counter;
+
+  DWORD result = SignalObjectAndWait(m_hMutex, m_hEvents[startCount % NUM_EVENTS], timeoutMs, FALSE);
+
+  if (waitRes != WAIT_OBJECT_0 && waitRes != WAIT_TIMEOUT) {
+    ReleaseMutex(m_hMutex);
+    throw std::runtime_error(
+        "SignalObjectAndWait failed on broadcast wait. Error: " +
+        std::to_string(GetLastError()));
+  }
+
+  waitRes = WaitForSingleObject(m_hMutex, INFINITE);
+  if (waitRes != WAIT_OBJECT_0) {
+    throw std::runtime_error(
+        "WaitForSingleObject failed on mutex in broadcast wait finish. Error: " +
+        std::to_string(GetLastError()));
+  }
+
+  bool signaled = m_pData->counter != startCount;
+
+  ReleaseMutex(m_hMutex);
+  return signaled;
 }
 
 void WindowsIpcBroadcast::notify_all() {
-  WaitForSingleObject(m_hMutex, INFINITE);
-  for (int i = 0; i < MAX_CLIENTS; i++) {
-    if (m_pData->waiters[i].active) {
-      if (!m_cachedClients[i].hEvent) {
-        m_cachedClients[i].hEvent = OpenEventA(EVENT_MODIFY_STATE, FALSE,
-                                               m_pData->waiters[i].eventName);
-        if (m_cachedClients[i].hEvent) {
-          m_cachedClients[i].hProcess =
-              OpenProcess(SYNCHRONIZE, FALSE, m_pData->waiters[i].clientPid);
-        } else if (GetLastError() == ERROR_FILE_NOT_FOUND) {
-          m_pData->waiters[i].active = false;
-        }
-      }
-
-      if (m_cachedClients[i].hEvent) {
-        bool isAlive = true;
-        if (m_cachedClients[i].hProcess &&
-            WaitForSingleObject(m_cachedClients[i].hProcess, 0) ==
-                WAIT_OBJECT_0) {
-          isAlive = false;
-        }
-
-        if (isAlive) {
-          SetEvent(m_cachedClients[i].hEvent);
-        } else {
-          m_pData->waiters[i].active =
-              false; // Client crashed/exited, prune the slot
-        }
-      }
-    }
-
-    // Clean up our handles if the client is no longer active
-    if (!m_pData->waiters[i].active && m_cachedClients[i].hEvent) {
-      CloseHandle(m_cachedClients[i].hEvent);
-      m_cachedClients[i].hEvent = NULL;
-      if (m_cachedClients[i].hProcess) {
-        CloseHandle(m_cachedClients[i].hProcess);
-        m_cachedClients[i].hProcess = NULL;
-      }
-    }
+  DWORD waitRes = WaitForSingleObject(m_hMutex, INFINITE);
+  if (waitRes != WAIT_OBJECT_0) {
+    throw std::runtime_error(
+        "WaitForSingleObject failed on mutex in broadcast notify_all. Error: " +
+        std::to_string(GetLastError()));
   }
+
+  uint32_t prevCount = m_pData->counter;
+  m_pData->counter++;
+
+  // Reset the next one, and then signal the current event.
+  ResetEvent(m_hEvents[m_pData->counter % NUM_EVENTS]);
+  SetEvent(m_hEvents[prevCount % NUM_EVENTS]); 
+
   ReleaseMutex(m_hMutex);
 }
 
