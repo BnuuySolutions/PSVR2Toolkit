@@ -26,13 +26,13 @@ namespace psvr2_toolkit {
   }
 
   // Hopefully no register stomping...
-  void ShareManager__sub_18015E990Hook(void *thisptr, void* a2) {
+  void ShareManager__setCalibDataHook(void *thisptr, uint8_t *calibData) {
     // This function is run inside CaesarUsbThreadImuStatus::initialize, it appears to copy a buffer.
     // Uses mutex/event SHARE_VRT2_WIN_CALIB.
     // TODO: Reverse this.
   }
 
-  void ShareManager__sub_18015F330Hook(void *thisptr, void* a2) {
+  void ShareManager__setFwInfoHook(void *thisptr, void* a2) {
     // This function is run inside CaesarUsbThreadImuStatus::initialize, it sets a few variables.
     // Uses mutex/event SHARE_VRT2_WIN_FW_INFO.
     // TODO: Reverse this.
@@ -289,13 +289,13 @@ namespace psvr2_toolkit {
     HookLib::InstallHook(reinterpret_cast<void *>(pHmdDriverLoader->GetBaseAddress() + 0x15E2A0),
                          reinterpret_cast<void *>(ShareManager__sub_18015E2A0Hook));
 
-    // ShareManager::sub_18015E990
+    // ShareManager::setCalibData
     HookLib::InstallHook(reinterpret_cast<void *>(pHmdDriverLoader->GetBaseAddress() + 0x15E990),
-                         reinterpret_cast<void *>(ShareManager__sub_18015E990Hook));
+                         reinterpret_cast<void *>(ShareManager__setCalibDataHook));
 
-    // ShareManager::sub_18015F330
+    // ShareManager::setFwInfo
     HookLib::InstallHook(reinterpret_cast<void *>(pHmdDriverLoader->GetBaseAddress() + 0x15F330),
-                         reinterpret_cast<void *>(ShareManager__sub_18015F330Hook));
+                         reinterpret_cast<void *>(ShareManager__setFwInfoHook));
 
     // ShareManager::sub_18015B950
     HookLib::InstallHook(reinterpret_cast<void *>(pHmdDriverLoader->GetBaseAddress() + 0x15B950),
