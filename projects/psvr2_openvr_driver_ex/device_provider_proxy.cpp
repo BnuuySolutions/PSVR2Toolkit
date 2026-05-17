@@ -7,6 +7,7 @@
 #include "driver_hooks/caesar_manager_hooks.h"
 #include "driver_context_proxy.h"
 #include "driver_hooks/hmd_device_hooks.h"
+#include "driver_hooks/sense_device_hooks.h"
 #include "hmd_driver_loader.h"
 #include "hook_lib.h"
 #include "driver_hooks/libpad_hooks.h"
@@ -135,6 +136,7 @@ namespace psvr2_toolkit {
     CaesarUsbThread::InstallHooks();
     HmdDeviceHooks::InstallHooks();
     LibpadHooks::InstallHooks();
+    SenseDeviceHooks::InstallHooks();
     UsbThreadHooks::InstallHooks();
   }
 

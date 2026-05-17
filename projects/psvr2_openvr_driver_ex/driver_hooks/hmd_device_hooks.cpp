@@ -31,6 +31,8 @@ namespace psvr2_toolkit {
     vr::EVRInitError result = sie__psvr2__HmdDevice__Activate(thisptr, unObjectId);
     vr::PropertyContainerHandle_t ulPropertyContainer = vr::VRProperties()->TrackedDeviceToPropertyContainer(unObjectId);
 
+    DriverHostProxy::Instance()->SetDevice(DeviceType::HMD, ulPropertyContainer, unObjectId);
+
     // Sony driver only defines the standard hidden area mesh.
     // OpenVR and OpenXR applications can ask for other types
     // and may end up with broken rendering in some cases

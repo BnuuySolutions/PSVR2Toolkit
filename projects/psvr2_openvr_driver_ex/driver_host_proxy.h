@@ -30,6 +30,38 @@ namespace psvr2_toolkit {
       return DeviceType::None;
     }
 
+    DeviceType GetDeviceType(vr::TrackedDeviceIndex_t deviceIndex) const {
+      if (deviceIndex == hmdIndex) {
+        return DeviceType::HMD;
+      }
+      else if (deviceIndex == leftControllerIndex) {
+        return DeviceType::SenseControllerLeft;
+      }
+      else if (deviceIndex == rightControllerIndex) {
+        return DeviceType::SenseControllerRight;
+      }
+      return DeviceType::None;
+    }
+
+    void SetDevice(DeviceType type, vr::PropertyContainerHandle_t propertyContainer, vr::TrackedDeviceIndex_t nDevice) {
+      switch (type) {
+        case DeviceType::HMD:
+          hmdContainer = propertyContainer;
+          hmdIndex = nDevice;
+          break;
+        case DeviceType::SenseControllerLeft:
+          leftControllerContainer = propertyContainer;
+          leftControllerIndex = nDevice;
+          break;
+        case DeviceType::SenseControllerRight:
+          rightControllerContainer = propertyContainer;
+          rightControllerIndex = nDevice;
+          break;
+        default:
+          break;
+      }
+    }
+
     /** IVRServerDriverHost **/
 
     bool TrackedDeviceAdded(const char *pchDeviceSerialNumber, vr::ETrackedDeviceClass eDeviceClass, vr::ITrackedDeviceServerDriver *pDriver) override;
@@ -52,11 +84,15 @@ namespace psvr2_toolkit {
     std::list<void (*)(vr::VREvent_t *)> m_pfnEventHandlers;
 
     // Used internally for controller pose correction.
-    vr::DriverPose_t GetPose(uint32_t unWhichDevice, const vr::DriverPose_t &originalPose);
+    vr::DriverPose_t GetPose(DeviceType type, const vr::DriverPose_t &originalPose);
 
     vr::PropertyContainerHandle_t hmdContainer = vr::k_ulInvalidPropertyContainer;
     vr::PropertyContainerHandle_t leftControllerContainer = vr::k_ulInvalidPropertyContainer;
     vr::PropertyContainerHandle_t rightControllerContainer = vr::k_ulInvalidPropertyContainer;
+
+    vr::TrackedDeviceIndex_t hmdIndex = vr::k_unTrackedDeviceIndexInvalid;
+    vr::TrackedDeviceIndex_t leftControllerIndex = vr::k_unTrackedDeviceIndexInvalid;
+    vr::TrackedDeviceIndex_t rightControllerIndex = vr::k_unTrackedDeviceIndexInvalid;
   };
 
 } // psvr2_toolkit
