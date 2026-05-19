@@ -390,6 +390,9 @@ namespace psvr2_toolkit {
         int32_t newLatencyOffset = 0;
 
         switch (ctx.state) {
+        case CalibrationState::Idle:
+          break;
+
         case CalibrationState::Start:
           ctx.thresholdLedCount = currentLedCount + 3;
           ctx.state = CalibrationState::FindInitialOnPoint;

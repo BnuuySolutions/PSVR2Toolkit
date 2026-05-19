@@ -1,8 +1,6 @@
 add_definitions(-DNOMINMAX)
 
 add_library(psvr2_openvr_driver_ex SHARED
-  common/hmd2_gaze.h
-  
   driver_hooks/aston_manager_hooks.cpp
   driver_hooks/caesar_manager_hooks.h
   driver_hooks/caesar_manager_hooks.cpp
@@ -29,10 +27,9 @@ add_library(psvr2_openvr_driver_ex SHARED
   usb_thread_gaze.cpp
 )
 target_include_directories(psvr2_openvr_driver_ex PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-target_include_directories(psvr2_openvr_driver_ex PUBLIC ${CMAKE_SOURCE_DIR}/include)
 
 target_link_libraries(psvr2_openvr_driver_ex PRIVATE shlwapi hid)
-target_link_libraries(psvr2_openvr_driver_ex PRIVATE libcustomshare)
+target_link_libraries(psvr2_openvr_driver_ex PRIVATE common libcustomshare)
 
 # Link our external libraries
 target_link_libraries(psvr2_openvr_driver_ex PRIVATE PolyHook_2)

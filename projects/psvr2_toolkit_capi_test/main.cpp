@@ -15,7 +15,7 @@
 
 #include "pad_trigger_effect.h"
 #include "psvr2tk_capi_loader.h"
-#include "psvr2tk_capi_private_loader.h"
+#include "psvr2tk_capi_loader_private.h"
 
 std::atomic<bool> g_appRunning = true;
 std::mutex g_hapticsMutex;

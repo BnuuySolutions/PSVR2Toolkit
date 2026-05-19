@@ -4,7 +4,7 @@
 
 #include "driver_interface/caesar_manager.h"
 #include "driver_host_proxy.h"
-#include "common/hmd2_gaze.h"
+#include "hmd2_gaze.h"
 #include "hmd_device_hooks.h"
 #include "hmd_driver_loader.h"
 #include "hook_lib.h"
