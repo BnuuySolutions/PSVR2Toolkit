@@ -1,5 +1,3 @@
-#include <chrono>
-
 #include "common.h"
 #include "driver_interface/caesar_manager.h"
 #include "custom_share_manager.h"
