@@ -1,3 +1,4 @@
+add_subdirectory(common)
 add_subdirectory(libcrossipc)
 add_subdirectory(libcustomshare)
 if (WIN32)

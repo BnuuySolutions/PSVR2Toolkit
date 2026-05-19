@@ -5,16 +5,6 @@ set(CMAKE_CXX_STANDARD 17)
 
 add_executable(psvr2_toolkit_capi_test main.cpp)
 
-target_include_directories(psvr2_toolkit_capi_test PRIVATE
-    ${CMAKE_SOURCE_DIR}/externals/imgui
-    ${CMAKE_SOURCE_DIR}/externals/imgui/backends
-)
+target_link_libraries(psvr2_toolkit_capi_test PRIVATE SDL3::SDL3 imgui)
 
-target_link_libraries(psvr2_toolkit_capi_test PRIVATE
-    SDL3::SDL3
-    imgui
-    psvr2_toolkit_capi_loader
-)
-
-target_include_directories(psvr2_toolkit_capi_test PUBLIC ${CMAKE_SOURCE_DIR}/projects/psvr2_toolkit_capi)
-target_include_directories(psvr2_toolkit_capi_test PUBLIC ${CMAKE_SOURCE_DIR}/include)
+target_link_libraries(psvr2_toolkit_capi_test PRIVATE psvr2_toolkit_capi_loader)

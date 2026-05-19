@@ -1,5 +1,5 @@
 #include "psvr2tk_capi_loader.h"
-#include "../projects/libcustomshare/util.h"
+#include "util.h"
 #include <cstddef>
 
 #ifdef _WIN32
