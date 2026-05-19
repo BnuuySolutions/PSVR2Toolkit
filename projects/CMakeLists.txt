@@ -13,6 +13,34 @@ if (WIN32)
   add_subdirectory(psvr2_toolkit_redir)
 endif()
 
+set(CAPI_DIST_DIR "${CMAKE_BINARY_DIR}/capi_dist")
+
+add_custom_target(psvr2_toolkit_capi_dist ALL
+  COMMAND ${CMAKE_COMMAND} -E make_directory "${CAPI_DIST_DIR}/include"
+  COMMAND ${CMAKE_COMMAND} -E make_directory "${CAPI_DIST_DIR}/lib"
+  COMMAND ${CMAKE_COMMAND} -E make_directory "${CAPI_DIST_DIR}/bin"
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different 
+    "${CMAKE_CURRENT_SOURCE_DIR}/psvr2_toolkit_capi_loader/psvr2tk_capi_loader.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/psvr2_toolkit_capi/psvr2tk_capi.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/common/common.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/common/hmd2_gaze.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/common/pad_trigger_effect.h"
+    "${CAPI_DIST_DIR}/include/"
+  COMMENT "Copying files to CAPI dist folder"
+)
+
+if(WIN32)
+  add_custom_command(TARGET psvr2_toolkit_capi_dist POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:psvr2_toolkit_capi_loader>" "${CAPI_DIST_DIR}/bin/"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_LINKER_FILE:psvr2_toolkit_capi_loader>" "${CAPI_DIST_DIR}/lib/"
+  )
+else()
+  add_custom_command(TARGET psvr2_toolkit_capi_dist POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:psvr2_toolkit_capi_loader>" "${CAPI_DIST_DIR}/lib/"
+  )
+endif()
+
+
 if(NOT CMAKE_HOST_WIN32)
     # Also build libcrossipc as separate project to make the winedll
     include(ExternalProject)
