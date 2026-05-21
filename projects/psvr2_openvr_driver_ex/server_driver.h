@@ -17,6 +17,11 @@ namespace psvr2 {
     bool ShouldBlockStandbyMode() override;
     void EnterStandby() override;
     void LeaveStandby() override;
+
+    void CheckDirectMode(const char *callee, bool *out_EdidTypeChanged = nullptr);
+
+  private:
+    float m_preferredRefreshRate;
   };
 
 } // psvr2
