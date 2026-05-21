@@ -8,9 +8,16 @@
 
 class CaesarManager {
 public:
+  enum EdidType : uint8_t {
+    EDID_TYPE_90HZ_120HZ,
+    EDID_TYPE_90HZ_ONLY
+  };
+
   static constexpr uintptr_t k_getSingletonRVA = 0x124C90;
+  static constexpr uintptr_t k_getEdidTypeRVA = 0x124970;
   static constexpr uintptr_t k_getIMUTimestampOffsetRVA = 0x1252E0;
   static constexpr uintptr_t k_createSingletonRVA = 0x125330;
+  static constexpr uintptr_t k_setEdidTypeRVA = 0x127E80;
 
   void** vftable;
   uint8_t unk0[0xB0];
@@ -31,12 +38,20 @@ public:
     return CaesarManager__getSingleton();
   }
 
-  void getIMUTimestampOffset(int64_t *hmdToHostOffset) {
+  int getEdidType(EdidType* out_Type) {
+    if (!CaesarManager__getEdidType) {
+      psvr2_toolkit::HmdDriverLoader *pHmdDriverLoader = psvr2_toolkit::HmdDriverLoader::Instance();
+      CaesarManager__getEdidType = decltype(CaesarManager__getEdidType)(pHmdDriverLoader->GetBaseAddress() + k_getEdidTypeRVA);
+    }
+    return CaesarManager__getEdidType(this, out_Type);
+  }
+
+  void getIMUTimestampOffset(int64_t *out_HmdToHostOffset) {
     if (!CaesarManager__getIMUTimestampOffset) {
       psvr2_toolkit::HmdDriverLoader *pHmdDriverLoader = psvr2_toolkit::HmdDriverLoader::Instance();
       CaesarManager__getIMUTimestampOffset = decltype(CaesarManager__getIMUTimestampOffset)(pHmdDriverLoader->GetBaseAddress() + k_getIMUTimestampOffsetRVA);
     }
-    CaesarManager__getIMUTimestampOffset(this, hmdToHostOffset);
+    CaesarManager__getIMUTimestampOffset(this, out_HmdToHostOffset);
   }
 
   static void createSingleton(const char *installPath, uint8_t a2) {
@@ -47,9 +62,19 @@ public:
     CaesarManager__createSingleton(installPath, a2);
   }
 
+  int setEdidType(EdidType type) {
+    if (!CaesarManager__setEdidType) {
+      psvr2_toolkit::HmdDriverLoader *pHmdDriverLoader = psvr2_toolkit::HmdDriverLoader::Instance();
+      CaesarManager__setEdidType = decltype(CaesarManager__setEdidType)(pHmdDriverLoader->GetBaseAddress() + k_setEdidTypeRVA);
+    }
+    return CaesarManager__setEdidType(this, type);
+  }
+
 private:
   inline static CaesarManager *(*CaesarManager__getSingleton)();
+  inline static int (*CaesarManager__getEdidType)(CaesarManager *, EdidType *);
   inline static void (*CaesarManager__getIMUTimestampOffset)(CaesarManager *, int64_t *);
-  inline static void (*CaesarManager__createSingleton)(const char *, uint8_t a2);
+  inline static void (*CaesarManager__createSingleton)(const char *, uint8_t);
+  inline static int (*CaesarManager__setEdidType)(CaesarManager *, EdidType);
 };
 static_assert(sizeof(CaesarManager) == 0x100, "Size of CaesarManager is not 0x100 bytes!");
