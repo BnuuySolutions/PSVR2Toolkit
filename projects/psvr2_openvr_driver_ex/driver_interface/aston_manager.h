@@ -27,7 +27,7 @@ public:
       psvr2_toolkit::HmdDriverLoader *pHmdDriverLoader = psvr2_toolkit::HmdDriverLoader::Instance();
       AstonManager__createSingleton = decltype(AstonManager__createSingleton)(pHmdDriverLoader->GetBaseAddress() + k_createSingletonRVA);
     }
-    return AstonManager__createSingleton(installPath);
+    AstonManager__createSingleton(installPath);
   }
 
 private:

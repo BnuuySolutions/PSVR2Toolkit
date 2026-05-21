@@ -44,7 +44,7 @@ public:
       psvr2_toolkit::HmdDriverLoader *pHmdDriverLoader = psvr2_toolkit::HmdDriverLoader::Instance();
       CaesarManager__createSingleton = decltype(CaesarManager__createSingleton)(pHmdDriverLoader->GetBaseAddress() + k_createSingletonRVA);
     }
-    return CaesarManager__createSingleton(installPath, a2);
+    CaesarManager__createSingleton(installPath, a2);
   }
 
 private:
