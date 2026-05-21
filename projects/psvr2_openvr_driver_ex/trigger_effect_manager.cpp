@@ -14,7 +14,6 @@ namespace psvr2_toolkit {
   static TriggerEffectCommandPayload g_lastLeft = { VRControllerType::Left, {} };
   static TriggerEffectCommandPayload g_lastRight = { VRControllerType::Right, {} };
 
-  AstonManager_t *(*getAstonManager)();
   int (*scePadSetTriggerEffect)(int handle, ScePadTriggerEffectParam *param);
 
   TriggerEffectManager *TriggerEffectManager::m_pInstance = nullptr;
@@ -42,7 +41,6 @@ namespace psvr2_toolkit {
       return;
     }
 
-    getAstonManager = decltype(getAstonManager)(pHmdDriverLoader->GetBaseAddress() + 0x1189D0);
     scePadSetTriggerEffect = decltype(scePadSetTriggerEffect)(pHmdDriverLoader->GetBaseAddress() + 0x1BF060);
 
     m_initialized = true;
@@ -98,7 +96,7 @@ namespace psvr2_toolkit {
   }
 
   void TriggerEffectManager::SetTriggerEffectCommand(VRControllerType controllerType, ScePadTriggerEffectCommand command) {
-    AstonManager_t *pAstonManager = getAstonManager();
+    AstonManager *pAstonManager = AstonManager::getSingleton();
 
     ScePadTriggerEffectParam param = {};
     switch (controllerType) {

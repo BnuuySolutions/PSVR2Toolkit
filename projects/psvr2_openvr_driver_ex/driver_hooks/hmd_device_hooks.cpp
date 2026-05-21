@@ -1,7 +1,3 @@
-#ifdef OPENVR_EXTENSIONS_AVAILABLE
-#include "psvr2_openvr_driver/openvr_ex/openvr_ex.h"
-#endif
-
 #include "driver_interface/caesar_manager.h"
 #include "driver_host_proxy.h"
 #include "common/hmd2_gaze.h"
@@ -20,9 +16,6 @@ namespace psvr2_toolkit {
   void (*ShareManager__getIntConfig)(void *thisPtr, uint32_t configId, int64_t *outValue);
   void (*ShareManager__setIntConfig)(void *thisPtr, uint32_t configId, int64_t *value);
 
-#ifdef OPENVR_EXTENSIONS_AVAILABLE
-  void *g_pOpenVRExHandle = nullptr;
-#endif
   vr::VRInputComponentHandle_t eyeTrackingComponent = vr::k_ulInvalidInputComponentHandle;
   int64_t currentBrightness;
 
@@ -128,22 +121,12 @@ namespace psvr2_toolkit {
       vr::VRDriverLog()->Log("Failed to get driver input interface. Are you on the latest version of SteamVR?");
     }
 
-#ifdef OPENVR_EXTENSIONS_AVAILABLE
-    psvr2_toolkit::openvr_ex::OnHmdActivate(ulPropertyContainer, &g_pOpenVRExHandle);
-#endif
-
     return result;
   }
 
   void (*sie__psvr2__HmdDevice__Deactivate)(void *) = nullptr;
   void sie__psvr2__HmdDevice__DeactivateHook(void *thisptr) {
     sie__psvr2__HmdDevice__Deactivate(thisptr);
-
-#ifdef OPENVR_EXTENSIONS_AVAILABLE
-    if (g_pOpenVRExHandle) {
-      psvr2_toolkit::openvr_ex::OnHmdDeactivate(&g_pOpenVRExHandle);
-    }
-#endif
   }
 
   inline const int64_t GetHostTimestamp()
@@ -185,17 +168,11 @@ namespace psvr2_toolkit {
 
     int64_t hmdToHostOffset;
 
-    CaesarManager::GetIMUTimestampOffset(CaesarManager::GetInstance(), &hmdToHostOffset);
+    CaesarManager::getSingleton()->getIMUTimestampOffset(&hmdToHostOffset);
 
     double timeOffset = ((static_cast<int64_t>(pGazeState->wearable.timestamp) + hmdToHostOffset) - GetHostTimestamp()) / 1e6;
 
-    (vr::VRDriverInput())->UpdateEyeTrackingComponent(eyeTrackingComponent, &eyeTrackingData, timeOffset);
-
-#ifdef OPENVR_EXTENSIONS_AVAILABLE
-    if (g_pOpenVRExHandle) {
-      psvr2_toolkit::openvr_ex::OnHmdUpdate(&g_pOpenVRExHandle, pData, dwSize);
-    }
-#endif
+    vr::VRDriverInput()->UpdateEyeTrackingComponent(eyeTrackingComponent, &eyeTrackingData, timeOffset);
   }
 
   void HmdDeviceHooks::InstallHooks() {
