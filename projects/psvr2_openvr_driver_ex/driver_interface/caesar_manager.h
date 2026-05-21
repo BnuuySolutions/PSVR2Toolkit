@@ -15,19 +15,21 @@ public:
 
   static constexpr uintptr_t k_getSingletonRVA = 0x124C90;
   static constexpr uintptr_t k_getEdidTypeRVA = 0x124970;
+  static constexpr uintptr_t k_getUsbBcdRVA = 0x125290;
   static constexpr uintptr_t k_getIMUTimestampOffsetRVA = 0x1252E0;
   static constexpr uintptr_t k_createSingletonRVA = 0x125330;
+  static constexpr uintptr_t k_getConnectionStatusRVA = 0x1253C0;
   static constexpr uintptr_t k_setEdidTypeRVA = 0x127E80;
 
-  void** vftable;
+  void **vftable;
   uint8_t unk0[0xB0];
-  psvr2_toolkit::CaesarUsbThread* imuStatusThread;
-  psvr2_toolkit::CaesarUsbThread* imageThread;
-  psvr2_toolkit::CaesarUsbThread* slamTrackingThread;
-  psvr2_toolkit::CaesarUsbThread* leddetThread;
-  psvr2_toolkit::CaesarUsbThread* genDataThread;
-  psvr2_toolkit::CaesarUsbThread* relocPreThread;
-  psvr2_toolkit::CaesarUsbThread* logThread;
+  psvr2_toolkit::CaesarUsbThread *imuStatusThread;
+  psvr2_toolkit::CaesarUsbThread *imageThread;
+  psvr2_toolkit::CaesarUsbThread *slamTrackingThread;
+  psvr2_toolkit::CaesarUsbThread *leddetThread;
+  psvr2_toolkit::CaesarUsbThread *genDataThread;
+  psvr2_toolkit::CaesarUsbThread *relocPreThread;
+  psvr2_toolkit::CaesarUsbThread *logThread;
   uint8_t unk1[0x10];
 
   static CaesarManager* getSingleton() {
@@ -38,12 +40,20 @@ public:
     return CaesarManager__getSingleton();
   }
 
-  int getEdidType(EdidType* out_Type) {
+  int getEdidType(EdidType *out_Type) {
     if (!CaesarManager__getEdidType) {
       psvr2_toolkit::HmdDriverLoader *pHmdDriverLoader = psvr2_toolkit::HmdDriverLoader::Instance();
       CaesarManager__getEdidType = decltype(CaesarManager__getEdidType)(pHmdDriverLoader->GetBaseAddress() + k_getEdidTypeRVA);
     }
     return CaesarManager__getEdidType(this, out_Type);
+  }
+
+  int getUsbBcd(uint16_t *out_UsbBcd) {
+    if (!CaesarManager__getUsbBcd) {
+      psvr2_toolkit::HmdDriverLoader *pHmdDriverLoader = psvr2_toolkit::HmdDriverLoader::Instance();
+      CaesarManager__getUsbBcd = decltype(CaesarManager__getUsbBcd)(pHmdDriverLoader->GetBaseAddress() + k_getUsbBcdRVA);
+    }
+    return CaesarManager__getUsbBcd(this, out_UsbBcd);
   }
 
   void getIMUTimestampOffset(int64_t *out_HmdToHostOffset) {
@@ -62,6 +72,14 @@ public:
     CaesarManager__createSingleton(installPath, a2);
   }
 
+  bool getConnectionStatus() {
+    if (!CaesarManager__getConnectionStatus) {
+      psvr2_toolkit::HmdDriverLoader *pHmdDriverLoader = psvr2_toolkit::HmdDriverLoader::Instance();
+      CaesarManager__getConnectionStatus = decltype(CaesarManager__getConnectionStatus)(pHmdDriverLoader->GetBaseAddress() + k_getConnectionStatusRVA);
+    }
+    return CaesarManager__getConnectionStatus(this);
+  }
+
   int setEdidType(EdidType type) {
     if (!CaesarManager__setEdidType) {
       psvr2_toolkit::HmdDriverLoader *pHmdDriverLoader = psvr2_toolkit::HmdDriverLoader::Instance();
@@ -73,8 +91,10 @@ public:
 private:
   inline static CaesarManager *(*CaesarManager__getSingleton)();
   inline static int (*CaesarManager__getEdidType)(CaesarManager *, EdidType *);
+  inline static int (*CaesarManager__getUsbBcd)(CaesarManager *, uint16_t *);
   inline static void (*CaesarManager__getIMUTimestampOffset)(CaesarManager *, int64_t *);
   inline static void (*CaesarManager__createSingleton)(const char *, uint8_t);
+  inline static bool (*CaesarManager__getConnectionStatus)(CaesarManager *);
   inline static int (*CaesarManager__setEdidType)(CaesarManager *, EdidType);
 };
 static_assert(sizeof(CaesarManager) == 0x100, "Size of CaesarManager is not 0x100 bytes!");
