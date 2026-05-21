@@ -1,6 +1,8 @@
 #include "server_driver.h"
 #include "driver_interface/aston_manager.h"
 #include "driver_interface/caesar_manager.h"
+#include "driver_interface/config_manager.h"
+#include "driver_interface/share_manager.h"
 #include "driver_interface/ukf_manager.h"
 
 #include <objbase.h>
@@ -20,6 +22,9 @@ namespace psvr2 {
 
     std::string installPath = vr::VRProperties()->GetStringProperty(pDriverContext->GetDriverHandle(), vr::Prop_InstallPath_String, nullptr);
 
+    ConfigManager::createSingleton();
+    ShareManager::createSingleton(1);
+    ShareManager::getSingleton()->sub_18015E2A0();
     UkfManager::createSingleton(0);
 
     vr::VRDriverLog()->Log("Init playstation_vr2_hmd module...\n");
