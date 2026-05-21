@@ -46,6 +46,32 @@ namespace psvr2 {
     // More initialization?
 
     CheckDirectMode("sie::psvr2::ServerDriver::Init");
+
+    bool connected = CaesarManager::getSingleton()->getConnectionStatus();
+
+    int retryCount = 0;
+    while (!connected && ++retryCount < 3) {
+      Sleep(1000);
+      connected = CaesarManager::getSingleton()->getConnectionStatus();
+    }
+
+    if (!connected) {
+      uint16_t usbBcd = 0;
+      CaesarManager::getSingleton()->getUsbBcd(&usbBcd);
+
+      if (usbBcd < 0x300) {
+        vr::VRDriverLog()->Log(
+          "PlayStation VR2 HMD is found via USB2 connection. "
+          "Please reconnect to a USB3 port.\n"
+        );
+      } else {
+        vr::VRDriverLog()->Log("PlayStation VR2 HMD is not found.\n");
+      }
+
+      Cleanup();
+
+      return vr::VRInitError_Driver_Failed;
+    }
   }
 
   void ServerDriver::Cleanup() {
