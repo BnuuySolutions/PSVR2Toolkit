@@ -10,6 +10,7 @@
 #include <mutex>
 #include <shared_mutex>
 #include <thread>
+#include <windows.h>
 
 #define IS_HANDLE_VALID(handle) (reinterpret_cast<uint64_t>(handle) != -1) 
 
@@ -27,6 +28,8 @@ namespace psvr2_toolkit {
 
   namespace {
     void LibusbEventThread() {
+      SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
+
       while (g_libusbThreadRunning) {
         struct timeval tv = {0, 100000}; // 100ms
         libusb_handle_events_timeout_completed(g_usbCtx, &tv, nullptr);
