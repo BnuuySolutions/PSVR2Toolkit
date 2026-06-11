@@ -39,6 +39,10 @@ For developers, we also have our own API library, which allows you to take full 
 
 6.) Enjoy your new features, please give us feedback in our [Discord](https://discord.gg/jym8CgJPF3).
 
+# Code Signing Policy
+
+Free code signing provided by [SignPath.io](https://signpath.io), certificate by [SignPath Foundation](https://signpath.org/).
+
 # Contact
 Have any legal complaints or questions?
 - Email: `wdh at bnuuy.solutions`
