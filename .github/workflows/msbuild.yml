@@ -60,7 +60,7 @@ jobs:
         api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
         organization-id: e5b00777-6877-43dd-8f53-89ac106cb9be
         project-slug: PSVR2Toolkit
-        signing-policy-slug: test-signing
+        signing-policy-slug: release-signing
         github-artifact-id: ${{ steps.upload-artifacts.outputs.artifact-id }}
         wait-for-completion: true
         output-artifact-directory: ${{env.ARTIFACTS_DIR}}
