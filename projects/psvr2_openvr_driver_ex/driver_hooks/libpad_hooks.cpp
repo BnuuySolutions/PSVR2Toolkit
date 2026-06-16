@@ -445,22 +445,16 @@ namespace psvr2_toolkit {
             break;
           }
 
-          [[fallthrough]];
+          break;
         }
 
         case CalibrationState::BinarySearchRightEdge:
         {
-          if (ctx.state == CalibrationState::BinarySearchRightEdge) {
-            if (currentLedCount > ctx.thresholdLedCount) { // LEDs are on
-              ctx.searchLowerBound = latencyOffset;
-            }
-            else { // LEDs are off
-              ctx.searchUpperBound = latencyOffset;
-            }
+          if (currentLedCount > ctx.thresholdLedCount) { // LEDs are on
+            ctx.searchLowerBound = latencyOffset;
           }
-          else {
-            // We just fell through. Use the bounds from the last step.
-            ctx.state = CalibrationState::BinarySearchRightEdge;
+          else { // LEDs are off
+            ctx.searchUpperBound = latencyOffset;
           }
 
           newLatencyOffset = (ctx.searchLowerBound + ctx.searchUpperBound) / 2;
