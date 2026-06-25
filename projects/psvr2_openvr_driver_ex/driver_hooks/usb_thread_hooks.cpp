@@ -1,6 +1,8 @@
 #include "usb_thread_hooks.h"
 
+#include "../driver_interface/caesar_manager.h"
 #include "hmd2_gaze.h"
+#include "hmd_device_camera.h"
 #include "hmd_driver_loader.h"
 #include "hook_lib.h"
 #include "util.h"
@@ -15,13 +17,14 @@ namespace psvr2_toolkit {
     unsigned char magic[2];
     uint16_t version;
     uint32_t total_size;
-    uint8_t unk0[8];
+    uint32_t timestamp;
+    uint8_t unk0[4];
     uint16_t image_type;
     uint8_t unk1[22];
     uint32_t custom_data_size;
     uint8_t unk2[20];
     uint8_t unk3[192];
-    uint8_t __unkData2[2097152];
+    uint8_t data[2097152];
   };
 
   // TODO: only partial
@@ -62,7 +65,7 @@ namespace psvr2_toolkit {
     uint32_t actualBufferSize = bufferSize;
 
     if (!bufferSize) {
-      return 0;
+        return 0;
     }
 
     while (actualBufferSize > 0) {
@@ -150,6 +153,24 @@ namespace psvr2_toolkit {
       if (a1->image_data.magic[0] == 'V' && a1->image_data.magic[1] == 'I') {
         if (a1->image_data.image_type == 6) {
           CustomShareManager::getSingleton()->setGazeImage((unsigned char *)&a1->image_data);
+        }
+        else if (a1->image_data.image_type == 11) {
+          static HmdDeviceCamera* pHmdDeviceCamera = HmdDeviceCamera::Instance();
+
+          int64_t hmdToHostOffset;
+          CaesarManager::GetIMUTimestampOffset(CaesarManager::GetInstance(), &hmdToHostOffset);
+
+          double timeOffset = (static_cast<int64_t>(a1->image_data.timestamp) + hmdToHostOffset) / 1e6;
+
+          static LARGE_INTEGER frequency{};
+          if (frequency.QuadPart == 0)
+          {
+              QueryPerformanceFrequency(&frequency);
+          }
+
+          uint64_t ticks = static_cast<uint64_t>(timeOffset * static_cast<double>(frequency.QuadPart));
+
+          pHmdDeviceCamera->UploadBC4(ticks, a1->image_data.data);
         }
       }
     }
