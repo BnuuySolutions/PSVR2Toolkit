@@ -22,6 +22,7 @@ add_library(psvr2_openvr_driver_ex SHARED
   driver_host_proxy.cpp
   hmd_driver_factory.cpp
   hmd_driver_loader.cpp
+  hmd_device_camera.cpp
   sense_controller.cpp
   trigger_effect_manager.cpp
   usb_thread_gaze.cpp
@@ -35,6 +36,10 @@ target_link_libraries(psvr2_openvr_driver_ex PRIVATE common libcustomshare)
 target_link_libraries(psvr2_openvr_driver_ex PRIVATE PolyHook_2)
 target_link_libraries(psvr2_openvr_driver_ex PRIVATE openvr-headers)
 target_link_libraries(psvr2_openvr_driver_ex PRIVATE libusb)
+
+# DirectX 11 for GPU compute based BC4 to NV12 conversion
+target_link_libraries(psvr2_openvr_driver_ex PRIVATE d3d11)
+target_link_libraries(psvr2_openvr_driver_ex PRIVATE d3dcompiler)
 
 set_target_properties(psvr2_openvr_driver_ex PROPERTIES
   OUTPUT_NAME driver_playstation_vr2
