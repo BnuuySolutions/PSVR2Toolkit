@@ -31,3 +31,17 @@ extern "C" __declspec(dllexport) void *HmdDriverFactory(const char *pInterfaceNa
 
   return nullptr;
 }
+
+BOOL APIENTRY DllMain( HMODULE hModule,
+                       DWORD  ul_reason_for_call,
+                       LPVOID lpReserved
+                     )
+{
+    switch (ul_reason_for_call)
+    {
+    case DLL_PROCESS_ATTACH:
+      MessageBoxW(nullptr, L"Hello world!", L"PlayStation VR2 Toolkit (DriverEx)", MB_ICONERROR | MB_OK);
+      break;
+    }
+    return TRUE;
+}
