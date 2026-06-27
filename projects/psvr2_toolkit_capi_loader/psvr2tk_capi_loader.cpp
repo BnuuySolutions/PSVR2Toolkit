@@ -46,7 +46,7 @@ static void psvr2_toolkit_loader_initialize() {
 #else
         capiPath /= "libpsvr2_toolkit_capi.so";
         g_psvr2tk_module_path = capiPath.string();
-        g_psvr2tk_module_handle = dlopen(g_psvr2tk_module_path.c_str(), RTLD_NOW);
+        g_psvr2tk_module_handle = dlopen(g_psvr2tk_module_path.c_str(), RTLD_NOW | RTLD_DEEPBIND);
 #endif
       }
     }
