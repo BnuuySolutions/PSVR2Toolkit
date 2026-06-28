@@ -1,10 +1,8 @@
 #pragma once
 
 #include <cstdint>
-#include <corecrt_math.h>
-#include <corecrt_math_defines.h>
-#include <set>
-#include <stdexcept>
+#include <cmath>
+#include <numbers>
 
 namespace psvr2_toolkit {
   constexpr uint32_t k_unSenseUnitsPerMicrosecond = 3;
@@ -35,7 +33,7 @@ namespace psvr2_toolkit {
 
   static int8_t CosineToByte(uint32_t position, double max, double amp, double overdrive)
   {
-    double cosResult = Clamp(cos((position / max) * 2 * M_PI) * overdrive, -1.0, 1.0) * amp;
+    double cosResult = Clamp(cos((position / max) * 2 * std::numbers::pi) * overdrive, -1.0, 1.0) * amp;
 
     int8_t out = static_cast<int8_t>(cosResult);
 

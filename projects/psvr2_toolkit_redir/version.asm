@@ -1,0 +1,70 @@
+.code
+extern GetFileVersionInfoA_orig:QWORD
+extern GetFileVersionInfoByHandle_orig:QWORD
+extern GetFileVersionInfoExA_orig:QWORD
+extern GetFileVersionInfoExW_orig:QWORD
+extern GetFileVersionInfoSizeA_orig:QWORD
+extern GetFileVersionInfoSizeExA_orig:QWORD
+extern GetFileVersionInfoSizeExW_orig:QWORD
+extern GetFileVersionInfoSizeW_orig:QWORD
+extern GetFileVersionInfoW_orig:QWORD
+extern VerFindFileA_orig:QWORD
+extern VerFindFileW_orig:QWORD
+extern VerInstallFileA_orig:QWORD
+extern VerInstallFileW_orig:QWORD
+extern VerLanguageNameA_orig:QWORD
+extern VerLanguageNameW_orig:QWORD
+extern VerQueryValueA_orig:QWORD
+extern VerQueryValueW_orig:QWORD
+GetFileVersionInfoA_new proc
+  jmp QWORD ptr GetFileVersionInfoA_orig
+GetFileVersionInfoA_new endp
+GetFileVersionInfoByHandle_new proc
+  jmp QWORD ptr GetFileVersionInfoByHandle_orig
+GetFileVersionInfoByHandle_new endp
+GetFileVersionInfoExA_new proc
+  jmp QWORD ptr GetFileVersionInfoExA_orig
+GetFileVersionInfoExA_new endp
+GetFileVersionInfoExW_new proc
+  jmp QWORD ptr GetFileVersionInfoExW_orig
+GetFileVersionInfoExW_new endp
+GetFileVersionInfoSizeA_new proc
+  jmp QWORD ptr GetFileVersionInfoSizeA_orig
+GetFileVersionInfoSizeA_new endp
+GetFileVersionInfoSizeExA_new proc
+  jmp QWORD ptr GetFileVersionInfoSizeExA_orig
+GetFileVersionInfoSizeExA_new endp
+GetFileVersionInfoSizeExW_new proc
+  jmp QWORD ptr GetFileVersionInfoSizeExW_orig
+GetFileVersionInfoSizeExW_new endp
+GetFileVersionInfoSizeW_new proc
+  jmp QWORD ptr GetFileVersionInfoSizeW_orig
+GetFileVersionInfoSizeW_new endp
+GetFileVersionInfoW_new proc
+  jmp QWORD ptr GetFileVersionInfoW_orig
+GetFileVersionInfoW_new endp
+VerFindFileA_new proc
+  jmp QWORD ptr VerFindFileA_orig
+VerFindFileA_new endp
+VerFindFileW_new proc
+  jmp QWORD ptr VerFindFileW_orig
+VerFindFileW_new endp
+VerInstallFileA_new proc
+  jmp QWORD ptr VerInstallFileA_orig
+VerInstallFileA_new endp
+VerInstallFileW_new proc
+  jmp QWORD ptr VerInstallFileW_orig
+VerInstallFileW_new endp
+VerLanguageNameA_new proc
+  jmp QWORD ptr VerLanguageNameA_orig
+VerLanguageNameA_new endp
+VerLanguageNameW_new proc
+  jmp QWORD ptr VerLanguageNameW_orig
+VerLanguageNameW_new endp
+VerQueryValueA_new proc
+  jmp QWORD ptr VerQueryValueA_orig
+VerQueryValueA_new endp
+VerQueryValueW_new proc
+  jmp QWORD ptr VerQueryValueW_orig
+VerQueryValueW_new endp
+end

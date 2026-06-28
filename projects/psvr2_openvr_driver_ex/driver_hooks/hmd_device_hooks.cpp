@@ -1,9 +1,7 @@
-#ifdef OPENVR_EXTENSIONS_AVAILABLE
-#include "psvr2_openvr_driver/openvr_ex/openvr_ex.h"
-#endif
-
+#include "driver_interface/caesar_manager.h"
 #include "driver_host_proxy.h"
-#include "common/hmd2_gaze.h"
+#include "hmd2_gaze.h"
+#include "hmd_device_camera.h"
 #include "hmd_device_hooks.h"
 #include "hmd_driver_loader.h"
 #include "hook_lib.h"
@@ -15,15 +13,10 @@
 #include <cstdint>
 
 namespace psvr2_toolkit {
-  void *(*CaesarManager__getInstance)();
-  uint64_t(*CaesarManager__getIMUTimestampOffset)(void *thisptr, int64_t *hmdToHostOffset);
   void *(*ShareManager__getInstance)();
   void (*ShareManager__getIntConfig)(void *thisPtr, uint32_t configId, int64_t *outValue);
   void (*ShareManager__setIntConfig)(void *thisPtr, uint32_t configId, int64_t *value);
 
-#ifdef OPENVR_EXTENSIONS_AVAILABLE
-  void *g_pOpenVRExHandle = nullptr;
-#endif
   vr::VRInputComponentHandle_t eyeTrackingComponent = vr::k_ulInvalidInputComponentHandle;
   int64_t currentBrightness;
 
@@ -32,6 +25,8 @@ namespace psvr2_toolkit {
     vr::EVRInitError result = sie__psvr2__HmdDevice__Activate(thisptr, unObjectId);
     vr::PropertyContainerHandle_t ulPropertyContainer = vr::VRProperties()->TrackedDeviceToPropertyContainer(unObjectId);
 
+    DriverHostProxy::Instance()->SetDevice(DeviceType::HMD, ulPropertyContainer, unObjectId);
+
     // Sony driver only defines the standard hidden area mesh.
     // OpenVR and OpenXR applications can ask for other types
     // and may end up with broken rendering in some cases
@@ -39,7 +34,7 @@ namespace psvr2_toolkit {
     // Thanks to Checkerboard for spotting this!
     if (result == vr::VRInitError_None) {
       vr::CVRHiddenAreaHelpers hamHelpers(vr::VRPropertiesRaw());
-      
+
       for (int e = 0; e < 2; ++e) {
         vr::EVREye eye = static_cast<vr::EVREye>(e);
         vr::ETrackedPropertyError err;
@@ -58,7 +53,7 @@ namespace psvr2_toolkit {
             inverseVerts.reserve(perimeter.size() * 3);
 
             vr::HmdVector2_t center = { 0.5f, 0.5f };
-            
+
             for (size_t i = 0; i < perimeter.size() - 1; ++i) {
               inverseVerts.push_back(center);
               inverseVerts.push_back(perimeter[i]);
@@ -112,6 +107,100 @@ namespace psvr2_toolkit {
       }
     });
 
+    vr::VRProperties()->SetBoolProperty(ulPropertyContainer, vr::Prop_AllowCameraToggle_Bool, true);
+    vr::VRProperties()->SetBoolProperty(ulPropertyContainer, vr::Prop_HasCamera_Bool, true);
+    vr::VRProperties()->SetBoolProperty(ulPropertyContainer, vr::Prop_HasCameraComponent_Bool, true);
+    vr::VRProperties()->SetInt32Property(ulPropertyContainer, vr::Prop_NumCameras_Int32, 2); // ?
+
+    // Required to make camera work...
+    vr::VRProperties()->SetUint64Property(ulPropertyContainer, vr::Prop_FPGAVersion_Uint64, 0x104);
+    vr::VRProperties()->SetUint64Property(ulPropertyContainer, vr::Prop_FirmwareVersion_Uint64, 0x56456BA0);
+    vr::VRProperties()->SetUint64Property(ulPropertyContainer, vr::Prop_CameraFirmwareVersion_Uint64, 0x200040049);
+
+    // TODO: make this not hardcoded
+    vr::HmdMatrix34_t cameraToHeadTransforms[2]
+    {
+      {
+        {
+          {  0.96483f, -0.00285f,  0.26284f, -0.05384f },
+          { -0.12877f,  0.86660f,  0.48210f, -0.03609f },
+          { -0.22915f, -0.49899f,  0.83576f, -0.09910f }
+        }
+      },
+      {
+        {
+          {  0.96546f,  0.00490f, -0.26052f,  0.02514f },
+          {  0.12543f,  0.86764f,  0.48112f, -0.03605f },
+          {  0.22840f, -0.49717f,  0.83705f, -0.09950f }
+        }
+      }
+    };
+
+    cameraToHeadTransforms[1] = HmdMath::convert44to34(
+      HmdMath::multiplyMatrix(
+        HmdMath::convert34to44(cameraToHeadTransforms[1]),
+        HmdMath::convert34to44(HmdMath::createTransformMatrixFromEuler({0,0,0}, 2.0f, 0.0f, 0.0f))
+      ));
+
+    vr::VRProperties()->SetProperty(ulPropertyContainer, vr::Prop_CameraToHeadTransform_Matrix34, &cameraToHeadTransforms, sizeof(vr::HmdMatrix34_t), vr::k_unHmdMatrix34PropertyTag);
+    vr::VRProperties()->SetProperty(ulPropertyContainer, vr::Prop_CameraToHeadTransforms_Matrix34_Array, &cameraToHeadTransforms, sizeof(vr::HmdMatrix34_t) * 2, vr::k_unHmdMatrix34PropertyTag);
+
+    vr::VRProperties()->SetInt32Property(ulPropertyContainer, vr::Prop_CameraFrameLayout_Int32, vr::EVRTrackedCameraFrameLayout_Stereo | vr::EVRTrackedCameraFrameLayout_HorizontalLayout);
+    vr::VRProperties()->SetInt32Property(ulPropertyContainer, vr::Prop_CameraStreamFormat_Int32, vr::CVS_FORMAT_NV12);
+
+    vr::EVRDistortionFunctionType cameraDistortionFunction[2] = {
+        vr::VRDistortionFunctionType_Extended_FTheta,
+        vr::VRDistortionFunctionType_Extended_FTheta
+    };
+
+    vr::VRProperties()->SetProperty(
+      ulPropertyContainer,
+      vr::Prop_CameraDistortionFunction_Int32_Array,
+      &cameraDistortionFunction,
+      sizeof(cameraDistortionFunction),
+      vr::k_unInt32PropertyTag
+    );
+
+    float cameraDistortionCoeffs[2][vr::k_unMaxDistortionFunctionParameters] = {
+        { 8.925063f, -11.718638f, 6.383888f, -1.237600f, 0.0f, 0.0f, 0.0f, 0.0f },
+        { 8.937389f, -11.752472f, 6.413345f, -1.245505f, 0.0f, 0.0f, 0.0f, 0.0f }
+    };
+
+    vr::VRProperties()->SetProperty(
+      ulPropertyContainer,
+      vr::Prop_CameraDistortionCoefficients_Float_Array,
+      &cameraDistortionCoeffs,
+      sizeof(cameraDistortionCoeffs),
+      vr::k_unFloatPropertyTag
+    );
+
+    vr::HmdVector4_t whiteBalance[2] = {
+        { 1.0f, 1.0f, 1.0f, 1.0f },
+        { 1.0f, 1.0f, 1.0f, 1.0f }
+    };
+    vr::VRProperties()->SetProperty(ulPropertyContainer, vr::Prop_CameraWhiteBalance_Vector4_Array,
+      whiteBalance, sizeof(whiteBalance), vr::k_unHmdVector4PropertyTag);
+
+    vr::VRProperties()->SetFloatProperty(ulPropertyContainer, vr::Prop_CameraExposureTime_Float, 1.0f / 60.0f);
+    vr::VRProperties()->SetFloatProperty(ulPropertyContainer, vr::Prop_CameraGlobalGain_Float, 1.0f);
+
+    HmdDeviceCamera* pHmdDeviceCamera = HmdDeviceCamera::Instance();
+
+    vr::EVRInitError eError;
+    pHmdDeviceCamera->pVRBlockQueue = (vr::IVRBlockQueue *)vr::VRDriverContext()->GetGenericInterface(vr::IVRBlockQueue_Version, &eError);
+    vr::IVRPaths *pVRPaths = (vr::IVRPaths *)vr::VRDriverContext()->GetGenericInterface(vr::IVRPaths_Version, &eError);
+
+    pHmdDeviceCamera->pVRBlockQueue->Create(&pHmdDeviceCamera->blockQueueHandle, "/lighthouse/camera/raw_frames", frameDataSize, 512, 8);
+
+    int32_t width = IMAGE_WIDTH * 2;
+    vr::WritePathProperty(pVRPaths, pHmdDeviceCamera->blockQueueHandle, "/width", width);
+
+    int32_t height = IMAGE_HEIGHT;
+    vr::WritePathProperty(pVRPaths, pHmdDeviceCamera->blockQueueHandle, "/height", height);
+
+    int32_t format = vr::CVS_FORMAT_NV12;
+    vr::WritePathProperty(pVRPaths, pHmdDeviceCamera->blockQueueHandle, "/format", format);
+
     // Tell SteamVR our dashboard scale.
     vr::VRProperties()->SetFloatProperty(ulPropertyContainer, vr::Prop_DashboardScale_Float, .9f);
 
@@ -129,22 +218,23 @@ namespace psvr2_toolkit {
       vr::VRDriverLog()->Log("Failed to get driver input interface. Are you on the latest version of SteamVR?");
     }
 
-#ifdef OPENVR_EXTENSIONS_AVAILABLE
-    psvr2_toolkit::openvr_ex::OnHmdActivate(ulPropertyContainer, &g_pOpenVRExHandle);
-#endif
-
     return result;
   }
 
   void (*sie__psvr2__HmdDevice__Deactivate)(void *) = nullptr;
   void sie__psvr2__HmdDevice__DeactivateHook(void *thisptr) {
     sie__psvr2__HmdDevice__Deactivate(thisptr);
+  }
 
-#ifdef OPENVR_EXTENSIONS_AVAILABLE
-    if (g_pOpenVRExHandle) {
-      psvr2_toolkit::openvr_ex::OnHmdDeactivate(&g_pOpenVRExHandle);
+
+  void *(*sie__psvr2__HmdDevice__GetComponent)(void *, char *) = nullptr;
+  void *sie__psvr2__HmdDevice__GetComponentHook(void *thisptr, char *pchComponentNameAndVersion) {
+    if (strcmp(pchComponentNameAndVersion, vr::IVRCameraComponent_Version) == 0) {
+      HmdDeviceCamera *pHmdDeviceCamera = HmdDeviceCamera::Instance();
+      return pHmdDeviceCamera;
     }
-#endif
+
+    return sie__psvr2__HmdDevice__GetComponent(thisptr, pchComponentNameAndVersion);
   }
 
   inline const int64_t GetHostTimestamp()
@@ -186,17 +276,11 @@ namespace psvr2_toolkit {
 
     int64_t hmdToHostOffset;
 
-    CaesarManager__getIMUTimestampOffset(CaesarManager__getInstance(), &hmdToHostOffset);
+    CaesarManager::GetIMUTimestampOffset(CaesarManager::GetInstance(), &hmdToHostOffset);
 
     double timeOffset = ((static_cast<int64_t>(pGazeState->wearable.timestamp) + hmdToHostOffset) - GetHostTimestamp()) / 1e6;
 
     (vr::VRDriverInput())->UpdateEyeTrackingComponent(eyeTrackingComponent, &eyeTrackingData, timeOffset);
-
-#ifdef OPENVR_EXTENSIONS_AVAILABLE
-    if (g_pOpenVRExHandle) {
-      psvr2_toolkit::openvr_ex::OnHmdUpdate(&g_pOpenVRExHandle, pData, dwSize);
-    }
-#endif
   }
 
   void HmdDeviceHooks::InstallHooks() {
@@ -212,8 +296,11 @@ namespace psvr2_toolkit {
                          reinterpret_cast<void *>(sie__psvr2__HmdDevice__DeactivateHook),
                          reinterpret_cast<void **>(&sie__psvr2__HmdDevice__Deactivate));
 
-    CaesarManager__getInstance = decltype(CaesarManager__getInstance)(pHmdDriverLoader->GetBaseAddress() + 0x124c90);
-    CaesarManager__getIMUTimestampOffset = decltype(CaesarManager__getIMUTimestampOffset)(pHmdDriverLoader->GetBaseAddress() + 0x1252e0);
+    // sie::psvr2::HmdDevice::GetComponent
+    HookLib::InstallHook(reinterpret_cast<void *>(pHmdDriverLoader->GetBaseAddress() + 0x19EC60),
+                         reinterpret_cast<void *>(sie__psvr2__HmdDevice__GetComponentHook),
+                         reinterpret_cast<void **>(&sie__psvr2__HmdDevice__GetComponent));
+
     ShareManager__getInstance = decltype(ShareManager__getInstance)(pHmdDriverLoader->GetBaseAddress() + 0x15bbd0);
     ShareManager__getIntConfig = decltype(ShareManager__getIntConfig)(pHmdDriverLoader->GetBaseAddress() + 0x15d270);
     ShareManager__setIntConfig = decltype(ShareManager__setIntConfig)(pHmdDriverLoader->GetBaseAddress() + 0x15f3d0);

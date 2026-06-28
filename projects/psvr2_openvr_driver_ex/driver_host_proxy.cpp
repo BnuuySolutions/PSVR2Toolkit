@@ -1,18 +1,13 @@
 #include "driver_host_proxy.h"
 
 #include "hmd_math.h"
+#include "hmd_types.h"
 #include "util.h"
 #include "vr_settings.h"
 
 #include <cstdint>
 
 namespace psvr2_toolkit {
-
-  /* Hardcoded device indexes, in order of when they are registered inside the driver. */
-
-  static constexpr uint32_t k_unDeviceIndexHeadset = 0; // Currently not used.
-  static constexpr uint32_t k_unDeviceIndexSenseControllerLeft = 1;
-  static constexpr uint32_t k_unDeviceIndexSenseControllerRight = 2;
 
   DriverHostProxy *DriverHostProxy::m_pInstance = nullptr;
 
@@ -46,39 +41,16 @@ namespace psvr2_toolkit {
 
     bool success = m_pDriverHost->TrackedDeviceAdded(pchDeviceSerialNumber, eDeviceClass, pDriver);
 
-    if (success)
-    {
-      switch (eDeviceClass)
-      {
-      case vr::ETrackedDeviceClass::TrackedDeviceClass_HMD:
-        if (hmdContainer == vr::k_ulInvalidPropertyContainer) {
-          hmdContainer = vr::VRProperties()->TrackedDeviceToPropertyContainer(k_unDeviceIndexHeadset);
-        }
-        break;
-      case vr::ETrackedDeviceClass::TrackedDeviceClass_Controller:
-        if (Util::StartsWith(pchDeviceSerialNumber, "playstation_vr2_sense_controller_left")) {
-          if (leftControllerContainer == vr::k_ulInvalidPropertyContainer) {
-            leftControllerContainer = vr::VRProperties()->TrackedDeviceToPropertyContainer(k_unDeviceIndexSenseControllerLeft);
-          }
-        }
-
-        else if (Util::StartsWith(pchDeviceSerialNumber, "playstation_vr2_sense_controller_right")) {
-          if (rightControllerContainer == vr::k_ulInvalidPropertyContainer) {
-            rightControllerContainer = vr::VRProperties()->TrackedDeviceToPropertyContainer(k_unDeviceIndexSenseControllerRight);
-          }
-        }
-      }
-    }
-
     return success;
   }
 
   void DriverHostProxy::TrackedDevicePoseUpdated(uint32_t unWhichDevice, const vr::DriverPose_t &newPose, uint32_t unPoseStructSize) {
-    if (unWhichDevice != k_unDeviceIndexSenseControllerLeft && unWhichDevice != k_unDeviceIndexSenseControllerRight) {
+    DeviceType deviceType = GetDeviceType(unWhichDevice);
+    if (deviceType != DeviceType::SenseControllerLeft && deviceType != DeviceType::SenseControllerRight) {
       return m_pDriverHost->TrackedDevicePoseUpdated(unWhichDevice, newPose, unPoseStructSize);
     }
 
-    return m_pDriverHost->TrackedDevicePoseUpdated(unWhichDevice, GetPose(unWhichDevice, newPose), unPoseStructSize);
+    return m_pDriverHost->TrackedDevicePoseUpdated(unWhichDevice, GetPose(deviceType, newPose), unPoseStructSize);
   }
 
   void DriverHostProxy::VsyncEvent(double vsyncTimeOffsetSeconds) {
@@ -127,12 +99,12 @@ namespace psvr2_toolkit {
     m_pDriverHost->SetRecommendedRenderTargetSize(unWhichDevice, nWidth, nHeight);
   }
 
-  vr::DriverPose_t DriverHostProxy::GetPose(uint32_t unWhichDevice, const vr::DriverPose_t &originalPose) {
+  vr::DriverPose_t DriverHostProxy::GetPose(DeviceType type, const vr::DriverPose_t &originalPose) {
     static vr::HmdQuaternion_t imuRotationOffset = HmdMath::EulerToQuaternion(0, 0, 0.680678427219391);
     static vr::HmdQuaternion_t imuRotationOffsetInverse = HmdMath::QuaternionInverse(imuRotationOffset);
 
     // Whether this is the left controller or not.
-    bool isLeft = unWhichDevice == k_unDeviceIndexSenseControllerLeft;
+    bool isLeft = (type == DeviceType::SenseControllerLeft);
 
     // Our new pose is a copy of the original pose.
     vr::DriverPose_t newPose = originalPose;

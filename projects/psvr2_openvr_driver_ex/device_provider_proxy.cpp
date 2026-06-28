@@ -1,9 +1,13 @@
 #include "device_provider_proxy.h"
 
+#include "driver_hooks/aston_manager_hooks.h"
+#include "command_thread.h"
+#include "caesar_usb_thread.h"
 #include "config.h"
 #include "driver_hooks/caesar_manager_hooks.h"
 #include "driver_context_proxy.h"
 #include "driver_hooks/hmd_device_hooks.h"
+#include "driver_hooks/sense_device_hooks.h"
 #include "hmd_driver_loader.h"
 #include "hook_lib.h"
 #include "driver_hooks/libpad_hooks.h"
@@ -40,7 +44,7 @@ namespace psvr2_toolkit {
 
   vr::EVRInitError DeviceProviderProxy::Init(vr::IVRDriverContext *pDriverContext) {
 #if _DEBUG
-    Sleep(8000);
+    Sleep(2000);
 #endif
 
     VR_INIT_SERVER_DRIVER_CONTEXT(pDriverContext);
@@ -51,6 +55,9 @@ namespace psvr2_toolkit {
     }
 
     CustomShareManager::createSingleton();
+    CustomShareManager::getSingleton()->setupCAPIPath();
+    
+    CommandThread::Initialize();
 
     static DriverContextProxy *pDriverContextProxy = DriverContextProxy::Instance();
     pDriverContextProxy->SetDriverContext(pDriverContext);
@@ -63,8 +70,14 @@ namespace psvr2_toolkit {
       SenseController::Destroy();
     }
 
+    CommandThread::Stop();
+    
     m_pDeviceProvider->Cleanup();
 
+    // The cleanup call above handles joining all CaesarUsbThread instances.
+    // We're taking care of tearing down global stuff like the libusb event thread.
+    CaesarUsbThread::Stop();
+    
     VR_CLEANUP_SERVER_DRIVER_CONTEXT();
   }
 
@@ -118,9 +131,12 @@ namespace psvr2_toolkit {
     INSTALL_STUB(reinterpret_cast<void*>(pHmdDriverLoader->GetBaseAddress() + 0x12F830)); // VrDialogManager::CreateDashboardProcess
     INSTALL_STUB(reinterpret_cast<void*>(pHmdDriverLoader->GetBaseAddress() + 0x130020)); // VrDialogManager::CreateDialogProcess
 
+    AstonManagerHooks::InstallHooks();
     CaesarManagerHooks::InstallHooks();
+    CaesarUsbThread::InstallHooks();
     HmdDeviceHooks::InstallHooks();
     LibpadHooks::InstallHooks();
+    SenseDeviceHooks::InstallHooks();
     UsbThreadHooks::InstallHooks();
   }
 

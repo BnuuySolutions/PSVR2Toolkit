@@ -1,9 +1,15 @@
+#include "custom_share_manager.h"
 #include "driver_host_proxy.h"
 #include "hmd_driver_loader.h"
 #include "math_helpers.h"
 #include "sense_controller.h"
 #include "sense_crc.h"
+#include "trigger_effect_manager.h"
+#include "common.h"
 
+#include <algorithm>
+#include <array>
+#include <cstdint>
 #include <iostream>
 #include <iomanip>
 #include <string>
@@ -30,23 +36,20 @@ void SenseController::SetGeneratedHaptic(float freq, uint32_t amp, uint32_t samp
   this->hapticAmp = amp;
   this->hapticSamplesLeft = sampleCount;
 }
-void SenseController::SetPCM(const std::vector<int8_t>& newPCMData) {
+
+void SenseController::MixPCM(const PCMBufferType& newPCMData) {
   std::scoped_lock<std::mutex> lock(controllerMutex);
 
-  this->pcmData = newPCMData;
-  this->samplesRead = 0;
+  for (size_t i = 0; i < pcmData.size(); i++)
+  {
+    pcmData[i] = ClampedAdd(pcmData[i], newPCMData[i]);
+  }
 }
-void SenseController::AppendPCM(const std::vector<int8_t>& newPCMData) {
+
+void SenseController::ResetPCM() {
   std::scoped_lock<std::mutex> lock(controllerMutex);
 
-  // Append the new PCM data to the existing data
-  this->pcmData.insert(pcmData.end(), newPCMData.begin(), newPCMData.end());
-
-  // Trim off data that is already read
-  // Move current head to beginning of the vector
-  std::move(pcmData.begin() + this->samplesRead, pcmData.end(), pcmData.begin());
-  this->pcmData.resize(pcmData.size() - this->samplesRead);
-  this->samplesRead = 0;
+  pcmData.fill(0);
 }
 
 void SenseController::SetTrackingControllerSettings(const SenseControllerPCModePacket_t* data) {
@@ -80,14 +83,15 @@ void SenseController::SetHandle(void* handle, int padHandle) {
     this->padHandle = padHandle;
   }
 
-  if (handle != nullptr)
+  if (padHandle != -1)
   {
-    this->SetGeneratedHaptic(800.0f, k_unSenseMaxHapticAmplitude, 1500);
+    if (handle != nullptr)
+    {
+      this->SetGeneratedHaptic(800.0f, k_unSenseMaxHapticAmplitude, 1500);
+    }
     this->ClearTimestampOffset();
   }
 }
-
-uint32_t offset = 0;
 
 void SenseController::SendToDevice() {
   SenseControllerPacket_t buffer;
@@ -139,13 +143,8 @@ void SenseController::SendToDevice() {
 
       auto& pcmData = this->pcmData;
 
-      // Copy the PCM data to the buffer. We need to make sure we don't go out of bounds.
-      size_t bytesToCopy = std::min(pcmData.size() - this->samplesRead, static_cast<size_t>(32));
-      if (bytesToCopy != 0)
-      {
-        memcpy_s(&buffer.hapticPCM, sizeof(buffer.hapticPCM), pcmData.data() + this->samplesRead, bytesToCopy);
-        this->samplesRead += bytesToCopy;
-      }
+      // Copy the PCM data to the buffer.
+      std::memcpy(buffer.hapticPCM, pcmData.data(), pcmData.size());
 
       // Calculate the haptic overdrive based on frequency. We want overdrive to range from 25.0 to 1.0.
       // Basically, this makes a square wave from the cosine wave. Lower frequencies will have a higher overdrive.
@@ -218,7 +217,7 @@ void SenseThread()
   QueryPerformanceFrequency(&frequency);
 
   // Duration we want to run every iteration (32/3000 or 0.010666 seconds)
-  LONGLONG duration = static_cast<LONGLONG>((32.0 / static_cast<double>(k_unSenseSampleRate)) * frequency.QuadPart);
+  LONGLONG duration = static_cast<LONGLONG>((static_cast<double>(k_senseChunkSize) / static_cast<double>(k_senseSampleRate)) * frequency.QuadPart);
 
   LARGE_INTEGER start;
   QueryPerformanceCounter(&start);
@@ -228,8 +227,48 @@ void SenseThread()
     LARGE_INTEGER now;
     QueryPerformanceCounter(&now);
 
+    CustomShareManager* pShareManager = CustomShareManager::getSingleton();
+    if (pShareManager) {
+      leftController.ResetPCM();
+      rightController.ResetPCM();
+      for (int i = 0; i < k_maxSlots; i++) {
+        unsigned char pcmLeft[k_senseChunkSize] = {0};
+        unsigned char pcmRight[k_senseChunkSize] = {0};
+        
+        pShareManager->readPcm(i, pcmLeft, pcmRight);
+        
+        bool hasLeft = false;
+        bool hasRight = false;
+        for (int j = 0; j < k_senseChunkSize; j++) {
+          if (pcmLeft[j] != 0) hasLeft = true;
+          if (pcmRight[j] != 0) hasRight = true;
+        }
+        
+        if (hasLeft) {
+          PCMBufferType pcmVec;
+          std::copy(std::begin(pcmLeft), std::end(pcmLeft), pcmVec.begin());
+          
+          leftController.MixPCM(pcmVec);
+        }
+        
+        if (hasRight) {
+          PCMBufferType pcmVec;
+          std::copy(std::begin(pcmRight), std::end(pcmRight), pcmVec.begin());
+
+          rightController.MixPCM(pcmVec);
+        }
+      }
+    }
+
+    // TODO: this should be moved out to support non-enhanced haptics path
+    TriggerEffectManager::Instance()->Update();
+
     leftController.SendToDevice();
     rightController.SendToDevice();
+    
+    if (pShareManager) {
+      pShareManager->signalPcmUpdate();
+    }
 
     if (SenseController::g_ShouldResetLEDTrackingInTicks > 0)
     {
@@ -322,11 +361,11 @@ static void PollNextEvent(vr::VREvent_t* pEvent)
       senseHapticAmp = static_cast<uint8_t>(sqrtf(hapticEvent.fAmplitude) * k_unSenseMaxHapticAmplitude);
       if (hapticEvent.fDurationSeconds == 0.0f) {
         senseHapticFreq = std::max(80.0f, senseHapticFreq);
-        senseHapticSamplesLeft = static_cast<uint32_t>(k_unSenseSampleRate / senseHapticFreq);
+        senseHapticSamplesLeft = static_cast<uint32_t>(k_senseSampleRate / senseHapticFreq);
       }
       else
       {
-        senseHapticSamplesLeft = static_cast<uint32_t>(hapticEvent.fDurationSeconds * k_unSenseSampleRate);
+        senseHapticSamplesLeft = static_cast<uint32_t>(hapticEvent.fDurationSeconds * k_senseSampleRate);
       }
     }
 

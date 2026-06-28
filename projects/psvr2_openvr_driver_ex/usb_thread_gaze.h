@@ -1,24 +1,24 @@
 #pragma once
 
+#include "caesar_usb_thread.h"
+
 #include <cstdint>
 
-class CaesarUsbThreadGaze {
+namespace psvr2_toolkit {
+
+class CaesarUsbThreadGaze : public CaesarUsbThread {
 public:
+  virtual uint8_t GetInterface() override;
+  virtual uint8_t GetEndpoint() override;
+
+  virtual void OnConnected() override;
+
+  virtual int PollAndProcess() override;
+
   static void Reset();
   static CaesarUsbThreadGaze *Instance();
-
-  void dtor_CaesarUsbThreadGaze();
-
-  void close();
-
-  uint8_t getUsbInf();
-  uint8_t getReadPipeId();
-
-  int poll();
-
 private:
   static CaesarUsbThreadGaze *m_pInstance;
-
-  void **m_ppVTable;
-  char m_pBaseData[0x218]; // Total size (excluding VTable pointer) of CaesarUsbThread.
 };
+
+} // namespace psvr2_toolkit
