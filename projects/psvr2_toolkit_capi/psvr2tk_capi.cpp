@@ -27,15 +27,8 @@ extern "C" {
     return CustomShareManager::getSingleton()->getGazeStatus(pGazeStatus, &g_lastGazeStatusCounter, timeoutMs);
   }
 
-  bool psvr2_toolkit_gaze_image(unsigned char* pGazeImage, uint32_t timeoutMs) {
-    unsigned char* ptr = nullptr;
-    bool isNew = CustomShareManager::getSingleton()->getGazeImageBuffer(&ptr, &g_lastGazeImageCounter, timeoutMs);
-    if (ptr) {
-      // TODO: size shouldn't be 0x200100?
-      // Also thinking of just making this API return a pointer instead to avoid a copy.
-      std::memcpy(pGazeImage, ptr, 0x200100);
-    }
-    return isNew;
+  bool psvr2_toolkit_gaze_image(unsigned char** pGazeImage, uint32_t timeoutMs) {
+    return CustomShareManager::getSingleton()->getGazeImageBuffer(pGazeImage, &g_lastGazeImageCounter, timeoutMs);
   }
 
   void psvr2_toolkit_write_pcm(VRControllerType controllerType, const unsigned char* pcm) {

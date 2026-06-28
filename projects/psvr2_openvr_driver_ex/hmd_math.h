@@ -4,9 +4,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <numbers>
 #include <vector>
-
-#define PI 3.14159265359f
 
 namespace psvr2_toolkit {
 
@@ -233,7 +232,7 @@ namespace psvr2_toolkit {
      * @return The angle in radians.
      */
     static float toRadians(float degrees) {
-        return degrees * PI / 180.0f;
+        return degrees * std::numbers::pi / 180.0f;
     }
 
     /**

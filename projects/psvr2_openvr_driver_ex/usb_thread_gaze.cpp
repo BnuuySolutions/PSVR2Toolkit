@@ -1,4 +1,3 @@
-// #include "common/hmd2_gaze.h" TODO: sort out header re-location
 #include "driver_hooks/hmd_device_hooks.h"
 #include "driver_interface/caesar_manager.h"
 #include "custom_share_manager.h"
@@ -55,9 +54,6 @@ void CaesarUsbThreadGaze::OnConnected() {
 
   // Gaze stream enable. For some reason this doesn't really stick.
   this->ControlCommand(true, 0x0C, nullptr, 0, 0, 0, 1);
-
-  //char data[8] = { 1, 0, 0, 0, 0x05, 0, 0, 0 };
-  //CaesarUsbThread::ControlCommandHook(this, true, 0xb, data, 8, 0, 0, 1);
 }
 
 int CaesarUsbThreadGaze::PollAndProcess() {

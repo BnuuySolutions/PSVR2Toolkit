@@ -134,7 +134,7 @@ int main(int argc, char* argv[]) {
 
   // Buffers for CAPI data
   hmd2_gaze_status_t gazeStatus;
-  std::vector<unsigned char> gazeImage(0x200100, 0);
+  unsigned char* latestGazeImage = nullptr;
 
   // Gaze image is 2048x1024 8-bit grayscale, with a 256-byte header.
   const int IMAGE_WIDTH = 400;
@@ -171,18 +171,20 @@ int main(int argc, char* argv[]) {
 
     // Fetch the latest data from the CAPI
     psvr2_toolkit_gaze_status(&gazeStatus, 0);
-    psvr2_toolkit_gaze_image(gazeImage.data(), 0);
+    psvr2_toolkit_gaze_image(&latestGazeImage, 0);
 
     // Convert and upload texture data
-    void* mapped_ptr = SDL_MapGPUTransferBuffer(gpu_device, transferBuffer, false);
-    if (mapped_ptr) {
-        uint32_t* dst = reinterpret_cast<uint32_t*>(mapped_ptr);
-        const unsigned char* src = gazeImage.data() + 0x100; // Skip header
-        for (size_t i = 0; i < IMAGE_WIDTH * IMAGE_HEIGHT; ++i) {
-            unsigned char val = src[i];
-            dst[i] = (uint32_t)val | ((uint32_t)val << 8) | ((uint32_t)val << 16) | (0xFF << 24); // Grayscale to RGBA
+    if (latestGazeImage) {
+        void* mapped_ptr = SDL_MapGPUTransferBuffer(gpu_device, transferBuffer, false);
+        if (mapped_ptr) {
+            uint32_t* dst = reinterpret_cast<uint32_t*>(mapped_ptr);
+            const unsigned char* src = latestGazeImage + 0x100; // Skip header
+            for (size_t i = 0; i < IMAGE_WIDTH * IMAGE_HEIGHT; ++i) {
+                unsigned char val = src[i];
+                dst[i] = (uint32_t)val | ((uint32_t)val << 8) | ((uint32_t)val << 16) | (0xFF << 24); // Grayscale to RGBA
+            }
+            SDL_UnmapGPUTransferBuffer(gpu_device, transferBuffer);
         }
-        SDL_UnmapGPUTransferBuffer(gpu_device, transferBuffer);
     }
 
     // Start the ImGui frame

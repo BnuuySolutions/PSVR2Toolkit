@@ -6,7 +6,7 @@
   X(int, psvr2_toolkit_init, (), ()) \
   X(void, psvr2_toolkit_deinit, (), ()) \
   X(bool, psvr2_toolkit_gaze_status, (hmd2_gaze_status_t* pGazeStatus, uint32_t timeoutMs), (pGazeStatus, timeoutMs)) \
-  X(bool, psvr2_toolkit_gaze_image, (unsigned char* pGazeImage, uint32_t timeoutMs), (pGazeImage, timeoutMs)) \
+  X(bool, psvr2_toolkit_gaze_image, (unsigned char** pGazeImage, uint32_t timeoutMs), (pGazeImage, timeoutMs)) \
   X(void, psvr2_toolkit_write_pcm, (VRControllerType controllerType, const unsigned char* pcm), (controllerType, pcm)) \
   X(void, psvr2_toolkit_wait_for_pcm, (), ()) \
   X(void, psvr2_toolkit_set_trigger_effect, (VRControllerType controllerType, const ScePadTriggerEffectCommand& command), (controllerType, command)) \
