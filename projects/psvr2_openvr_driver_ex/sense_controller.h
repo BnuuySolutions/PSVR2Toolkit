@@ -186,17 +186,51 @@ namespace psvr2_toolkit {
     void AddTimestampOffsetSample(double sample) {
       std::scoped_lock<std::mutex> lock(this->controllerMutex);
 
-      if (!this->hasTimestampOffset) {
+      // Average in the new sample with exponential decay.
+      // We'll use this as a sanity check to make sure we're not off by a lot.
+      this->averageSample = this->averageSample * 0.999 + sample * 0.001;
+
+      uint64_t now = GetHostTimestamp();
+
+      // Reset if the average sample is more than 10000 microseconds off or we don't have a timestamp offset
+      if (!this->hasTimestampOffset || std::abs(this->filteredOffset - this->averageSample) > 10000.0) {
         this->timeStampOffset = sample;
         this->filteredOffset = sample;
+        this->averageSample = sample;
         this->hasTimestampOffset = true;
+        this->currentDecayRate = k_initialDecayRate;
+        this->lastFloorHitTimestamp = now;
+
+        Util::DriverLog("[{}] Reset timestamp offset", this->isLeft ? "L" : "R");
       }
       else {
+        uint64_t dt = now - this->lastSampleTimestamp;
+        double elapsed = static_cast<double>(now - this->lastFloorHitTimestamp);
+
+        // If we haven't hit the floor in 10 seconds, start increasing the decay rate
+        if (elapsed > k_targetFloorInterval) {
+          // Increase decay rate slowly (ramp to k_maxDecayRate over target interval of no hits)
+          this->currentDecayRate += static_cast<double>(dt) * (k_maxDecayRate / k_targetFloorInterval);
+          if (this->currentDecayRate > k_maxDecayRate) {
+            this->currentDecayRate = k_maxDecayRate;
+          }
+        }
+
         // Counter any potential drift to ensure accuracy.
-        this->timeStampOffset -= (GetHostTimestamp() - this->lastSampleTimestamp) * 5.0E-5;
+        this->timeStampOffset -= static_cast<double>(dt) * (this->currentDecayRate - (k_maxDecayRate / 2.0));
 
         if (this->timeStampOffset < sample) {
           this->timeStampOffset = sample;
+
+          // Feedback loop on decay rate:
+          // If we hit too early (elapsed < k_targetFloorInterval), decrease decay rate
+          if (elapsed < k_targetFloorInterval) {
+            // Proportional reduction: 0.9 for immediate hit, 1.0 for target interval hit
+            double factor = elapsed / k_targetFloorInterval;
+            this->currentDecayRate *= (0.9 + 0.1 * factor);
+          }
+
+          this->lastFloorHitTimestamp = now;
         }
 
         // Update filtered offset with maximum delta
@@ -205,7 +239,7 @@ namespace psvr2_toolkit {
         this->filteredOffset += maxDelta;
       }
 
-      this->lastSampleTimestamp = GetHostTimestamp();
+      this->lastSampleTimestamp = now;
     }
 
     void ClearTimestampOffset() {
@@ -248,14 +282,22 @@ namespace psvr2_toolkit {
 
     static std::atomic<uint8_t> g_ShouldResetLEDTrackingInTicks;
   private:
+    static constexpr double k_maxDecayRate = 5.0E-5;
+    static constexpr double k_initialDecayRate = 1.0E-5;
+    static constexpr double k_targetFloorInterval = 10.0E6; // 10 seconds in microseconds
+
     void* handle = NULL;
     int padHandle = -1;
     std::mutex controllerMutex;
 
     double timeStampOffset = 0.0;
     double filteredOffset = 0.0;
+    double averageSample = 0.0;
     bool hasTimestampOffset = false;
     uint64_t lastSampleTimestamp = 0;
+
+    double currentDecayRate = k_maxDecayRate;
+    uint64_t lastFloorHitTimestamp = 0;
 
     bool isTracking = false;
     uint64_t lastTrackedTimestamp = 0;
