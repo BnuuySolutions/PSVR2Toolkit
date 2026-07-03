@@ -21,10 +21,11 @@ namespace psvr2_toolkit {
   void AstonManagerHooks::InstallHooks() {
     static HmdDriverLoader *pHmdDriverLoader = HmdDriverLoader::Instance();
 
-    // AstonManager::acquireLibpadAccess
-    HookLib::InstallHook(reinterpret_cast<void *>(pHmdDriverLoader->GetBaseAddress() + 0x11d0c0),
-                         reinterpret_cast<void *>(AstonManager__acquireLibpadAccessHook),
-                         reinterpret_cast<void **>(&AstonManager__acquireLibpadAccess));
+    // TODO: bring this back or fix it in the ShareManager implementation
+    // // AstonManager::acquireLibpadAccess
+    // HookLib::InstallHook(reinterpret_cast<void *>(pHmdDriverLoader->GetBaseAddress() + 0x11d0c0),
+    //                      reinterpret_cast<void *>(AstonManager__acquireLibpadAccessHook),
+    //                      reinterpret_cast<void **>(&AstonManager__acquireLibpadAccess));
 
     // Controller poll rate stub
     if (Util::IsRunningOnWine()) {
