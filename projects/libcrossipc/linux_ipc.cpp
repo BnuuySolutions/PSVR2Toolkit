@@ -86,8 +86,8 @@ struct LinuxIpcEvent::EventData {
   bool signaled;
 };
 
-LinuxIpcEvent::LinuxIpcEvent(const char *name)
-    : m_name(name), m_fd(-1), m_data(nullptr) {
+LinuxIpcEvent::LinuxIpcEvent(const char *name, bool manualReset)
+    : m_name(name), m_fd(-1), m_data(nullptr), m_manualReset(manualReset) {
   std::string shmName = "/" + m_name + "_EVT_SHM";
   m_fd = shm_open(shmName.c_str(), O_CREAT | O_EXCL | O_RDWR, 0666);
   bool initialize = false;
@@ -147,7 +147,21 @@ void LinuxIpcEvent::set() {
     pthread_mutex_consistent(&m_data->mutex);
 
   m_data->signaled = true;
-  pthread_cond_signal(&m_data->cond);
+  if (m_manualReset) {
+    pthread_cond_broadcast(&m_data->cond);
+  } else {
+    pthread_cond_signal(&m_data->cond);
+  }
+
+  pthread_mutex_unlock(&m_data->mutex);
+}
+
+void LinuxIpcEvent::reset() {
+  int ret = pthread_mutex_lock(&m_data->mutex);
+  if (ret == EOWNERDEAD)
+    pthread_mutex_consistent(&m_data->mutex);
+
+  m_data->signaled = false;
 
   pthread_mutex_unlock(&m_data->mutex);
 }
@@ -184,7 +198,7 @@ bool LinuxIpcEvent::wait(uint32_t timeoutMs) {
     }
   }
 
-  if (success) {
+  if (success && !m_manualReset) {
     m_data->signaled = false; // Auto-reset behavior
   }
 
@@ -302,6 +316,18 @@ bool LinuxIpcBroadcast::wait(uint32_t timeoutMs) {
 void LinuxIpcBroadcast::notify_all() {
   m_data->futex_word.fetch_add(1, std::memory_order_release);
   syscall(SYS_futex, &m_data->futex_word, FUTEX_WAKE, INT_MAX, nullptr, nullptr, 0);
+}
+
+void* LinuxIpcMutex::get_native_handle() {
+    return reinterpret_cast<void*>(static_cast<uintptr_t>(m_fd));
+}
+
+void* LinuxIpcEvent::get_native_handle() {
+    return reinterpret_cast<void*>(static_cast<uintptr_t>(m_fd));
+}
+
+void* LinuxIpcSharedMemory::get_native_handle() {
+    return reinterpret_cast<void*>(static_cast<uintptr_t>(m_fd));
 }
 
 #endif // __linux__

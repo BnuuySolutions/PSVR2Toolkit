@@ -7,6 +7,10 @@
 #include <vector>
 #include <windows.h>
 
+class IIpcMutex;
+class IIpcEvent;
+class IIpcSharedMemory;
+
 #pragma pack(push, 1)
 
 struct EventStruct { void* field2_0x10; HANDLE* Evt; HANDLE* Mtx; char field27_0x30; };
@@ -267,6 +271,61 @@ struct VRSharedMemory {
 #define DEF_WRITE_MEMCPY(FuncName, GroupIdx, MemGroup, MemData, Size) \
     int FuncName(this ShareManager& self, void* data);
 
+enum ShareResourceIndex {
+    SR_Common = 0,
+    SR_Status = 1,
+    SR_Calib = 2,
+    SR_InputHmd = 3,
+    SR_InputContR = 4,
+    SR_InputContL = 5,
+    SR_PoseHmd = 6,
+    SR_PoseContR = 7,
+    SR_PoseContL = 8,
+    SR_Image = 9,
+    SR_Evf = 10,
+    SR_PlayareaResult = 11,
+    SR_ImageSetting = 12,
+    SR_BlobConfig = 13,
+    SR_IrCamSetting = 14,
+    SR_ContConfig = 15,
+    SR_ArmModel = 16,
+    SR_ContLedInfo = 17,
+    SR_BluetoothQualityInfo = 18,
+    SR_FwInfo1 = 19,
+    SR_FwInfo2 = 20,
+    SR_VrDialog = 21,
+    SR_Application = 22,
+    SR_VrTraceData = 23,
+    SR_DebugData = 24,
+    SR_LibpadAccess = 25,
+    SR_LibpadRequestSteamVRPlugin = 26,
+    SR_LibpadRequestAssistantApp = 27,
+    SR_GeneralConfig = 28,
+    SR_Log = 29,
+    SR_TelemetryDevInfo = 30,
+    SR_TelemetryTrackingInfo = 31,
+    SR_TelemetryTrackingPcInfo = 32,
+    SR_VrAppSceneInfo = 33,
+    SR_InitialSetupInfo = 34,
+    SR_PlayareaSetupInfo = 35,
+    SR_Max = 36
+};
+
+enum ShareConfigIndex {
+    SC_LastRecordedDateTime = 0,
+    SC_VibrationStrength = 1,
+    SC_ScreenBrightness = 2,
+    SC_LimitDisplay = 3,
+    SC_MemorySize = 4,
+    SC_Done = 5,
+    SC_State = 6,
+    SC_CrashCount = 7,
+    SC_OutputLog = 8,
+    SC_BluetoothNotification = 9,
+    SC_Status = 10,
+    SC_Max = 11
+};
+
 struct GlobalEventContext {
     HANDLE* hMutex;
     HANDLE* hEvent;
@@ -276,6 +335,9 @@ struct GlobalEventContext {
 
     char exitFlag;
     void* threadInfo; // Offset 0x38
+
+    IIpcMutex* ipcMutex;
+    IIpcEvent* ipcEvent;
 };
 
 class ShareManager {
@@ -286,7 +348,7 @@ public:
     static ShareManager* GetInstance();
     static void InitializeInstance(DWORD processInstanceId);
 
-    static void ReplaceShareManager();
+    static void InstallHooks();
 
     void Initialize(this ShareManager& self, DWORD processInstanceId);
     void RegisterEventCallback(this ShareManager& self, uint64_t mask, std::function<void()>* pCallback);
@@ -407,8 +469,8 @@ private:
     uint8_t m_pad_offset0[8];                   // Offset 0x0
     HANDLE* m_hConfigMutexes[16];               // Offset 0x8, size 128 bytes (0x80), ends at 0x88
     uint8_t m_pad_offset88[0x2108];             // Pad from 0x88 to 0x2190
-    HANDLE* m_hEvents[36];                      // Offset 0x2190, size 288 bytes (0x120), ends at 0x22b0
-    HANDLE* m_hMutexes[36];                     // Offset 0x22b0, size 288 bytes (0x120), ends at 0x23d0
+    HANDLE* m_hEvents[SR_Max];                      // Offset 0x2190, size 288 bytes (0x120), ends at 0x22b0
+    HANDLE* m_hMutexes[SR_Max];                     // Offset 0x22b0, size 288 bytes (0x120), ends at 0x23d0
     GlobalEventContext* m_pEventContext;        // Offset 0x23d0, size 8 bytes, ends at 0x23d8
     HANDLE m_hSharedFileMapping;                // Offset 0x23d8, size 8 bytes, ends at 0x23e0
     VRSharedMemory* m_pMem;                     // Offset 0x23e0, size 8 bytes, ends at 0x23e8
@@ -432,7 +494,7 @@ private:
         char CachedValue[256]; // Used by EVF worker to detect changes
     };
 
-    ConfigMapping m_configMappings[11];
+    ConfigMapping m_configMappings[SC_Max];
     char m_configIniPath[MAX_PATH];
 
     static ShareManager* s_instance;
@@ -446,4 +508,9 @@ private:
     // IPC helper mutex locks (we'll use CrossIPC here later)
     void Lock(int idx);
     void Unlock(int idx);
+
+    IIpcMutex* m_ipcConfigMutexes[16];
+    IIpcEvent* m_ipcEvents[SR_Max];
+    IIpcMutex* m_ipcMutexes[SR_Max];
+    IIpcSharedMemory* m_ipcSharedMemory;
 };
