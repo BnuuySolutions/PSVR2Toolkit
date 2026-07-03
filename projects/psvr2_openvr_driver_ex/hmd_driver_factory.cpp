@@ -1,8 +1,6 @@
 #include "device_provider_proxy.h"
 #include "hmd_driver_loader.h"
 
-#include "driver_interface/share_manager.h"
-
 #include <openvr_driver.h>
 #include <windows.h>
 
@@ -13,7 +11,6 @@ extern "C" __declspec(dllexport) void *HmdDriverFactory(const char *pInterfaceNa
 
   // Check if the HMD driver DLL is actually loaded.
   if (pHmdDriverLoader->GetBaseAddress()) {
-    ShareManager::ReplaceShareManager();
     void *result = pHmdDriverLoader->pfnHmdDriverFactory(pInterfaceName, pReturnCode);
 
     if (strcmp(vr::IServerTrackedDeviceProvider_Version, pInterfaceName) == 0 &&

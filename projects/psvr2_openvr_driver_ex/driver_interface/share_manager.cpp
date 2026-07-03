@@ -1,5 +1,7 @@
 #include "../hmd_driver_loader.h"
 #include "share_manager.h"
+
+#include "cross_ipc.h"
 #include "hook_lib.h"
 #include "util.h"
 
@@ -57,6 +59,11 @@ ShareManager::ShareManager() : m_hSharedFileMapping(nullptr), m_pMem(nullptr), m
     memset(m_hEvents, 0, sizeof(m_hEvents));
     memset(m_hMutexes, 0, sizeof(m_hMutexes));
 
+    memset(m_ipcConfigMutexes, 0, sizeof(m_ipcConfigMutexes));
+    memset(m_ipcEvents, 0, sizeof(m_ipcEvents));
+    memset(m_ipcMutexes, 0, sizeof(m_ipcMutexes));
+    m_ipcSharedMemory = nullptr;
+
     // Compile-time offset checks to guarantee binary compatibility with the DLL
     static_assert(offsetof(ShareManager, m_hConfigMutexes) == 0x08, "m_hConfigMutexes offset mismatch");
     static_assert(offsetof(ShareManager, m_hEvents) == 0x2190, "m_hEvents offset mismatch");
@@ -74,29 +81,46 @@ ShareManager::ShareManager() : m_hSharedFileMapping(nullptr), m_pMem(nullptr), m
 }
 
 ShareManager::~ShareManager() {
-    for (int i = 0; i < 36; ++i) {
+    for (int i = 0; i < SR_Max; ++i) {
+        if (m_ipcEvents[i]) {
+            DestroyIpcEvent(m_ipcEvents[i]);
+            m_ipcEvents[i] = nullptr;
+        }
         if (m_hEvents[i]) {
-            CloseHandle(*m_hEvents[i]);
             delete m_hEvents[i];
             m_hEvents[i] = nullptr;
         }
+        if (m_ipcMutexes[i]) {
+            DestroyIpcMutex(m_ipcMutexes[i]);
+            m_ipcMutexes[i] = nullptr;
+        }
         if (m_hMutexes[i]) {
-            CloseHandle(*m_hMutexes[i]);
             delete m_hMutexes[i];
             m_hMutexes[i] = nullptr;
         }
     }
     for (int i = 0; i < 16; ++i) {
-        if (m_hConfigMutexes[i]) {
-            if (i == 11) {
-                CloseHandle(*reinterpret_cast<HANDLE*>(m_hConfigMutexes[11]));
-                operator delete(m_hConfigMutexes[11]);
-            } else {
-                CloseHandle(*m_hConfigMutexes[i]);
-                delete m_hConfigMutexes[i];
+        if (i < SC_Max) {
+            if (m_ipcConfigMutexes[i]) {
+                DestroyIpcMutex(m_ipcConfigMutexes[i]);
+                m_ipcConfigMutexes[i] = nullptr;
             }
-            m_hConfigMutexes[i] = nullptr;
+            if (m_hConfigMutexes[i]) {
+                delete m_hConfigMutexes[i];
+                m_hConfigMutexes[i] = nullptr;
+            }
+        } else if (i == SC_Max) {
+            if (m_hConfigMutexes[SC_Max]) {
+                CloseHandle(*reinterpret_cast<HANDLE*>(m_hConfigMutexes[SC_Max]));
+                operator delete(m_hConfigMutexes[SC_Max]);
+                m_hConfigMutexes[SC_Max] = nullptr;
+            }
         }
+    }
+    if (m_ipcSharedMemory) {
+        m_ipcSharedMemory->unmap();
+        DestroyIpcSharedMemory(m_ipcSharedMemory);
+        m_ipcSharedMemory = nullptr;
     }
 }
 
@@ -117,7 +141,7 @@ void ShareManager::InitializeInstance(DWORD processInstanceId) {
     s_instance->Initialize(processInstanceId);
 }
 
-void ShareManager::ReplaceShareManager() {
+void ShareManager::InstallHooks() {
     static HmdDriverLoader *pHmdDriverLoader = HmdDriverLoader::Instance();
     uint64_t baseAddress = pHmdDriverLoader->GetBaseAddress();
 
@@ -240,19 +264,25 @@ void ShareManager::Initialize(this ShareManager& self, DWORD processInstanceId) 
 
     self.m_instanceId = processInstanceId;
 
-    for (int i = 0; i < 36; ++i) {
-        self.m_hEvents[i] = new HANDLE(CreateEventA(nullptr, TRUE, FALSE, SharedResourceNames[i][0]));
-        self.m_hMutexes[i] = new HANDLE(CreateMutexA(nullptr, FALSE, SharedResourceNames[i][1]));
+    for (int i = 0; i < SR_Max; ++i) {
+        self.m_ipcEvents[i] = CreateIpcEvent(SharedResourceNames[i][0], true);
+        self.m_ipcMutexes[i] = CreateIpcMutex(SharedResourceNames[i][1]);
+
+        void* rawEvt = self.m_ipcEvents[i] ? self.m_ipcEvents[i]->get_native_handle() : nullptr;
+        self.m_hEvents[i] = rawEvt ? new HANDLE(reinterpret_cast<HANDLE>(rawEvt)) : nullptr;
+
+        void* rawMtx = self.m_ipcMutexes[i] ? self.m_ipcMutexes[i]->get_native_handle() : nullptr;
+        self.m_hMutexes[i] = rawMtx ? new HANDLE(reinterpret_cast<HANDLE>(rawMtx)) : nullptr;
     }
 
-    self.m_hSharedFileMapping = CreateFileMappingA(
-        INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE, 0, 0x2000000, "SHARE_VRT2_WIN"
-    );
-
-    if (self.m_hSharedFileMapping) {
-        self.m_pMem = reinterpret_cast<VRSharedMemory*>(
-            MapViewOfFile(self.m_hSharedFileMapping, FILE_MAP_ALL_ACCESS, 0, 0, 0x2000000)
-        );
+    self.m_ipcSharedMemory = CreateIpcSharedMemory("SHARE_VRT2_WIN", 0x2000000);
+    if (self.m_ipcSharedMemory) {
+        self.m_pMem = reinterpret_cast<VRSharedMemory*>(IpcSharedMemory_Map(self.m_ipcSharedMemory));
+        void* rawShm = self.m_ipcSharedMemory->get_native_handle();
+        self.m_hSharedFileMapping = rawShm ? reinterpret_cast<HANDLE>(rawShm) : nullptr;
+    } else {
+        self.m_pMem = nullptr;
+        self.m_hSharedFileMapping = nullptr;
     }
 
     if (!self.m_pMem) {
@@ -260,10 +290,12 @@ void ShareManager::Initialize(this ShareManager& self, DWORD processInstanceId) 
     }
 
     GlobalEventContext* pCtx = new GlobalEventContext();
-    pCtx->hMutex = self.m_hMutexes[10];
-    pCtx->hEvent = self.m_hEvents[10];
+    pCtx->hMutex = self.m_hMutexes[SR_Evf];
+    pCtx->hEvent = self.m_hEvents[SR_Evf];
     pCtx->pSharedFlags = reinterpret_cast<uint64_t*>(reinterpret_cast<uint8_t*>(self.m_pMem) + 0x110C200);
     pCtx->exitFlag = '\0';
+    pCtx->ipcMutex = self.m_ipcMutexes[SR_Evf];
+    pCtx->ipcEvent = self.m_ipcEvents[SR_Evf];
 
     void* threadInfo1 = operator new(0x10);
     if (threadInfo1) {
@@ -319,10 +351,13 @@ void ShareManager::Initialize(this ShareManager& self, DWORD processInstanceId) 
         }
     }
 
-    for (int i = 0; i < 11; i++) {
+    for (int i = 0; i < SC_Max; i++) {
         char configName[32];
         snprintf(configName, sizeof(configName), "CONFIG_ID_%d", i);
-        self.m_hConfigMutexes[i] = new HANDLE(CreateMutexA(nullptr, FALSE, configName));
+        self.m_ipcConfigMutexes[i] = CreateIpcMutex(configName);
+
+        void* rawMtx = self.m_ipcConfigMutexes[i] ? self.m_ipcConfigMutexes[i]->get_native_handle() : nullptr;
+        self.m_hConfigMutexes[i] = rawMtx ? new HANDLE(reinterpret_cast<HANDLE>(rawMtx)) : nullptr;
     }
 
     self.InitializeSub_ad30();
@@ -366,9 +401,9 @@ void ShareManager::RegisterEventCallback(this ShareManager& self, uint64_t mask,
     GlobalEventContext* pCtx = self.m_pEventContext;
 
     if (pCtx && pCallback) {
-        WaitForSingleObject(pCtx->hMutex, INFINITE);
+        if (pCtx->ipcMutex) pCtx->ipcMutex->lock();
         pCtx->callbacks.push_back({*pCallback, mask});
-        ReleaseMutex(pCtx->hMutex);
+        if (pCtx->ipcMutex) pCtx->ipcMutex->unlock();
     }
 }
 
@@ -378,17 +413,22 @@ void ShareManager::WaitDynamicEvent(GlobalEventContext** ppCtx) {
     if (!pCtx || pCtx->exitFlag != '\0') return;
 
     do {
-        WaitForSingleObject(pCtx->hMutex, INFINITE);
+        if (pCtx->ipcMutex) pCtx->ipcMutex->lock();
         uint64_t currentFlags = *pCtx->pSharedFlags;
 
         if (currentFlags == 0) {
-            ReleaseMutex(pCtx->hMutex);
-            DWORD res = WaitForSingleObject(pCtx->hEvent, 100);
-            ResetEvent(pCtx->hEvent);
-            if (res != WAIT_TIMEOUT) continue;
+            if (pCtx->ipcMutex) pCtx->ipcMutex->unlock();
+            bool signaled = false;
+            if (pCtx->ipcEvent) {
+                signaled = pCtx->ipcEvent->wait(100);
+                pCtx->ipcEvent->reset();
+            } else {
+                Sleep(100);
+            }
+            if (!signaled) continue;
         } else {
             *pCtx->pSharedFlags = 0;
-            ReleaseMutex(pCtx->hMutex);
+            if (pCtx->ipcMutex) pCtx->ipcMutex->unlock();
 
             for (const auto& cb : pCtx->callbacks) {
                 if ((currentFlags & cb.second) == cb.second) {
@@ -403,10 +443,10 @@ void ShareManager::WaitDynamicEvent(GlobalEventContext** ppCtx) {
 
 
 void ShareManager::GetIntConfig(this ShareManager& self, int configId, long* outValue) {
-    if (configId < 0 || configId >= 11 || !outValue) return;
+    if (configId < 0 || configId >= SC_Max || !outValue) return;
 
-    if (self.m_hConfigMutexes[configId]) {
-        WaitForSingleObject(*self.m_hConfigMutexes[configId], INFINITE);
+    if (self.m_ipcConfigMutexes[configId]) {
+        self.m_ipcConfigMutexes[configId]->lock();
     }
 
     const char* strData = self.m_pMem->configs_9e00.str_configs[configId].stringData;
@@ -415,8 +455,8 @@ void ShareManager::GetIntConfig(this ShareManager& self, int configId, long* out
         *outValue = std::strtol(strData, nullptr, 10);
     }
 
-    if (self.m_hConfigMutexes[configId]) {
-        ReleaseMutex(*self.m_hConfigMutexes[configId]);
+    if (self.m_ipcConfigMutexes[configId]) {
+        self.m_ipcConfigMutexes[configId]->unlock();
     }
 }
 
@@ -432,10 +472,10 @@ static const char* GetHostStringPtr(const void* hostStrObj) {
 }
 
 uint32_t ShareManager::ReadStringConfig(this ShareManager& self, int configId, std::string& outStr) {
-    if (configId < 0 || configId >= 11) return 0xFFFFFFFF;
+    if (configId < 0 || configId >= SC_Max) return 0xFFFFFFFF;
 
-    if (self.m_hConfigMutexes[configId]) {
-        WaitForSingleObject(*self.m_hConfigMutexes[configId], INFINITE);
+    if (self.m_ipcConfigMutexes[configId]) {
+        self.m_ipcConfigMutexes[configId]->lock();
     }
 
     uint32_t counter = self.m_pMem->configs_9e00.str_configs[configId].counter;
@@ -443,17 +483,17 @@ uint32_t ShareManager::ReadStringConfig(this ShareManager& self, int configId, s
 
     outStr = strData;
 
-    if (self.m_hConfigMutexes[configId]) {
-        ReleaseMutex(*self.m_hConfigMutexes[configId]);
+    if (self.m_ipcConfigMutexes[configId]) {
+        self.m_ipcConfigMutexes[configId]->unlock();
     }
     return counter;
 }
 
 void ShareManager::WriteConfigString(this ShareManager& self, int configId, const std::string& str) {
-    if (configId < 0 || configId >= 11) return;
+    if (configId < 0 || configId >= SC_Max) return;
 
-    if (self.m_hConfigMutexes[configId]) {
-        WaitForSingleObject(*self.m_hConfigMutexes[configId], INFINITE);
+    if (self.m_ipcConfigMutexes[configId]) {
+        self.m_ipcConfigMutexes[configId]->lock();
     }
 
     uint32_t& counter = self.m_pMem->configs_9e00.str_configs[configId].counter;
@@ -463,8 +503,8 @@ void ShareManager::WriteConfigString(this ShareManager& self, int configId, cons
 
     counter += 1;
 
-    if (self.m_hConfigMutexes[configId]) {
-        ReleaseMutex(*self.m_hConfigMutexes[configId]);
+    if (self.m_ipcConfigMutexes[configId]) {
+        self.m_ipcConfigMutexes[configId]->unlock();
     }
 }
 
@@ -488,7 +528,7 @@ uint32_t ShareManager::ReadStringConfig_Hook(this ShareManager& self, int config
 }
 
 void ShareManager::WriteConfigString_Hook(this ShareManager& self, int configId, const void* strObj) {
-    if (configId < 0 || configId >= 11) return;
+    if (configId < 0 || configId >= SC_Max) return;
 
     const char* str = GetHostStringPtr(strObj);
     self.WriteConfigString(configId, str);
@@ -496,7 +536,7 @@ void ShareManager::WriteConfigString_Hook(this ShareManager& self, int configId,
 
 int ShareManager::ReadLogStrings(this ShareManager& self, long long destAddress, int maxCount) {
     int readCount = 0;
-    self.Lock(29);
+    self.Lock(SR_Log);
     uint8_t head = self.m_pMem->logs.log_head;
     uint8_t tail = self.m_pMem->logs.log_tail;
 
@@ -516,7 +556,7 @@ int ShareManager::ReadLogStrings(this ShareManager& self, long long destAddress,
         readCount++;
     }
     self.m_pMem->logs.log_tail = tail;
-    self.Unlock(29);
+    self.Unlock(SR_Log);
     return readCount;
 }
 
@@ -524,7 +564,7 @@ void ShareManager::WriteLogString(this ShareManager& self, char level, const cha
     va_list args;
     va_start(args, format);
 
-    self.Lock(29);
+    self.Lock(SR_Log);
     uint8_t head = self.m_pMem->logs.log_head;
 
     char* destStr = self.m_pMem->logs.log_strings[head];
@@ -552,8 +592,8 @@ void ShareManager::WriteLogString(this ShareManager& self, char level, const cha
         self.m_pMem->logs.log_tail++;
     }
 
-    self.Unlock(29);
-    if (self.m_hEvents[29]) SetEvent(*self.m_hEvents[29]);
+    self.Unlock(SR_Log);
+    if (self.m_ipcEvents[SR_Log]) self.m_ipcEvents[SR_Log]->set();
 }
 
 void ShareManager::ReadIntConfigSafe(this ShareManager& self, int configId, int* outValue) {
@@ -574,8 +614,8 @@ void ShareManager::ReadIntConfigSafe(this ShareManager& self, int configId, int*
 
 
 uint64_t ShareManager::UpdateProcessExitCodes(this ShareManager& self, void* outData) {
-    self.Lock(0);
-    for (int i = 0; i < 11; i++) {
+    self.Lock(SR_Common);
+    for (int i = 0; i < SC_Max; i++) {
         DWORD pid = self.m_pMem->watchdog.pids[i];
         if (pid != 0 && pid != GetCurrentProcessId()) {
             HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION, FALSE, pid);
@@ -596,136 +636,136 @@ uint64_t ShareManager::UpdateProcessExitCodes(this ShareManager& self, void* out
         }
     }
     memcpy(outData, self.m_pMem->watchdog.timestamps, 176);
-    self.Unlock(0);
+    self.Unlock(SR_Common);
     return 0;
 }
 
 uint32_t ShareManager::ReadCommon_0x10(this ShareManager& self, uint64_t* outData) {
-    self.Lock(0);
+    self.Lock(SR_Common);
     if (outData) *outData = self.m_pMem->common_0x10.data_0x10;
     uint32_t cnt = self.m_pMem->common_0x10.counter_0x8;
-    self.Unlock(0);
+    self.Unlock(SR_Common);
     return cnt;
 }
 
 int ShareManager::WriteCommon_0x10(this ShareManager& self, uint64_t data) {
-    self.Lock(0);
+    self.Lock(SR_Common);
     self.m_pMem->common_0x10.data_0x10 = data;
     int cnt = ++self.m_pMem->common_0x10.counter_0x8;
-    self.Unlock(0);
+    self.Unlock(SR_Common);
     return cnt;
 }
 
 int ShareManager::ReadCommon_0x18(this ShareManager& self) {
-    self.Lock(0);
+    self.Lock(SR_Common);
     int val = self.m_pMem->common_0x18.data_0x18;
-    self.Unlock(0);
+    self.Unlock(SR_Common);
     return val;
 }
 
 uint32_t ShareManager::ReadCommon_0x9dd0(this ShareManager& self, uint64_t* outData) {
-    self.Lock(0);
+    self.Lock(SR_Common);
     if (outData) *outData = self.m_pMem->common_9dd0.data_0x9dd0;
     uint32_t cnt = self.m_pMem->common_9dd0.counter_0x9dc8;
-    self.Unlock(0);
+    self.Unlock(SR_Common);
     return cnt;
 }
 
 int ShareManager::WriteCommon_0x9dd0(this ShareManager& self, uint64_t data) {
-    self.Lock(0);
+    self.Lock(SR_Common);
     self.m_pMem->common_9dd0.data_0x9dd0 = data;
     int cnt = ++self.m_pMem->common_9dd0.counter_0x9dc8;
-    self.Unlock(0);
+    self.Unlock(SR_Common);
     return cnt;
 }
 
 uint32_t ShareManager::ReadCommon_0xc72c(this ShareManager& self, uint8_t* outData) {
-    self.Lock(0);
+    self.Lock(SR_Common);
     if (outData) *outData = self.m_pMem->common_c72c.data_0xc72c;
     uint32_t cnt = self.m_pMem->common_c72c.ctr;
-    self.Unlock(0);
+    self.Unlock(SR_Common);
     return cnt;
 }
 
 int ShareManager::WriteCommon_0xc72c(this ShareManager& self, uint8_t data) {
-    self.Lock(0);
+    self.Lock(SR_Common);
     self.m_pMem->common_c72c.data_0xc72c = data;
     int cnt = ++self.m_pMem->common_c72c.ctr;
-    self.Unlock(0);
+    self.Unlock(SR_Common);
     return cnt;
 }
 
 uint32_t ShareManager::ReadPlayareaSetup_0xc814(this ShareManager& self, void* outData) {
-    self.Lock(35);
+    self.Lock(SR_PlayareaSetupInfo);
     if (outData) *(uint32_t*)outData = self.m_pMem->playarea_setup_c814.data;
     uint32_t cnt = self.m_pMem->playarea_setup_c814.ctr;
-    self.Unlock(35);
+    self.Unlock(SR_PlayareaSetupInfo);
     return cnt;
 }
 
 int ShareManager::WritePlayareaSetup_0xc814(this ShareManager& self, uint32_t data) {
-    self.Lock(35);
+    self.Lock(SR_PlayareaSetupInfo);
     self.m_pMem->playarea_setup_c814.data = data;
     int cnt = ++self.m_pMem->playarea_setup_c814.ctr;
-    self.Unlock(35);
+    self.Unlock(SR_PlayareaSetupInfo);
     return cnt;
 }
 
 uint32_t ShareManager::ReadArmModel_0x84a4(this ShareManager& self, void* outData, int param) {
-    self.Lock(16);
+    self.Lock(SR_ArmModel);
     if (param < 0 || param >= 2) {
-        self.Unlock(16);
+        self.Unlock(SR_ArmModel);
         return 0;
     }
     auto& slot = self.m_pMem->arm_model_84a4.slots[param];
     if (outData) memcpy(outData, slot.data, 0x50);
     uint32_t cnt = slot.ctr;
-    self.Unlock(16);
+    self.Unlock(SR_ArmModel);
     return cnt;
 }
 
 int ShareManager::WriteArmModel_0x84a4(this ShareManager& self, void* data, int param) {
-    self.Lock(16);
+    self.Lock(SR_ArmModel);
     if (param < 0 || param >= 2) {
-        self.Unlock(16);
+        self.Unlock(SR_ArmModel);
         return 0;
     }
     auto& slot = self.m_pMem->arm_model_84a4.slots[param];
     if (data) memcpy(slot.data, data, 0x50);
     int cnt = ++slot.ctr;
-    self.Unlock(16);
+    self.Unlock(SR_ArmModel);
     return cnt;
 }
 
 uint32_t ShareManager::ReadBtQualityInfo_0x9170(this ShareManager& self, void* outData, int param) {
-    self.Lock(18);
+    self.Lock(SR_BluetoothQualityInfo);
     if (param < 0 || param >= 2) {
-        self.Unlock(18);
+        self.Unlock(SR_BluetoothQualityInfo);
         return 0;
     }
     auto& slot = self.m_pMem->bt_qual_9170.slots[param];
     if (outData) memcpy(outData, slot.data, 80);
     uint32_t cnt = slot.ctr;
-    self.Unlock(18);
+    self.Unlock(SR_BluetoothQualityInfo);
     return cnt;
 }
 
 int ShareManager::WriteBtQualityInfo_0x9170(this ShareManager& self, void* data, int param) {
-    self.Lock(18);
+    self.Lock(SR_BluetoothQualityInfo);
     if (param < 0 || param >= 2) {
-        self.Unlock(18);
+        self.Unlock(SR_BluetoothQualityInfo);
         return 0;
     }
     auto& slot = self.m_pMem->bt_qual_9170.slots[param];
     if (data) memcpy(slot.data, data, 80);
     int cnt = ++slot.ctr;
-    self.Unlock(18);
+    self.Unlock(SR_BluetoothQualityInfo);
     return cnt;
 }
 
 uint32_t ShareManager::AcquireImageWriteSlot(this ShareManager& self, long long* outImageBuffer, long long* outTrackingData) {
     uint32_t result = 0xFFFFFFFF;
-    self.Lock(9);
+    self.Lock(SR_Image);
 
     uint32_t writeIdx = self.m_writeIndex[0];
 
@@ -741,7 +781,7 @@ uint32_t ShareManager::AcquireImageWriteSlot(this ShareManager& self, long long*
             break;
         }
     }
-    self.Unlock(9);
+    self.Unlock(SR_Image);
     return result;
 }
 
@@ -749,7 +789,7 @@ uint32_t ShareManager::AcquireInputWriteSlot(this ShareManager& self, int groupI
     if (groupIdx < 0 || groupIdx >= 3) return 0xFFFFFFFF;
 
     uint32_t result = 0xFFFFFFFF;
-    int mutexIdx = 3 + groupIdx;
+    int mutexIdx = SR_InputHmd + groupIdx;
     self.Lock(mutexIdx);
 
     uint32_t writeIdx = self.m_writeIndex_40[groupIdx];
@@ -773,7 +813,7 @@ uint32_t ShareManager::AcquirePoseWriteSlot(this ShareManager& self, int groupId
     if (groupIdx < 0 || groupIdx >= 4) return 0xFFFFFFFF;
 
     uint32_t result = 0xFFFFFFFF;
-    int mutexIdx = 6 + groupIdx;
+    int mutexIdx = SR_PoseHmd + groupIdx;
     self.Lock(mutexIdx);
 
     uint32_t writeIdx = self.m_writeIndex_28[groupIdx];
@@ -795,7 +835,7 @@ uint32_t ShareManager::AcquirePoseWriteSlot(this ShareManager& self, int groupId
 
 void ShareManager::CommitImageWriteSlot(this ShareManager& self, uint32_t slotIdx) {
     if (slotIdx >= 8) return;
-    self.Lock(9);
+    self.Lock(SR_Image);
 
     ImageSlotMeta& slot = self.m_pMem->image_meta.slots[slotIdx];
     slot.state = 1;
@@ -812,15 +852,15 @@ void ShareManager::CommitImageWriteSlot(this ShareManager& self, uint32_t slotId
     }
     slot.exposure = exposureVal;
 
-    self.Unlock(9);
+    self.Unlock(SR_Image);
     self.m_writeIndex[0] = slotIdx;
-    if (self.m_hEvents[9]) SetEvent(*self.m_hEvents[9]);
+    if (self.m_ipcEvents[SR_Image]) self.m_ipcEvents[SR_Image]->set();
 }
 
 void ShareManager::CommitInputWriteSlot(this ShareManager& self, int groupIdx, uint32_t slotIdx) {
     if (groupIdx < 0 || groupIdx >= 3 || slotIdx >= 64) return;
 
-    int mutexIdx = 3 + groupIdx;
+    int mutexIdx = SR_InputHmd + groupIdx;
     self.Lock(mutexIdx);
 
     InputSlotMeta& slot = self.m_pMem->input_meta.groups[groupIdx].slots[slotIdx];
@@ -829,13 +869,13 @@ void ShareManager::CommitInputWriteSlot(this ShareManager& self, int groupIdx, u
 
     self.Unlock(mutexIdx);
     self.m_writeIndex_40[groupIdx] = slotIdx;
-    if (self.m_hEvents[mutexIdx]) SetEvent(*self.m_hEvents[mutexIdx]);
+    if (self.m_ipcEvents[mutexIdx]) self.m_ipcEvents[mutexIdx]->set();
 }
 
 void ShareManager::CommitPoseWriteSlot(this ShareManager& self, int groupIdx, uint32_t slotIdx, void* params) {
     if (groupIdx < 0 || groupIdx >= 4 || slotIdx >= 64) return;
 
-    int mutexIdx = 6 + groupIdx;
+    int mutexIdx = SR_PoseHmd + groupIdx;
     self.Lock(mutexIdx);
 
     PoseSlotMeta& slot = self.m_pMem->pose_meta.groups[groupIdx].slots[slotIdx];
@@ -849,13 +889,13 @@ void ShareManager::CommitPoseWriteSlot(this ShareManager& self, int groupIdx, ui
 
     self.Unlock(mutexIdx);
     self.m_writeIndex_28[groupIdx] = slotIdx;
-    if (self.m_hEvents[mutexIdx]) SetEvent(*self.m_hEvents[mutexIdx]);
+    if (self.m_ipcEvents[mutexIdx]) self.m_ipcEvents[mutexIdx]->set();
 }
 
 uint32_t ShareManager::AcquireImageReadSlot(this ShareManager& self, long long* outImageBuffer, void* outTrackingData, void* outUnknown) {
     uint32_t result = 0xFFFFFFFF;
     uint32_t highestSeq = 0;
-    self.Lock(9);
+    self.Lock(SR_Image);
 
     for (uint32_t i = 0; i < 8; i++) {
         ImageSlotMeta& slot = self.m_pMem->image_meta.slots[i];
@@ -884,7 +924,7 @@ uint32_t ShareManager::AcquireInputReadSlot(this ShareManager& self, int groupId
 
     uint32_t result = 0xFFFFFFFF;
     uint32_t highestSeq = 0;
-    int mutexIdx = 3 + groupIdx;
+    int mutexIdx = SR_InputHmd + groupIdx;
     self.Lock(mutexIdx);
 
     for (uint32_t i = 0; i < 64; i++) {
@@ -912,7 +952,7 @@ uint32_t ShareManager::AcquirePoseReadSlot(this ShareManager& self, int groupIdx
 
     uint32_t result = 0xFFFFFFFF;
     uint32_t highestSeq = 0;
-    int mutexIdx = 6 + groupIdx;
+    int mutexIdx = SR_PoseHmd + groupIdx;
     self.Lock(mutexIdx);
 
     for (uint32_t i = 0; i < 64; i++) {
@@ -938,19 +978,19 @@ uint32_t ShareManager::AcquirePoseReadSlot(this ShareManager& self, int groupIdx
 
 void ShareManager::CommitImageReadSlot(this ShareManager& self, uint32_t slotIdx) {
     if (slotIdx >= 8) return;
-    self.Lock(9);
+    self.Lock(SR_Image);
     ImageSlotMeta& slot = self.m_pMem->image_meta.slots[slotIdx];
     if (slot.read_counter > 0) {
         slot.read_counter -= 1;
         if (slot.read_counter == 0) slot.state = 1;
     }
-    self.Unlock(9);
+    self.Unlock(SR_Image);
 }
 
 void ShareManager::CommitInputReadSlot(this ShareManager& self, int groupIdx, uint32_t slotIdx) {
     if (groupIdx < 0 || groupIdx >= 3 || slotIdx >= 64) return;
 
-    int mutexIdx = 3 + groupIdx;
+    int mutexIdx = SR_InputHmd + groupIdx;
     self.Lock(mutexIdx);
     InputSlotMeta& slot = self.m_pMem->input_meta.groups[groupIdx].slots[slotIdx];
     if (slot.read_counter > 0) {
@@ -965,7 +1005,7 @@ void ShareManager::CommitInputReadSlot(this ShareManager& self, int groupIdx, ui
 void ShareManager::CommitPoseReadSlot(this ShareManager& self, int groupIdx, uint32_t slotIdx) {
     if (groupIdx < 0 || groupIdx >= 4 || slotIdx >= 64) return;
 
-    int mutexIdx = 6 + groupIdx;
+    int mutexIdx = SR_PoseHmd + groupIdx;
     self.Lock(mutexIdx);
     PoseSlotMeta& slot = self.m_pMem->pose_meta.groups[groupIdx].slots[slotIdx];
     if (slot.read_counter > 0) {
@@ -980,12 +1020,11 @@ void ShareManager::CommitPoseReadSlot(this ShareManager& self, int groupIdx, uin
 uint64_t ShareManager::TryAcquireShareMutex(this ShareManager& self, uint32_t typeIndex) {
     if (typeIndex > 1) return 0xFFFFFFFFFFFFFF00;
 
-    int realIdx = 26 + typeIndex;
-    if (!self.m_hMutexes[realIdx]) return 0xFFFFFFFFFFFFFF00;
-    DWORD res = WaitForSingleObject(*self.m_hMutexes[realIdx], 0);
+    int realIdx = SR_LibpadRequestSteamVRPlugin + typeIndex;
+    if (!self.m_ipcMutexes[realIdx]) return 0xFFFFFFFFFFFFFF00;
 
-    if (res == WAIT_OBJECT_0 || res == WAIT_ABANDONED) {
-        ReleaseMutex(*self.m_hMutexes[realIdx]);
+    if (self.m_ipcMutexes[realIdx]->try_lock()) {
+        self.m_ipcMutexes[realIdx]->unlock();
         return 0;
     }
 
@@ -997,8 +1036,8 @@ uint32_t ShareManager::AcquireShareMutex(this ShareManager& self, uint32_t typeI
         return 0xFFFFFFFF;
     }
 
-    if (self.m_hMutexes[26 + typeIndex]) {
-        WaitForSingleObject(*self.m_hMutexes[26 + typeIndex], INFINITE);
+    if (self.m_ipcMutexes[SR_LibpadRequestSteamVRPlugin + typeIndex]) {
+        self.m_ipcMutexes[SR_LibpadRequestSteamVRPlugin + typeIndex]->lock();
     }
 
     return 0;
@@ -1009,18 +1048,16 @@ uint32_t ShareManager::ReleaseShareMutex(this ShareManager& self, uint32_t typeI
         return 0xFFFFFFFF;
     }
 
-    if (self.m_hMutexes[26 + typeIndex]) {
-        ReleaseMutex(*self.m_hMutexes[26 + typeIndex]);
+    if (self.m_ipcMutexes[SR_LibpadRequestSteamVRPlugin + typeIndex]) {
+        self.m_ipcMutexes[SR_LibpadRequestSteamVRPlugin + typeIndex]->unlock();
     }
 
     return 0;
 }
 
 uint32_t ShareManager::TryAcquireLibpadMutex(this ShareManager& self) {
-    if (!self.m_hMutexes[25]) return 0xFFFFFFFF;
-    DWORD res = WaitForSingleObject(*self.m_hMutexes[25], 0);
-
-    if (res == WAIT_OBJECT_0 || res == WAIT_ABANDONED) {
+    if (!self.m_ipcMutexes[SR_LibpadAccess]) return 0xFFFFFFFF;
+    if (self.m_ipcMutexes[SR_LibpadAccess]->try_lock()) {
         return 0;
     }
 
@@ -1028,34 +1065,35 @@ uint32_t ShareManager::TryAcquireLibpadMutex(this ShareManager& self) {
 }
 
 int ShareManager::ReleaseLibpadMutex(this ShareManager& self) {
-    if (!self.m_hMutexes[25]) return 0;
-    return ReleaseMutex(*self.m_hMutexes[25]) ? 1 : 0;
+    if (!self.m_ipcMutexes[SR_LibpadAccess]) return 0;
+    self.m_ipcMutexes[SR_LibpadAccess]->unlock();
+    return 1;
 }
 
 void ShareManager::ReleaseMutexByIndex(this ShareManager& self, int index) {
-    if (self.m_hMutexes[index]) {
-        ReleaseMutex(*self.m_hMutexes[index]);
+    if (index >= 0 && index < SR_Max && self.m_ipcMutexes[index]) {
+        self.m_ipcMutexes[index]->unlock();
     }
 }
 
 void ShareManager::ClearLogEventFlag(this ShareManager& self) {
-    self.Lock(29);
+    self.Lock(SR_Log);
     self.m_pMem->logs.log_head = 0;
-    self.Unlock(29);
+    self.Unlock(SR_Log);
 }
 
 void ShareManager::SetGlobalEventFlag(this ShareManager& self, uint64_t flags) {
     GlobalEventContext* pCtx = self.m_pEventContext;
     if (pCtx) {
-        if (pCtx->hMutex) WaitForSingleObject(*pCtx->hMutex, INFINITE);
+        if (pCtx->ipcMutex) pCtx->ipcMutex->lock();
         *pCtx->pSharedFlags |= flags;
-        if (pCtx->hEvent) SetEvent(*pCtx->hEvent);
-        if (pCtx->hMutex) ReleaseMutex(*pCtx->hMutex);
+        if (pCtx->ipcEvent) pCtx->ipcEvent->set();
+        if (pCtx->ipcMutex) pCtx->ipcMutex->unlock();
     }
 }
 
 uint32_t ShareManager::ReadPlayareaResult(this ShareManager& self, void* outData) {
-    self.Lock(11);
+    self.Lock(SR_PlayareaResult);
 
     uint32_t bestSlot = 0xFFFFFFFF;
     uint32_t highestSeq = 0;
@@ -1081,12 +1119,12 @@ uint32_t ShareManager::ReadPlayareaResult(this ShareManager& self, void* outData
         slot.state = 1;
     }
 
-    self.Unlock(11);
+    self.Unlock(SR_PlayareaResult);
     return bestSlot;
 }
 
 uint32_t ShareManager::WritePlayareaResult(this ShareManager& self, void* data) {
-    self.Lock(11);
+    self.Lock(SR_PlayareaResult);
 
     uint32_t targetSlot = 0xFFFFFFFF;
     uint32_t highestSeq = 0;
@@ -1114,17 +1152,17 @@ uint32_t ShareManager::WritePlayareaResult(this ShareManager& self, void* data) 
     slot.sequenceId = highestSeq + 1;
     slot.state = 1;
 
-    self.Unlock(11);
+    self.Unlock(SR_PlayareaResult);
     return targetSlot;
 }
 
 int ShareManager::WriteFwInfo2_0x9280(this ShareManager& self, void* data) {
-    self.Lock(20);
+    self.Lock(SR_FwInfo2);
     if (data) {
         memcpy(self.m_pMem->fw_info2_9280.data, data, sizeof(self.m_pMem->fw_info2_9280.data));
     }
     int cnt = ++self.m_pMem->fw_info2_9280.ctr;
-    self.Unlock(20);
+    self.Unlock(SR_FwInfo2);
 
     self.SetGlobalEventFlag(0x40);
 
@@ -1132,15 +1170,13 @@ int ShareManager::WriteFwInfo2_0x9280(this ShareManager& self, void* data) {
 }
 
 uint32_t ShareManager::WaitShareEvent(this ShareManager& self, int groupIdx, DWORD timeoutMs) {
-    if (!self.m_hEvents[groupIdx]) return 0xFFFFFFFF;
-    DWORD result = WaitForSingleObject(*self.m_hEvents[groupIdx], timeoutMs);
-
-    if (result != WAIT_OBJECT_0) {
-        return 0xFFFFFFFF;
+    if (groupIdx < 0 || groupIdx >= SR_Max || !self.m_ipcEvents[groupIdx]) return 0xFFFFFFFF;
+    bool success = self.m_ipcEvents[groupIdx]->wait(timeoutMs);
+    if (success) {
+        self.m_ipcEvents[groupIdx]->reset();
+        return 0;
     }
-
-    ResetEvent(*self.m_hEvents[groupIdx]);
-    return 0;
+    return 0xFFFFFFFF;
 }
 
 #define IMPL_READ_MEMCPY_RET(FuncName, GroupIdx, MemGroup, MemData, Size) \
@@ -1251,7 +1287,7 @@ unsigned __stdcall ShareManager::EvfWorkerThread_Conditional(void* pContext) {
     char sharedMemBuffer[256];
 
     while (!self->m_exitThreads) {
-        for (int i = 0; i < 11; i++) {
+        for (int i = 0; i < SC_Max; i++) {
             ConfigMapping& map = self->m_configMappings[i];
 
             std::string sharedStr;
@@ -1278,17 +1314,17 @@ unsigned __stdcall ShareManager::EvfWorkerThread_Conditional(void* pContext) {
 }
 
 void ShareManager::InitializeSub_ad30(this ShareManager& self) {
-    self.m_configMappings[0] = {"SafetyNotice", "LastRecordedDateTime", ""};
-    self.m_configMappings[1] = {"Controller", "VibrationStrength", "1"};
-    self.m_configMappings[2] = {"HMD", "ScreenBrightness", "31"};
-    self.m_configMappings[3] = {"SafetyNotice", "LimitDisplay", ""};
-    self.m_configMappings[4] = {"VRTrace", "MemorySize", "1"};
-    self.m_configMappings[5] = {"InitialSetup", "Done", "1"}; // Default is 1 because PSVR2TK already skips Sony's setup.
-    self.m_configMappings[6] = {"DataCollection", "State", ""};
-    self.m_configMappings[7] = {"HMD", "CrashCount", "0"};
-    self.m_configMappings[8] = {"Telemetry", "OutputLog", "0"};
-    self.m_configMappings[9] = {"Controller", "BluetoothNotification", "1"};
-    self.m_configMappings[10] = {"Controller", "Status", "0"};
+    self.m_configMappings[SC_LastRecordedDateTime] = {"SafetyNotice", "LastRecordedDateTime", ""};
+    self.m_configMappings[SC_VibrationStrength] = {"Controller", "VibrationStrength", "1"};
+    self.m_configMappings[SC_ScreenBrightness] = {"HMD", "ScreenBrightness", "31"};
+    self.m_configMappings[SC_LimitDisplay] = {"SafetyNotice", "LimitDisplay", ""};
+    self.m_configMappings[SC_MemorySize] = {"VRTrace", "MemorySize", "1"};
+    self.m_configMappings[SC_Done] = {"InitialSetup", "Done", "1"}; // Default is 1 because PSVR2TK already skips Sony's setup.
+    self.m_configMappings[SC_State] = {"DataCollection", "State", ""};
+    self.m_configMappings[SC_CrashCount] = {"HMD", "CrashCount", "0"};
+    self.m_configMappings[SC_OutputLog] = {"Telemetry", "OutputLog", "0"};
+    self.m_configMappings[SC_BluetoothNotification] = {"Controller", "BluetoothNotification", "1"};
+    self.m_configMappings[SC_Status] = {"Controller", "Status", "0"};
 
     char szPath[MAX_PATH];
     if (SUCCEEDED(SHGetFolderPathA(NULL, CSIDL_LOCAL_APPDATA, NULL, 0, szPath))) {
@@ -1313,7 +1349,7 @@ void ShareManager::InitializeSub_ad30(this ShareManager& self) {
 
     self.m_exitThreads = false;
 
-    for (int i = 0; i < 11; i++) {
+    for (int i = 0; i < SC_Max; i++) {
         self.m_configMappings[i].CachedValue[0] = '\0';
     }
 }
@@ -1325,7 +1361,7 @@ void ShareManager::InitializeSub_bdb0(this ShareManager& self) {
     char tempBuffer[256];
     std::string sharedStr;
 
-    for (int i = 0; i < 11; i++) {
+    for (int i = 0; i < SC_Max; i++) {
         ConfigMapping& map = self.m_configMappings[i];
         tempBuffer[0] = '\0';
 
@@ -1367,13 +1403,13 @@ void ShareManager::InitializeSub_bdb0(this ShareManager& self) {
 }
 
 void ShareManager::Lock(int idx) {
-    if (m_hMutexes[idx]) {
-        WaitForSingleObject(*m_hMutexes[idx], INFINITE);
+    if (idx >= 0 && idx < 36 && m_ipcMutexes[idx]) {
+        m_ipcMutexes[idx]->lock();
     }
 }
 
 void ShareManager::Unlock(int idx) {
-    if (m_hMutexes[idx]) {
-        ReleaseMutex(*m_hMutexes[idx]);
+    if (idx >= 0 && idx < 36 && m_ipcMutexes[idx]) {
+        m_ipcMutexes[idx]->unlock();
     }
 }

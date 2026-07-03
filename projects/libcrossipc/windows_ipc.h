@@ -16,6 +16,7 @@ public:
   void lock() override;
   bool try_lock() override;
   void unlock() override;
+  void* get_native_handle() override;
 
 private:
   HANDLE m_hMutex;
@@ -23,11 +24,13 @@ private:
 
 class WindowsIpcEvent : public IIpcEvent {
 public:
-  explicit WindowsIpcEvent(const char *name);
+  explicit WindowsIpcEvent(const char *name, bool manualReset = false);
   virtual ~WindowsIpcEvent();
 
   void set() override;
   bool wait(uint32_t timeoutMs = 0xFFFFFFFF) override;
+  void reset() override;
+  void* get_native_handle() override;
 
 private:
   HANDLE m_hEvent;
@@ -40,6 +43,7 @@ public:
 
   void *map() override;
   void unmap() override;
+  void* get_native_handle() override;
 
 private:
   HANDLE m_hFileMapping;

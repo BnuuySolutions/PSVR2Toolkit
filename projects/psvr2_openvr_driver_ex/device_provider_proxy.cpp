@@ -1,18 +1,19 @@
 #include "device_provider_proxy.h"
 
-#include "driver_hooks/aston_manager_hooks.h"
 #include "command_thread.h"
 #include "caesar_usb_thread.h"
 #include "config.h"
-#include "driver_hooks/caesar_manager_hooks.h"
 #include "driver_context_proxy.h"
+#include "driver_hooks/aston_manager_hooks.h"
+#include "driver_hooks/caesar_manager_hooks.h"
 #include "driver_hooks/hmd_device_hooks.h"
+#include "driver_hooks/libpad_hooks.h"
 #include "driver_hooks/sense_device_hooks.h"
+#include "driver_hooks/usb_thread_hooks.h"
+#include "driver_interface/share_manager.h"
 #include "hmd_driver_loader.h"
 #include "hook_lib.h"
-#include "driver_hooks/libpad_hooks.h"
 #include "trigger_effect_manager.h"
-#include "driver_hooks/usb_thread_hooks.h"
 #include "util.h"
 #include "vr_settings.h"
 
@@ -137,6 +138,7 @@ namespace psvr2_toolkit {
     HmdDeviceHooks::InstallHooks();
     LibpadHooks::InstallHooks();
     SenseDeviceHooks::InstallHooks();
+    ShareManager::InstallHooks();
     UsbThreadHooks::InstallHooks();
   }
 

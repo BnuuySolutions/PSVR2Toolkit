@@ -20,6 +20,7 @@ public:
     void lock() override;
     bool try_lock() override;
     void unlock() override;
+    void* get_native_handle() override;
 };
 
 class LinuxIpcEvent : public IIpcEvent {
@@ -28,12 +29,15 @@ private:
     int m_fd;
     struct EventData;
     EventData *m_data;
+    bool m_manualReset;
 
 public:
-    LinuxIpcEvent(const char* name);
+    LinuxIpcEvent(const char* name, bool manualReset = false);
     ~LinuxIpcEvent() override;
     void set() override;
     bool wait(uint32_t timeoutMs = 0xFFFFFFFF) override;
+    void reset() override;
+    void* get_native_handle() override;
 };
 
 class LinuxIpcSharedMemory : public IIpcSharedMemory {
@@ -48,6 +52,7 @@ public:
     ~LinuxIpcSharedMemory() override;
     void *map() override;
     void unmap() override;
+    void* get_native_handle() override;
 };
 
 class LinuxIpcBroadcast : public IIpcBroadcast {
