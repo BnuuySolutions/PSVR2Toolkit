@@ -5,27 +5,8 @@
 #include "util.h"
 
 namespace psvr2_toolkit {
-
-  void *(*AstonManager__acquireLibpadAccess)(void *) = nullptr;
-  void AstonManager__acquireLibpadAccessHook(void *thisptr) {
-    static bool ranOnce = false;
-
-    // For some reason, a deadlock occurs when this function is ran twice under Ignition.
-    // So, we'll just only allow this to run once.
-    if (!ranOnce) {
-      AstonManager__acquireLibpadAccess(thisptr);
-      ranOnce = true;
-    }
-  }
-
   void AstonManagerHooks::InstallHooks() {
     static HmdDriverLoader *pHmdDriverLoader = HmdDriverLoader::Instance();
-
-    // TODO: bring this back or fix it in the ShareManager implementation
-    // // AstonManager::acquireLibpadAccess
-    // HookLib::InstallHook(reinterpret_cast<void *>(pHmdDriverLoader->GetBaseAddress() + 0x11d0c0),
-    //                      reinterpret_cast<void *>(AstonManager__acquireLibpadAccessHook),
-    //                      reinterpret_cast<void **>(&AstonManager__acquireLibpadAccess));
 
     // Controller poll rate stub
     if (Util::IsRunningOnWine()) {

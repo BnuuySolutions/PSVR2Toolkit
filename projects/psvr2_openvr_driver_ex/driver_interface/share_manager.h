@@ -6,10 +6,26 @@
 #include <functional>
 #include <vector>
 #include <windows.h>
+#include <mutex>
+#include <condition_variable>
+
 
 class IIpcMutex;
 class IIpcEvent;
 class IIpcSharedMemory;
+
+struct ProcessOwnedMutex {
+  std::mutex localMtx;
+  std::condition_variable cv;
+  IIpcMutex *ipcMutex = nullptr;
+  bool isAcquired = false;
+  bool isLocking = false;
+  
+  void Lock();
+  bool TryLock();
+  void Unlock();
+  bool IsFreeOrOwned();
+};
 
 #pragma pack(push, 1)
 
@@ -587,4 +603,7 @@ private:
   IIpcEvent *m_ipcEvents[SR_Max];
   IIpcMutex *m_ipcMutexes[SR_Max];
   IIpcSharedMemory *m_ipcSharedMemory;
+
+  ProcessOwnedMutex m_libpadMutex;
+  ProcessOwnedMutex m_shareMutexes[2];
 };
