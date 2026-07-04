@@ -53,6 +53,10 @@ void IpcMutex_Unlock(IIpcMutex *mutex) {
   mutex->unlock();
 }
 
+void *IpcMutex_GetNativeHandle(IIpcMutex *mutex) {
+  return mutex ? mutex->get_native_handle() : nullptr;
+}
+
 void DestroyIpcEvent(IIpcEvent *event) {
   delete event;
 }
@@ -69,6 +73,10 @@ void IpcEvent_Reset(IIpcEvent *event) {
   event->reset();
 }
 
+void *IpcEvent_GetNativeHandle(IIpcEvent *event) {
+  return event ? event->get_native_handle() : nullptr;
+}
+
 void DestroyIpcSharedMemory(IIpcSharedMemory *shm) {
   delete shm;
 }
@@ -79,6 +87,10 @@ void *IpcSharedMemory_Map(IIpcSharedMemory *shm) {
 
 void IpcSharedMemory_Unmap(IIpcSharedMemory *shm) {
   shm->unmap();
+}
+
+void *IpcSharedMemory_GetNativeHandle(IIpcSharedMemory *shm) {
+  return shm ? shm->get_native_handle() : nullptr;
 }
 
 void DestroyIpcBroadcast(IIpcBroadcast *broadcast) {

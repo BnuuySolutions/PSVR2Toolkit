@@ -60,15 +60,18 @@ CROSS_IPC_API void DestroyIpcMutex(IIpcMutex *mutex);
 CROSS_IPC_API void IpcMutex_Lock(IIpcMutex *mutex);
 CROSS_IPC_API bool IpcMutex_TryLock(IIpcMutex *mutex);
 CROSS_IPC_API void IpcMutex_Unlock(IIpcMutex *mutex);
+CROSS_IPC_API void *IpcMutex_GetNativeHandle(IIpcMutex *mutex);
 
 CROSS_IPC_API void DestroyIpcEvent(IIpcEvent *event);
 CROSS_IPC_API void IpcEvent_Set(IIpcEvent *event);
 CROSS_IPC_API bool IpcEvent_Wait(IIpcEvent *event, uint32_t timeoutMs);
 CROSS_IPC_API void IpcEvent_Reset(IIpcEvent *event);
+CROSS_IPC_API void *IpcEvent_GetNativeHandle(IIpcEvent *event);
 
 CROSS_IPC_API void DestroyIpcSharedMemory(IIpcSharedMemory *shm);
 CROSS_IPC_API void *IpcSharedMemory_Map(IIpcSharedMemory *shm);
 CROSS_IPC_API void IpcSharedMemory_Unmap(IIpcSharedMemory *shm);
+CROSS_IPC_API void *IpcSharedMemory_GetNativeHandle(IIpcSharedMemory *shm);
 
 CROSS_IPC_API void DestroyIpcBroadcast(IIpcBroadcast *broadcast);
 CROSS_IPC_API bool IpcBroadcast_Wait(IIpcBroadcast *broadcast, uint32_t timeoutMs);
