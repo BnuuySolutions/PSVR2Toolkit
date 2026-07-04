@@ -48,6 +48,69 @@ static const char *SharedResourceNames[][2] = {
     {"SHARE_VRT2_WIN_PLAYAREA_SETUP_INFO_EVT", "SHARE_VRT2_WIN_PLAYAREA_SETUP_INFO_MTX"}
 };
 
+void ProcessOwnedMutex::Lock() {
+  if (!ipcMutex) return;
+  std::unique_lock<std::mutex> lock(localMtx);
+  while (isLocking) {
+    cv.wait(lock);
+  }
+  if (isAcquired) {
+    return;
+  }
+  isLocking = true;
+  lock.unlock();
+
+  IpcMutex_Lock(ipcMutex);
+
+  lock.lock();
+  isLocking = false;
+  isAcquired = true;
+  cv.notify_all();
+}
+
+bool ProcessOwnedMutex::TryLock() {
+  if (!ipcMutex) return false;
+  std::unique_lock<std::mutex> lock(localMtx);
+  if (isLocking) {
+    return false;
+  }
+  if (isAcquired) {
+    return true;
+  }
+  if (IpcMutex_TryLock(ipcMutex)) {
+    isAcquired = true;
+    return true;
+  }
+  return false;
+}
+
+void ProcessOwnedMutex::Unlock() {
+  if (!ipcMutex) return;
+  std::unique_lock<std::mutex> lock(localMtx);
+  if (!isAcquired) {
+    return;
+  }
+  IpcMutex_Unlock(ipcMutex);
+  isAcquired = false;
+  cv.notify_all();
+}
+
+bool ProcessOwnedMutex::IsFreeOrOwned() {
+  if (!ipcMutex) return false;
+  std::unique_lock<std::mutex> lock(localMtx);
+  if (isAcquired) {
+    return true;
+  }
+  if (isLocking) {
+    return false;
+  }
+  if (IpcMutex_TryLock(ipcMutex)) {
+    IpcMutex_Unlock(ipcMutex);
+    return true;
+  }
+  return false;
+}
+
 ShareManager *ShareManager::s_instance = nullptr;
 bool ShareManager::s_isInitialized = false;
 
@@ -115,7 +178,7 @@ ShareManager::~ShareManager() {
     }
   }
   if (m_ipcSharedMemory) {
-    m_ipcSharedMemory->unmap();
+    IpcSharedMemory_Unmap(m_ipcSharedMemory);
     DestroyIpcSharedMemory(m_ipcSharedMemory);
     m_ipcSharedMemory = nullptr;
   }
@@ -265,17 +328,21 @@ void ShareManager::Initialize(this ShareManager &self, DWORD processInstanceId) 
     self.m_ipcEvents[i] = CreateIpcEvent(SharedResourceNames[i][0], true);
     self.m_ipcMutexes[i] = CreateIpcMutex(SharedResourceNames[i][1]);
 
-    void *rawEvt = self.m_ipcEvents[i] ? self.m_ipcEvents[i]->get_native_handle() : nullptr;
+    void *rawEvt = IpcEvent_GetNativeHandle(self.m_ipcEvents[i]);
     self.m_hEvents[i] = rawEvt ? new HANDLE(reinterpret_cast<HANDLE>(rawEvt)) : nullptr;
 
-    void *rawMtx = self.m_ipcMutexes[i] ? self.m_ipcMutexes[i]->get_native_handle() : nullptr;
+    void *rawMtx = IpcMutex_GetNativeHandle(self.m_ipcMutexes[i]);
     self.m_hMutexes[i] = rawMtx ? new HANDLE(reinterpret_cast<HANDLE>(rawMtx)) : nullptr;
   }
+
+  self.m_libpadMutex.ipcMutex = self.m_ipcMutexes[SR_LibpadAccess];
+  self.m_shareMutexes[0].ipcMutex = self.m_ipcMutexes[SR_LibpadRequestSteamVRPlugin];
+  self.m_shareMutexes[1].ipcMutex = self.m_ipcMutexes[SR_LibpadRequestAssistantApp];
 
   self.m_ipcSharedMemory = CreateIpcSharedMemory("SHARE_VRT2_WIN", 0x2000000);
   if (self.m_ipcSharedMemory) {
     self.m_pMem = reinterpret_cast<VRSharedMemory *>(IpcSharedMemory_Map(self.m_ipcSharedMemory));
-    void *rawShm = self.m_ipcSharedMemory->get_native_handle();
+    void *rawShm = IpcSharedMemory_GetNativeHandle(self.m_ipcSharedMemory);
     self.m_hSharedFileMapping = rawShm ? reinterpret_cast<HANDLE>(rawShm) : nullptr;
   } else {
     self.m_pMem = nullptr;
@@ -354,7 +421,7 @@ void ShareManager::Initialize(this ShareManager &self, DWORD processInstanceId) 
     snprintf(configName, sizeof(configName), "CONFIG_ID_%d", i);
     self.m_ipcConfigMutexes[i] = CreateIpcMutex(configName);
 
-    void *rawMtx = self.m_ipcConfigMutexes[i] ? self.m_ipcConfigMutexes[i]->get_native_handle() : nullptr;
+    void *rawMtx = IpcMutex_GetNativeHandle(self.m_ipcConfigMutexes[i]);
     self.m_hConfigMutexes[i] = rawMtx ? new HANDLE(reinterpret_cast<HANDLE>(rawMtx)) : nullptr;
   }
 
@@ -398,10 +465,10 @@ void ShareManager::RegisterEventCallback(this ShareManager &self, uint64_t mask,
 
   if (pCtx && pCallback) {
     if (pCtx->ipcMutex)
-      pCtx->ipcMutex->lock();
+      IpcMutex_Lock(pCtx->ipcMutex);
     pCtx->callbacks.push_back({*pCallback, mask});
     if (pCtx->ipcMutex)
-      pCtx->ipcMutex->unlock();
+      IpcMutex_Unlock(pCtx->ipcMutex);
   }
 }
 
@@ -414,16 +481,16 @@ void ShareManager::WaitDynamicEvent(GlobalEventContext **ppCtx) {
 
   do {
     if (pCtx->ipcMutex)
-      pCtx->ipcMutex->lock();
+      IpcMutex_Lock(pCtx->ipcMutex);
     uint64_t currentFlags = *pCtx->pSharedFlags;
 
     if (currentFlags == 0) {
       if (pCtx->ipcMutex)
-        pCtx->ipcMutex->unlock();
+        IpcMutex_Unlock(pCtx->ipcMutex);
       bool signaled = false;
       if (pCtx->ipcEvent) {
-        signaled = pCtx->ipcEvent->wait(100);
-        pCtx->ipcEvent->reset();
+        signaled = IpcEvent_Wait(pCtx->ipcEvent, 100);
+        IpcEvent_Reset(pCtx->ipcEvent);
       } else {
         Sleep(100);
       }
@@ -432,7 +499,7 @@ void ShareManager::WaitDynamicEvent(GlobalEventContext **ppCtx) {
     } else {
       *pCtx->pSharedFlags = 0;
       if (pCtx->ipcMutex)
-        pCtx->ipcMutex->unlock();
+        IpcMutex_Unlock(pCtx->ipcMutex);
 
       for (const auto &cb : pCtx->callbacks) {
         if ((currentFlags & cb.second) == cb.second) {
@@ -450,7 +517,7 @@ void ShareManager::GetIntConfig(this ShareManager &self, int configId, long *out
     return;
 
   if (self.m_ipcConfigMutexes[configId]) {
-    self.m_ipcConfigMutexes[configId]->lock();
+    IpcMutex_Lock(self.m_ipcConfigMutexes[configId]);
   }
 
   const char *strData = self.m_pMem->configs_9e00.str_configs[configId].stringData;
@@ -460,7 +527,7 @@ void ShareManager::GetIntConfig(this ShareManager &self, int configId, long *out
   }
 
   if (self.m_ipcConfigMutexes[configId]) {
-    self.m_ipcConfigMutexes[configId]->unlock();
+    IpcMutex_Unlock(self.m_ipcConfigMutexes[configId]);
   }
 }
 
@@ -481,7 +548,7 @@ uint32_t ShareManager::ReadStringConfig(this ShareManager &self, int configId, s
     return 0xFFFFFFFF;
 
   if (self.m_ipcConfigMutexes[configId]) {
-    self.m_ipcConfigMutexes[configId]->lock();
+    IpcMutex_Lock(self.m_ipcConfigMutexes[configId]);
   }
 
   uint32_t counter = self.m_pMem->configs_9e00.str_configs[configId].counter;
@@ -490,7 +557,7 @@ uint32_t ShareManager::ReadStringConfig(this ShareManager &self, int configId, s
   outStr = strData;
 
   if (self.m_ipcConfigMutexes[configId]) {
-    self.m_ipcConfigMutexes[configId]->unlock();
+    IpcMutex_Unlock(self.m_ipcConfigMutexes[configId]);
   }
   return counter;
 }
@@ -500,7 +567,7 @@ void ShareManager::WriteConfigString(this ShareManager &self, int configId, cons
     return;
 
   if (self.m_ipcConfigMutexes[configId]) {
-    self.m_ipcConfigMutexes[configId]->lock();
+    IpcMutex_Lock(self.m_ipcConfigMutexes[configId]);
   }
 
   uint32_t &counter = self.m_pMem->configs_9e00.str_configs[configId].counter;
@@ -511,7 +578,7 @@ void ShareManager::WriteConfigString(this ShareManager &self, int configId, cons
   counter += 1;
 
   if (self.m_ipcConfigMutexes[configId]) {
-    self.m_ipcConfigMutexes[configId]->unlock();
+    IpcMutex_Unlock(self.m_ipcConfigMutexes[configId]);
   }
 }
 
@@ -603,7 +670,7 @@ void ShareManager::WriteLogString(this ShareManager &self, char level, const cha
 
   self.Unlock(SR_Log);
   if (self.m_ipcEvents[SR_Log])
-    self.m_ipcEvents[SR_Log]->set();
+    IpcEvent_Set(self.m_ipcEvents[SR_Log]);
 }
 
 void ShareManager::ReadIntConfigSafe(this ShareManager &self, int configId, int *outValue) {
@@ -879,7 +946,7 @@ void ShareManager::CommitImageWriteSlot(this ShareManager &self, uint32_t slotId
   self.Unlock(SR_Image);
   self.m_writeIndex[0] = slotIdx;
   if (self.m_ipcEvents[SR_Image])
-    self.m_ipcEvents[SR_Image]->set();
+    IpcEvent_Set(self.m_ipcEvents[SR_Image]);
 }
 
 void ShareManager::CommitInputWriteSlot(this ShareManager &self, int groupIdx, uint32_t slotIdx) {
@@ -896,7 +963,7 @@ void ShareManager::CommitInputWriteSlot(this ShareManager &self, int groupIdx, u
   self.Unlock(mutexIdx);
   self.m_writeIndex_40[groupIdx] = slotIdx;
   if (self.m_ipcEvents[mutexIdx])
-    self.m_ipcEvents[mutexIdx]->set();
+    IpcEvent_Set(self.m_ipcEvents[mutexIdx]);
 }
 
 void ShareManager::CommitPoseWriteSlot(this ShareManager &self, int groupIdx, uint32_t slotIdx, void *params) {
@@ -918,7 +985,7 @@ void ShareManager::CommitPoseWriteSlot(this ShareManager &self, int groupIdx, ui
   self.Unlock(mutexIdx);
   self.m_writeIndex_28[groupIdx] = slotIdx;
   if (self.m_ipcEvents[mutexIdx])
-    self.m_ipcEvents[mutexIdx]->set();
+    IpcEvent_Set(self.m_ipcEvents[mutexIdx]);
 }
 
 uint32_t ShareManager::AcquireImageReadSlot(this ShareManager &self, long long *outImageBuffer, void *outTrackingData, void *outUnknown) {
@@ -1059,15 +1126,16 @@ void ShareManager::CommitPoseReadSlot(this ShareManager &self, int groupIdx, uin
 }
 
 uint64_t ShareManager::TryAcquireShareMutex(this ShareManager &self, uint32_t typeIndex) {
-  if (typeIndex > 1)
+  if (typeIndex > 1) {
     return 0xFFFFFFFFFFFFFF00;
+  }
 
   int realIdx = SR_LibpadRequestSteamVRPlugin + typeIndex;
-  if (!self.m_ipcMutexes[realIdx])
+  if (!self.m_ipcMutexes[realIdx]) {
     return 0xFFFFFFFFFFFFFF00;
+  }
 
-  if (self.m_ipcMutexes[realIdx]->try_lock()) {
-    self.m_ipcMutexes[realIdx]->unlock();
+  if (self.m_shareMutexes[typeIndex].IsFreeOrOwned()) {
     return 0;
   }
 
@@ -1079,9 +1147,7 @@ uint32_t ShareManager::AcquireShareMutex(this ShareManager &self, uint32_t typeI
     return 0xFFFFFFFF;
   }
 
-  if (self.m_ipcMutexes[SR_LibpadRequestSteamVRPlugin + typeIndex]) {
-    self.m_ipcMutexes[SR_LibpadRequestSteamVRPlugin + typeIndex]->lock();
-  }
+  self.m_shareMutexes[typeIndex].Lock();
 
   return 0;
 }
@@ -1091,17 +1157,17 @@ uint32_t ShareManager::ReleaseShareMutex(this ShareManager &self, uint32_t typeI
     return 0xFFFFFFFF;
   }
 
-  if (self.m_ipcMutexes[SR_LibpadRequestSteamVRPlugin + typeIndex]) {
-    self.m_ipcMutexes[SR_LibpadRequestSteamVRPlugin + typeIndex]->unlock();
-  }
+  self.m_shareMutexes[typeIndex].Unlock();
 
   return 0;
 }
 
 uint32_t ShareManager::TryAcquireLibpadMutex(this ShareManager &self) {
-  if (!self.m_ipcMutexes[SR_LibpadAccess])
+  if (!self.m_ipcMutexes[SR_LibpadAccess]) {
     return 0xFFFFFFFF;
-  if (self.m_ipcMutexes[SR_LibpadAccess]->try_lock()) {
+  }
+
+  if (self.m_libpadMutex.TryLock()) {
     return 0;
   }
 
@@ -1109,15 +1175,31 @@ uint32_t ShareManager::TryAcquireLibpadMutex(this ShareManager &self) {
 }
 
 int ShareManager::ReleaseLibpadMutex(this ShareManager &self) {
-  if (!self.m_ipcMutexes[SR_LibpadAccess])
+  if (!self.m_ipcMutexes[SR_LibpadAccess]) {
     return 0;
-  self.m_ipcMutexes[SR_LibpadAccess]->unlock();
-  return 1;
+  }
+
+  self.m_libpadMutex.Unlock();
+
+  return 0;
 }
 
 void ShareManager::ReleaseMutexByIndex(this ShareManager &self, int index) {
+  if (index == SR_LibpadAccess) {
+    self.ReleaseLibpadMutex();
+    return;
+  }
+  if (index == SR_LibpadRequestSteamVRPlugin) {
+    self.ReleaseShareMutex(0);
+    return;
+  }
+  if (index == SR_LibpadRequestAssistantApp) {
+    self.ReleaseShareMutex(1);
+    return;
+  }
+
   if (index >= 0 && index < SR_Max && self.m_ipcMutexes[index]) {
-    self.m_ipcMutexes[index]->unlock();
+    IpcMutex_Unlock(self.m_ipcMutexes[index]);
   }
 }
 
@@ -1131,12 +1213,12 @@ void ShareManager::SetGlobalEventFlag(this ShareManager &self, uint64_t flags) {
   GlobalEventContext *pCtx = self.m_pEventContext;
   if (pCtx) {
     if (pCtx->ipcMutex)
-      pCtx->ipcMutex->lock();
+      IpcMutex_Lock(pCtx->ipcMutex);
     *pCtx->pSharedFlags |= flags;
     if (pCtx->ipcEvent)
-      pCtx->ipcEvent->set();
+      IpcEvent_Set(pCtx->ipcEvent);
     if (pCtx->ipcMutex)
-      pCtx->ipcMutex->unlock();
+      IpcMutex_Unlock(pCtx->ipcMutex);
   }
 }
 
@@ -1221,9 +1303,9 @@ int ShareManager::WriteFwInfo2_0x9280(this ShareManager &self, void *data) {
 uint32_t ShareManager::WaitShareEvent(this ShareManager &self, int groupIdx, DWORD timeoutMs) {
   if (groupIdx < 0 || groupIdx >= SR_Max || !self.m_ipcEvents[groupIdx])
     return 0xFFFFFFFF;
-  bool success = self.m_ipcEvents[groupIdx]->wait(timeoutMs);
+  bool success = IpcEvent_Wait(self.m_ipcEvents[groupIdx], timeoutMs);
   if (success) {
-    self.m_ipcEvents[groupIdx]->reset();
+    IpcEvent_Reset(self.m_ipcEvents[groupIdx]);
     return 0;
   }
   return 0xFFFFFFFF;
@@ -1443,12 +1525,12 @@ void ShareManager::InitializeSub_bdb0(this ShareManager &self) {
 
 void ShareManager::Lock(int idx) {
   if (idx >= 0 && idx < 36 && m_ipcMutexes[idx]) {
-    m_ipcMutexes[idx]->lock();
+    IpcMutex_Lock(m_ipcMutexes[idx]);
   }
 }
 
 void ShareManager::Unlock(int idx) {
   if (idx >= 0 && idx < 36 && m_ipcMutexes[idx]) {
-    m_ipcMutexes[idx]->unlock();
+    IpcMutex_Unlock(m_ipcMutexes[idx]);
   }
 }
