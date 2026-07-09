@@ -23,8 +23,8 @@ namespace psvr2 {
     std::string installPath = vr::VRProperties()->GetStringProperty(pDriverContext->GetDriverHandle(), vr::Prop_InstallPath_String, nullptr);
 
     ConfigManager::createSingleton();
-    ShareManager::createSingleton(1);
-    ShareManager::getSingleton()->sub_18015E2A0();
+    ShareManager::InitializeInstance(1);
+    ShareManager::GetInstance()->ClearLogEventFlag();
     UkfManager::createSingleton(0);
 
     vr::VRDriverLog()->Log("Init playstation_vr2_hmd module...\n");
