@@ -435,6 +435,7 @@ public:
   static void InitializeInstance(DWORD processInstanceId);
 
   static void InstallHooks();
+  static void ShutdownInstance();
 
   void Initialize(this ShareManager &self, DWORD processInstanceId);
   void RegisterEventCallback(this ShareManager &self, uint64_t mask, std::function<void()> *pCallback);
