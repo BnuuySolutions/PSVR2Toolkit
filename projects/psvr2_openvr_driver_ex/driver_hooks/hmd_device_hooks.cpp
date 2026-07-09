@@ -281,11 +281,11 @@ namespace psvr2_toolkit {
 
     int64_t hmdToHostOffset;
 
-    CaesarManager::GetIMUTimestampOffset(CaesarManager::GetInstance(), &hmdToHostOffset);
+    CaesarManager::getSingleton()->getIMUTimestampOffset(&hmdToHostOffset);
 
     double timeOffset = ((static_cast<int64_t>(pGazeState->wearable.timestamp) + hmdToHostOffset) - GetHostTimestamp()) / 1e6;
 
-    (vr::VRDriverInput())->UpdateEyeTrackingComponent(eyeTrackingComponent, &eyeTrackingData, timeOffset);
+    vr::VRDriverInput()->UpdateEyeTrackingComponent(eyeTrackingComponent, &eyeTrackingData, timeOffset);
   }
 
   void HmdDeviceHooks::InstallHooks() {
