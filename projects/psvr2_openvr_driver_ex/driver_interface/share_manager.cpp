@@ -8,6 +8,8 @@
 using namespace psvr2_toolkit;
 
 #include <shlobj.h>
+#include <thread>
+#include <atomic>
 
 static const char *SharedResourceNames[][2] = {
     {"SHARE_VRT2_WIN_COMMON_EVT", "SHARE_VRT2_WIN_COMMON_MTX"},
@@ -48,6 +50,182 @@ static const char *SharedResourceNames[][2] = {
     {"SHARE_VRT2_WIN_PLAYAREA_SETUP_INFO_EVT", "SHARE_VRT2_WIN_PLAYAREA_SETUP_INFO_MTX"}
 };
 
+class ProcessOwnedMutexManager {
+public:
+  enum Action {
+    ACT_LOCK,
+    ACT_TRY_LOCK,
+    ACT_UNLOCK,
+    ACT_TRY_LOCK_AND_UNLOCK,
+    ACT_EXIT
+  };
+
+  struct Request {
+    Action action;
+    IIpcMutex* mutex;
+    std::mutex* callerMtx;
+    std::condition_variable* callerCv;
+    bool* doneFlag;
+    bool* resultBool;
+  };
+
+  static ProcessOwnedMutexManager& GetInstance() {
+    static ProcessOwnedMutexManager instance;
+    return instance;
+  }
+
+  void QueueRequest(Action action, IIpcMutex* mutex, std::mutex* callerMtx, std::condition_variable* callerCv, bool* doneFlag, bool* resultBool) {
+    Request req = { action, mutex, callerMtx, callerCv, doneFlag, resultBool };
+    {
+      std::lock_guard<std::mutex> lock(m_queueMtx);
+      m_requests.push_back(req);
+    }
+    SetEvent(m_hWakeEvent);
+  }
+
+  void Shutdown() {
+    m_exiting = true;
+    {
+      std::lock_guard<std::mutex> lock(m_queueMtx);
+      Request req = { ACT_EXIT, nullptr, nullptr, nullptr, nullptr, nullptr };
+      m_requests.push_back(req);
+    }
+    SetEvent(m_hWakeEvent);
+    if (m_thread.joinable()) {
+      m_thread.join();
+    }
+    if (m_hWakeEvent) {
+      CloseHandle(m_hWakeEvent);
+      m_hWakeEvent = nullptr;
+    }
+  }
+
+private:
+  ProcessOwnedMutexManager() {
+    m_hWakeEvent = CreateEventA(NULL, FALSE, FALSE, NULL);
+    m_exiting = false;
+    m_thread = std::thread(&ProcessOwnedMutexManager::ThreadLoop, this);
+  }
+
+  ~ProcessOwnedMutexManager() {
+    m_exiting = true;
+    if (m_thread.joinable()) {
+      m_thread.detach();
+    }
+    if (m_hWakeEvent) {
+      CloseHandle(m_hWakeEvent);
+      m_hWakeEvent = nullptr;
+    }
+  }
+
+  void ThreadLoop() {
+    auto completeRequest = [](const Request& req, bool success) {
+      if (req.callerMtx && req.doneFlag && req.resultBool && req.callerCv) {
+        std::lock_guard<std::mutex> lock(*req.callerMtx);
+        *req.doneFlag = true;
+        *req.resultBool = success;
+        req.callerCv->notify_all();
+      }
+    };
+
+    std::vector<Request> pendingLocks;
+
+    while (!m_exiting) {
+      DWORD timeout = pendingLocks.empty() ? INFINITE : 5;
+      WaitForSingleObject(m_hWakeEvent, timeout);
+
+      if (m_exiting) {
+        break;
+      }
+
+      std::vector<Request> localRequests;
+      {
+        std::lock_guard<std::mutex> lock(m_queueMtx);
+        localRequests = std::move(m_requests);
+        m_requests.clear();
+      }
+
+      for (const auto& req : localRequests) {
+        if (req.action == ACT_EXIT) {
+          m_exiting = true;
+          break;
+        }
+
+        if (req.action == ACT_UNLOCK) {
+          if (req.mutex) {
+            IpcMutex_Unlock(req.mutex);
+          }
+          for (auto it = pendingLocks.begin(); it != pendingLocks.end(); ) {
+            if (it->mutex == req.mutex) {
+              it = pendingLocks.erase(it);
+            } else {
+              ++it;
+            }
+          }
+          completeRequest(req, true);
+        }
+        else if (req.action == ACT_LOCK) {
+          if (req.mutex) {
+            pendingLocks.push_back(req);
+          } else {
+            completeRequest(req, false);
+          }
+        }
+        else { // ACT_TRY_LOCK or ACT_TRY_LOCK_AND_UNLOCK
+          bool success = false;
+          if (req.mutex) {
+            success = IpcMutex_TryLock(req.mutex);
+            if (success && req.action == ACT_TRY_LOCK_AND_UNLOCK) {
+              IpcMutex_Unlock(req.mutex);
+            }
+          }
+          completeRequest(req, success);
+        }
+      }
+
+      if (m_exiting) {
+        break;
+      }
+
+      // Poll pending locks (which includes any newly added lock requests)
+      for (auto it = pendingLocks.begin(); it != pendingLocks.end(); ) {
+        if (IpcMutex_TryLock(it->mutex)) {
+          completeRequest(*it, true);
+          it = pendingLocks.erase(it);
+        } else {
+          ++it;
+        }
+      }
+    }
+  }
+
+  std::mutex m_queueMtx;
+  std::vector<Request> m_requests;
+  HANDLE m_hWakeEvent;
+  std::thread m_thread;
+  std::atomic<bool> m_exiting;
+};
+
+static bool QueueAndWaitForRequest(ProcessOwnedMutex* target, std::unique_lock<std::mutex>& lock, ProcessOwnedMutexManager::Action action) {
+  bool done = false;
+  bool result = false;
+
+  ProcessOwnedMutexManager::GetInstance().QueueRequest(
+      action,
+      target->ipcMutex,
+      &target->localMtx,
+      &target->cv,
+      &done,
+      &result
+  );
+
+  while (!done) {
+    target->cv.wait(lock);
+  }
+
+  return result;
+}
+
 void ProcessOwnedMutex::Lock() {
   if (!ipcMutex) return;
   std::unique_lock<std::mutex> lock(localMtx);
@@ -58,13 +236,13 @@ void ProcessOwnedMutex::Lock() {
     return;
   }
   isLocking = true;
-  lock.unlock();
 
-  IpcMutex_Lock(ipcMutex);
+  bool success = QueueAndWaitForRequest(this, lock, ProcessOwnedMutexManager::ACT_LOCK);
 
-  lock.lock();
   isLocking = false;
-  isAcquired = true;
+  if (success) {
+    isAcquired = true;
+  }
   cv.notify_all();
 }
 
@@ -77,11 +255,14 @@ bool ProcessOwnedMutex::TryLock() {
   if (isAcquired) {
     return true;
   }
-  if (IpcMutex_TryLock(ipcMutex)) {
+
+  bool success = QueueAndWaitForRequest(this, lock, ProcessOwnedMutexManager::ACT_TRY_LOCK);
+
+  if (success) {
     isAcquired = true;
-    return true;
   }
-  return false;
+  cv.notify_all();
+  return success;
 }
 
 void ProcessOwnedMutex::Unlock() {
@@ -90,7 +271,9 @@ void ProcessOwnedMutex::Unlock() {
   if (!isAcquired) {
     return;
   }
-  IpcMutex_Unlock(ipcMutex);
+
+  QueueAndWaitForRequest(this, lock, ProcessOwnedMutexManager::ACT_UNLOCK);
+
   isAcquired = false;
   cv.notify_all();
 }
@@ -104,11 +287,8 @@ bool ProcessOwnedMutex::IsFreeOrOwned() {
   if (isLocking) {
     return false;
   }
-  if (IpcMutex_TryLock(ipcMutex)) {
-    IpcMutex_Unlock(ipcMutex);
-    return true;
-  }
-  return false;
+
+  return QueueAndWaitForRequest(this, lock, ProcessOwnedMutexManager::ACT_TRY_LOCK_AND_UNLOCK);
 }
 
 ShareManager *ShareManager::s_instance = nullptr;
@@ -141,6 +321,43 @@ ShareManager::ShareManager() : m_hSharedFileMapping(nullptr), m_pMem(nullptr), m
 }
 
 ShareManager::~ShareManager() {
+  m_exitThreads = true;
+
+  if (m_pEventContext) {
+    HANDLE hThread = nullptr;
+    if (m_pEventContext->threadInfo) {
+      DuplicateHandle(
+          GetCurrentProcess(),
+          *reinterpret_cast<HANDLE *>(m_pEventContext->threadInfo),
+          GetCurrentProcess(),
+          &hThread,
+          0,
+          FALSE,
+          DUPLICATE_SAME_ACCESS
+      );
+    }
+
+    m_pEventContext->exitFlag = 1;
+    if (m_ipcEvents[SR_Evf]) {
+      IpcEvent_Set(m_ipcEvents[SR_Evf]);
+    }
+
+    if (hThread) {
+      WaitForSingleObject(hThread, INFINITE);
+      CloseHandle(hThread);
+    }
+    m_pEventContext = nullptr;
+  }
+
+  if (m_hConfigMutexes[SC_Max]) {
+    HANDLE hThread = *reinterpret_cast<HANDLE *>(m_hConfigMutexes[SC_Max]);
+    if (hThread && hThread != INVALID_HANDLE_VALUE) {
+      WaitForSingleObject(hThread, INFINITE);
+    }
+  }
+
+  ProcessOwnedMutexManager::GetInstance().Shutdown();
+
   for (int i = 0; i < SR_Max; ++i) {
     if (m_ipcEvents[i]) {
       DestroyIpcEvent(m_ipcEvents[i]);
@@ -193,12 +410,19 @@ ShareManager *ShareManager::GetInstance() {
 
 void ShareManager::InitializeInstance(DWORD processInstanceId) {
   s_isInitialized = true;
-
+  
   if (s_instance == nullptr) {
     s_instance = new ShareManager();
   }
-
+  
   s_instance->Initialize(processInstanceId);
+}
+
+void ShareManager::ShutdownInstance() {
+  if (s_instance != nullptr) {
+    delete s_instance;
+    s_instance = nullptr;
+  }
 }
 
 void ShareManager::InstallHooks() {
@@ -207,6 +431,7 @@ void ShareManager::InstallHooks() {
 
   HookLib::InstallHook(reinterpret_cast<void *>(baseAddress + 0x15bbd0), reinterpret_cast<void *>(&ShareManager::GetInstance));
   HookLib::InstallHook(reinterpret_cast<void *>(baseAddress + 0x15bcf0), reinterpret_cast<void *>(&ShareManager::InitializeInstance));
+  HookLib::InstallHook(reinterpret_cast<void *>(baseAddress + 0x15e360), reinterpret_cast<void *>(&ShareManager::ShutdownInstance));
 
   HookLib::InstallHook(reinterpret_cast<void *>(baseAddress + 0x158600), reinterpret_cast<void *>(&ShareManager::Initialize));
   HookLib::InstallHook(reinterpret_cast<void *>(baseAddress + 0x15e0b0), reinterpret_cast<void *>(&ShareManager::RegisterEventCallback));
