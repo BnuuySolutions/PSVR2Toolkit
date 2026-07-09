@@ -25,5 +25,22 @@ if (UNIX)
   set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 endif()
 
+find_program(CLANG_FORMAT_EXECUTABLE NAMES clang-format)
+
+if (CLANG_FORMAT_EXECUTABLE)
+  file(GLOB_RECURSE FORMAT_FILES
+    CONFIGURE_DEPENDS
+    ${CMAKE_SOURCE_DIR}/projects/*.cpp
+    ${CMAKE_SOURCE_DIR}/projects/*.c
+    ${CMAKE_SOURCE_DIR}/projects/*.hpp
+    ${CMAKE_SOURCE_DIR}/projects/*.h
+  )
+
+  add_custom_target(format
+    COMMAND ${CLANG_FORMAT_EXECUTABLE} -i ${FORMAT_FILES}
+    COMMENT "Running clang-format"
+  )
+endif()
+
 add_subdirectory(externals)
 add_subdirectory(projects)

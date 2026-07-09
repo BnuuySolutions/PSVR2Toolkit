@@ -9,7 +9,6 @@
 #include <mutex>
 #include <condition_variable>
 
-
 class IIpcMutex;
 class IIpcEvent;
 class IIpcSharedMemory;
@@ -20,7 +19,7 @@ struct ProcessOwnedMutex {
   IIpcMutex *ipcMutex = nullptr;
   bool isAcquired = false;
   bool isLocking = false;
-  
+
   void Lock();
   bool TryLock();
   void Unlock();

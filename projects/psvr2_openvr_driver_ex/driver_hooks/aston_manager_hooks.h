@@ -2,9 +2,9 @@
 
 namespace psvr2_toolkit {
 
-  class AstonManagerHooks {
-  public:
-    static void InstallHooks();
-  };
+class AstonManagerHooks {
+public:
+  static void InstallHooks();
+};
 
-} // psvr2_toolkit
+} // namespace psvr2_toolkit

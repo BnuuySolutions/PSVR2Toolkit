@@ -27,7 +27,7 @@ std::atomic<uint8_t> SenseController::g_ShouldResetLEDTrackingInTicks = 0;
 SenseController SenseController::leftController = SenseController(true);
 SenseController SenseController::rightController = SenseController(false);
 
-std::atomic<std::thread*> hapticsThread;
+std::atomic<std::thread *> hapticsThread;
 
 void SenseController::SetGeneratedHaptic(float freq, uint32_t amp, uint32_t sampleCount) {
   std::scoped_lock<std::mutex> lock(controllerMutex);
@@ -37,11 +37,10 @@ void SenseController::SetGeneratedHaptic(float freq, uint32_t amp, uint32_t samp
   this->hapticSamplesLeft = sampleCount;
 }
 
-void SenseController::MixPCM(const PCMBufferType& newPCMData) {
+void SenseController::MixPCM(const PCMBufferType &newPCMData) {
   std::scoped_lock<std::mutex> lock(controllerMutex);
 
-  for (size_t i = 0; i < pcmData.size(); i++)
-  {
+  for (size_t i = 0; i < pcmData.size(); i++) {
     pcmData[i] = ClampedAdd(pcmData[i], newPCMData[i]);
   }
 }
@@ -52,30 +51,29 @@ void SenseController::ResetPCM() {
   pcmData.fill(0);
 }
 
-void SenseController::SetTrackingControllerSettings(const SenseControllerPCModePacket_t* data) {
+void SenseController::SetTrackingControllerSettings(const SenseControllerPCModePacket_t *data) {
   std::scoped_lock<std::mutex> lock(controllerMutex);
 
-  if (data->settings.adaptiveTriggerSetEnable)
-  {
+  if (data->settings.adaptiveTriggerSetEnable) {
     memcpy(&this->adaptiveTriggerData, &data->settings.adaptiveTriggerData, sizeof(SenseAdaptiveTriggerCommand_t));
   }
 
   memcpy(&this->driverTrackingData, data, sizeof(SenseControllerPCModePacket_t));
 }
 
-void SenseController::SetAdaptiveTriggerData(const SenseAdaptiveTriggerCommand_t* data) {
+void SenseController::SetAdaptiveTriggerData(const SenseAdaptiveTriggerCommand_t *data) {
   std::scoped_lock<std::mutex> lock(controllerMutex);
 
   memcpy(&this->adaptiveTriggerData, data, sizeof(SenseAdaptiveTriggerCommand_t));
 }
 
-const void* SenseController::GetHandle() {
+const void *SenseController::GetHandle() {
   std::scoped_lock<std::mutex> lock(controllerMutex);
 
   return this->handle;
 }
 
-void SenseController::SetHandle(void* handle, int padHandle) {
+void SenseController::SetHandle(void *handle, int padHandle) {
   {
     std::scoped_lock<std::mutex> lock(controllerMutex);
 
@@ -83,10 +81,8 @@ void SenseController::SetHandle(void* handle, int padHandle) {
     this->padHandle = padHandle;
   }
 
-  if (padHandle != -1)
-  {
-    if (handle != nullptr)
-    {
+  if (padHandle != -1) {
+    if (handle != nullptr) {
       this->SetGeneratedHaptic(800.0f, k_unSenseMaxHapticAmplitude, 1500);
     }
     this->ClearTimestampOffset();
@@ -99,8 +95,7 @@ void SenseController::SendToDevice() {
   {
     std::scoped_lock<std::mutex> lock(this->controllerMutex);
 
-    if (this->handle == NULL)
-    {
+    if (this->handle == NULL) {
       return;
     }
 
@@ -110,7 +105,7 @@ void SenseController::SendToDevice() {
     buffer.mode = 0xa0;
     buffer.unkData1 = 0x10;
 
-    uint32_t* crc = (uint32_t*)(&buffer.crc);
+    uint32_t *crc = (uint32_t *)(&buffer.crc);
 
     // With the 0xa0 mode, the rest of the data past the first few bytes are shifted ahead by one byte.
     // So copy what we did starting from the 5th byte in the original buffer to the 6th byte in the new buffer.
@@ -141,7 +136,7 @@ void SenseController::SendToDevice() {
     if (buffer.settings.hapticsIntensityReduction != 0x7) {
       buffer.packetNum = this->hapticPacketIncrement++;
 
-      auto& pcmData = this->pcmData;
+      auto &pcmData = this->pcmData;
 
       // Copy the PCM data to the buffer.
       std::memcpy(buffer.hapticPCM, pcmData.data(), pcmData.size());
@@ -153,16 +148,13 @@ void SenseController::SendToDevice() {
       double overdrive = 25.0;
 
       // Make sure we don't divide by zero
-      if (this->hapticFreq != 0.0)
-      {
+      if (this->hapticFreq != 0.0) {
         overdrive = Clamp(1000.0 / this->hapticFreq, 10.0 + 1.0, 35.0) - 10.0 + (this->hapticFreq - 300.0);
       }
 
       // In addition to copying the PCM data, we also want to add the generated haptic data to the buffer.
-      for (int i = 0; i < sizeof(buffer.hapticPCM); i++)
-      {
-        if (this->hapticSamplesLeft != 0)
-        {
+      for (int i = 0; i < sizeof(buffer.hapticPCM); i++) {
+        if (this->hapticSamplesLeft != 0) {
           buffer.hapticPCM[i] = ClampedAdd(buffer.hapticPCM[i], CosineToByte(hapticPosition, k_unSenseMaxSamplePosition, this->hapticAmp, overdrive));
           hapticPosition = (hapticPosition + static_cast<int32_t>(this->hapticFreq * k_unSenseSubsamples)) % k_unSenseMaxSamplePosition;
 
@@ -181,8 +173,7 @@ void SenseController::SendToDevice() {
   }
 
   long pendingOperationCount = asyncWriter.GetPendingOperationCount();
-  if (pendingOperationCount > 3)
-  {
+  if (pendingOperationCount > 3) {
     return;
   }
 
@@ -194,8 +185,7 @@ void SenseController::SendToDevice() {
     this->SetHandle(NULL, -1);
   };
 
-  if (!asyncWriter.Write(this->handle, &buffer, sizeof(buffer), 5000, timeoutLambda))
-  {
+  if (!asyncWriter.Write(this->handle, &buffer, sizeof(buffer), 5000, timeoutLambda)) {
     CloseHandle(this->handle);
 
     this->SetHandle(NULL, -1);
@@ -205,13 +195,12 @@ void SenseController::SendToDevice() {
   }
 };
 
-void SenseThread()
-{
+void SenseThread() {
   // Set thread importance
   SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_HIGHEST);
 
-  auto& leftController = SenseController::GetLeftController();
-  auto& rightController = SenseController::GetRightController();
+  auto &leftController = SenseController::GetLeftController();
+  auto &rightController = SenseController::GetRightController();
 
   LARGE_INTEGER frequency;
   QueryPerformanceFrequency(&frequency);
@@ -222,35 +211,36 @@ void SenseThread()
   LARGE_INTEGER start;
   QueryPerformanceCounter(&start);
 
-  while (hapticsThread)
-  {
+  while (hapticsThread) {
     LARGE_INTEGER now;
     QueryPerformanceCounter(&now);
 
-    CustomShareManager* pShareManager = CustomShareManager::getSingleton();
+    CustomShareManager *pShareManager = CustomShareManager::getSingleton();
     if (pShareManager) {
       leftController.ResetPCM();
       rightController.ResetPCM();
       for (int i = 0; i < k_maxSlots; i++) {
         unsigned char pcmLeft[k_senseChunkSize] = {0};
         unsigned char pcmRight[k_senseChunkSize] = {0};
-        
+
         pShareManager->readPcm(i, pcmLeft, pcmRight);
-        
+
         bool hasLeft = false;
         bool hasRight = false;
         for (int j = 0; j < k_senseChunkSize; j++) {
-          if (pcmLeft[j] != 0) hasLeft = true;
-          if (pcmRight[j] != 0) hasRight = true;
+          if (pcmLeft[j] != 0)
+            hasLeft = true;
+          if (pcmRight[j] != 0)
+            hasRight = true;
         }
-        
+
         if (hasLeft) {
           PCMBufferType pcmVec;
           std::copy(std::begin(pcmLeft), std::end(pcmLeft), pcmVec.begin());
-          
+
           leftController.MixPCM(pcmVec);
         }
-        
+
         if (hasRight) {
           PCMBufferType pcmVec;
           std::copy(std::begin(pcmRight), std::end(pcmRight), pcmVec.begin());
@@ -265,29 +255,27 @@ void SenseThread()
 
     leftController.SendToDevice();
     rightController.SendToDevice();
-    
+
     if (pShareManager) {
       pShareManager->signalPcmUpdate();
     }
 
-    if (SenseController::g_ShouldResetLEDTrackingInTicks > 0)
-    {
+    if (SenseController::g_ShouldResetLEDTrackingInTicks > 0) {
       SenseController::g_ShouldResetLEDTrackingInTicks--;
 
-      static HmdDriverLoader* pHmdDriverLoader = HmdDriverLoader::Instance();
-      static char* CaesarManager__resetTrackingFlag = reinterpret_cast<char*>(pHmdDriverLoader->GetBaseAddress() + 0x35b9f5);
+      static HmdDriverLoader *pHmdDriverLoader = HmdDriverLoader::Instance();
+      static char *CaesarManager__resetTrackingFlag = reinterpret_cast<char *>(pHmdDriverLoader->GetBaseAddress() + 0x35b9f5);
       *CaesarManager__resetTrackingFlag = 1;
     }
 
     LONGLONG elapsed = now.QuadPart - start.QuadPart;
 
     // Wait out the duration
-    while (elapsed < duration)
-    {
+    while (elapsed < duration) {
       // Sleep to not eat up CPU cycles.
-      timeBeginPeriod(1); // Set system timer resolution to 1 ms  
-      SleepEx(1, TRUE); // Sleep for 1ms, also be alertable for the AsyncFileWriter, which uses APCs.
-      timeEndPeriod(1); // Restore system timer resolution
+      timeBeginPeriod(1); // Set system timer resolution to 1 ms
+      SleepEx(1, TRUE);   // Sleep for 1ms, also be alertable for the AsyncFileWriter, which uses APCs.
+      timeEndPeriod(1);   // Restore system timer resolution
 
       QueryPerformanceCounter(&now);
       elapsed = now.QuadPart - start.QuadPart;
@@ -298,45 +286,36 @@ void SenseThread()
   }
 }
 
-static void PollNextEvent(vr::VREvent_t* pEvent)
-{
-  static DriverHostProxy* pDriverHostProxy = DriverHostProxy::Instance();
+static void PollNextEvent(vr::VREvent_t *pEvent) {
+  static DriverHostProxy *pDriverHostProxy = DriverHostProxy::Instance();
 
-  switch (pEvent->eventType)
-  {
-  case vr::EVREventType::VREvent_PropertyChanged:
-  {
-    vr::VREvent_Property_t propertyEvent = *reinterpret_cast<vr::VREvent_Property_t*>(&pEvent->data);
+  switch (pEvent->eventType) {
+  case vr::EVREventType::VREvent_PropertyChanged: {
+    vr::VREvent_Property_t propertyEvent = *reinterpret_cast<vr::VREvent_Property_t *>(&pEvent->data);
 
-    if (propertyEvent.prop == vr::ETrackedDeviceProperty::Prop_DisplayFrequency_Float)
-    {
+    if (propertyEvent.prop == vr::ETrackedDeviceProperty::Prop_DisplayFrequency_Float) {
       SenseController::g_ShouldResetLEDTrackingInTicks = 150;
     }
 
     break;
   }
-  case vr::EVREventType::VREvent_TrackedDeviceUserInteractionEnded:
-  {
-    if (pEvent->trackedDeviceIndex == vr::k_unTrackedDeviceIndex_Hmd)
-    {
+  case vr::EVREventType::VREvent_TrackedDeviceUserInteractionEnded: {
+    if (pEvent->trackedDeviceIndex == vr::k_unTrackedDeviceIndex_Hmd) {
       // Turn the controller status LED since the user isn't wearing the headset.
       // The user should be able to know if their controller is on.
       SenseController::g_StatusLED = true;
     }
     break;
   }
-  case vr::EVREventType::VREvent_TrackedDeviceUserInteractionStarted:
-  {
-    if (pEvent->trackedDeviceIndex == vr::k_unTrackedDeviceIndex_Hmd)
-    {
+  case vr::EVREventType::VREvent_TrackedDeviceUserInteractionStarted: {
+    if (pEvent->trackedDeviceIndex == vr::k_unTrackedDeviceIndex_Hmd) {
       // Conserve power and turn off the status LED.
       // The user is wearing the headset, and they likely don't need to see it.
       SenseController::g_StatusLED = false;
     }
     break;
   }
-  case vr::EVREventType::VREvent_Input_HapticVibration:
-  {
+  case vr::EVREventType::VREvent_Input_HapticVibration: {
     vr::VREvent_HapticVibration_t hapticEvent = pEvent->data.hapticVibration;
 
     // hapticEvent.containerHandle
@@ -344,11 +323,9 @@ static void PollNextEvent(vr::VREvent_t* pEvent)
     vr::ETrackedControllerRole role;
     if (deviceType == DeviceType::SenseControllerLeft) {
       role = vr::TrackedControllerRole_LeftHand;
-    }
-    else if (deviceType == DeviceType::SenseControllerRight) {
+    } else if (deviceType == DeviceType::SenseControllerRight) {
       role = vr::TrackedControllerRole_RightHand;
-    }
-    else {
+    } else {
       break;
     }
 
@@ -356,65 +333,54 @@ static void PollNextEvent(vr::VREvent_t* pEvent)
     uint8_t senseHapticAmp = 0;
     uint32_t senseHapticSamplesLeft = 0;
 
-    if (hapticEvent.fAmplitude != 0.0f)
-    {
+    if (hapticEvent.fAmplitude != 0.0f) {
       senseHapticAmp = static_cast<uint8_t>(sqrtf(hapticEvent.fAmplitude) * k_unSenseMaxHapticAmplitude);
       if (hapticEvent.fDurationSeconds == 0.0f) {
         senseHapticFreq = std::max(80.0f, senseHapticFreq);
         senseHapticSamplesLeft = static_cast<uint32_t>(k_senseSampleRate / senseHapticFreq);
-      }
-      else
-      {
+      } else {
         senseHapticSamplesLeft = static_cast<uint32_t>(hapticEvent.fDurationSeconds * k_senseSampleRate);
       }
     }
 
-    SenseController* controller = nullptr;
+    SenseController *controller = nullptr;
 
-    if (role == vr::TrackedControllerRole_LeftHand)
-    {
+    if (role == vr::TrackedControllerRole_LeftHand) {
       controller = &SenseController::GetLeftController();
-    }
-    else if (role == vr::TrackedControllerRole_RightHand)
-    {
+    } else if (role == vr::TrackedControllerRole_RightHand) {
       controller = &SenseController::GetRightController();
     }
 
-    if (controller != nullptr)
-    {
+    if (controller != nullptr) {
       controller->SetGeneratedHaptic(senseHapticFreq, senseHapticAmp, senseHapticSamplesLeft);
     }
 
     break;
   }
-  default:
-  {
+  default: {
     break;
   }
   }
 }
 
-void SenseController::Initialize()
-{
+void SenseController::Initialize() {
   DriverHostProxy::Instance()->AddEventHandler(PollNextEvent);
 
   hapticsThread = new std::thread(SenseThread);
   hapticsThread.load()->detach();
 }
 
-void SenseController::Destroy()
-{
-  auto& leftController = SenseController::GetLeftController();
+void SenseController::Destroy() {
+  auto &leftController = SenseController::GetLeftController();
   leftController.SetHandle(NULL, -1);
 
-  auto& rightController = SenseController::GetRightController();
+  auto &rightController = SenseController::GetRightController();
   rightController.SetHandle(NULL, -1);
 
-  std::thread* hapticsThreadCopy = hapticsThread;
+  std::thread *hapticsThreadCopy = hapticsThread;
   hapticsThread = nullptr;
 
-  if (hapticsThreadCopy->joinable())
-  {
+  if (hapticsThreadCopy->joinable()) {
     hapticsThreadCopy->join();
   }
   delete hapticsThreadCopy;

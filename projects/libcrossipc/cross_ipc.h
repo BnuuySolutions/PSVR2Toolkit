@@ -3,17 +3,17 @@
 #include <cstdint>
 
 #if (defined(_WIN32) && !defined(__WINE__))
-  #define WINDOWS_IPC
+#define WINDOWS_IPC
 #endif
 
 #ifdef WINDOWS_IPC
-  #ifdef libcrossipc_EXPORTS
-    #define CROSS_IPC_API __declspec(dllexport)
-  #else
-    #define CROSS_IPC_API __declspec(dllimport)
-  #endif
+#ifdef libcrossipc_EXPORTS
+#define CROSS_IPC_API __declspec(dllexport)
 #else
-  #define CROSS_IPC_API __attribute__((visibility("default"))) __cdecl
+#define CROSS_IPC_API __declspec(dllimport)
+#endif
+#else
+#define CROSS_IPC_API __attribute__((visibility("default"))) __cdecl
 #endif
 
 class IIpcMutex {
@@ -22,7 +22,7 @@ public:
   virtual void lock() = 0;
   virtual bool try_lock() = 0;
   virtual void unlock() = 0;
-  virtual void* get_native_handle() { return nullptr; }
+  virtual void *get_native_handle() { return nullptr; }
 };
 
 class IIpcEvent {
@@ -31,7 +31,7 @@ public:
   virtual void set() = 0;
   virtual bool wait(uint32_t timeoutMs = 0xFFFFFFFF) = 0;
   virtual void reset() = 0;
-  virtual void* get_native_handle() { return nullptr; }
+  virtual void *get_native_handle() { return nullptr; }
 };
 
 class IIpcSharedMemory {
@@ -39,7 +39,7 @@ public:
   virtual ~IIpcSharedMemory() = default;
   virtual void *map() = 0;
   virtual void unmap() = 0;
-  virtual void* get_native_handle() { return nullptr; }
+  virtual void *get_native_handle() { return nullptr; }
 };
 
 class IIpcBroadcast {
@@ -52,8 +52,7 @@ public:
 extern "C" {
 CROSS_IPC_API IIpcMutex *CreateIpcMutex(const char *name);
 CROSS_IPC_API IIpcEvent *CreateIpcEvent(const char *name, bool manualReset = false);
-CROSS_IPC_API IIpcSharedMemory *CreateIpcSharedMemory(const char *name,
-                                                      size_t size);
+CROSS_IPC_API IIpcSharedMemory *CreateIpcSharedMemory(const char *name, size_t size);
 CROSS_IPC_API IIpcBroadcast *CreateIpcBroadcast(const char *name);
 
 CROSS_IPC_API void DestroyIpcMutex(IIpcMutex *mutex);

@@ -17,6 +17,7 @@ public:
 
   static void Reset();
   static CaesarUsbThreadGaze *Instance();
+
 private:
   static CaesarUsbThreadGaze *m_pInstance;
 };

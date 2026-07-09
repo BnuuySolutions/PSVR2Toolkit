@@ -12,13 +12,11 @@
 
 #include "linux_ipc.h"
 
-
-LinuxIpcMutex::LinuxIpcMutex(const char *name)
-    : m_name(name), m_fd(-1), m_mutex(nullptr) {
+LinuxIpcMutex::LinuxIpcMutex(const char *name) : m_name(name), m_fd(-1), m_mutex(nullptr) {
   std::string shmName = "/" + m_name + "_MTX_SHM";
   m_fd = shm_open(shmName.c_str(), O_CREAT | O_EXCL | O_RDWR, 0666);
   bool initialize = false;
-  
+
   if (m_fd != -1) {
     initialize = true;
     if (ftruncate(m_fd, sizeof(pthread_mutex_t)) == -1)
@@ -36,8 +34,7 @@ LinuxIpcMutex::LinuxIpcMutex(const char *name)
     }
   }
 
-  m_mutex = static_cast<pthread_mutex_t *>(
-      mmap(nullptr, sizeof(pthread_mutex_t), PROT_READ | PROT_WRITE, MAP_SHARED, m_fd, 0));
+  m_mutex = static_cast<pthread_mutex_t *>(mmap(nullptr, sizeof(pthread_mutex_t), PROT_READ | PROT_WRITE, MAP_SHARED, m_fd, 0));
   if (m_mutex == MAP_FAILED) {
     m_mutex = nullptr;
     throw std::runtime_error("mmap failed");
@@ -77,8 +74,7 @@ void LinuxIpcMutex::lock() {
   if (ret == EOWNERDEAD) {
     pthread_mutex_consistent(m_mutex);
   } else if (ret != 0) {
-    throw std::runtime_error("pthread_mutex_lock failed: " +
-                             std::to_string(ret));
+    throw std::runtime_error("pthread_mutex_lock failed: " + std::to_string(ret));
   }
 }
 
@@ -97,12 +93,11 @@ struct LinuxIpcEvent::EventData {
   std::atomic<uint32_t> state;
 };
 
-LinuxIpcEvent::LinuxIpcEvent(const char *name, bool manualReset)
-    : m_name(name), m_fd(-1), m_data(nullptr), m_manualReset(manualReset) {
+LinuxIpcEvent::LinuxIpcEvent(const char *name, bool manualReset) : m_name(name), m_fd(-1), m_data(nullptr), m_manualReset(manualReset) {
   std::string shmName = "/" + m_name + "_EVT_SHM";
   m_fd = shm_open(shmName.c_str(), O_CREAT | O_EXCL | O_RDWR, 0666);
   bool initialize = false;
-  
+
   if (m_fd != -1) {
     initialize = true;
     if (ftruncate(m_fd, sizeof(EventData)) == -1)
@@ -120,8 +115,7 @@ LinuxIpcEvent::LinuxIpcEvent(const char *name, bool manualReset)
     }
   }
 
-  m_data = static_cast<EventData *>(mmap(
-      nullptr, sizeof(EventData), PROT_READ | PROT_WRITE, MAP_SHARED, m_fd, 0));
+  m_data = static_cast<EventData *>(mmap(nullptr, sizeof(EventData), PROT_READ | PROT_WRITE, MAP_SHARED, m_fd, 0));
   if (m_data == MAP_FAILED) {
     m_data = nullptr;
     throw std::runtime_error("mmap failed");
@@ -153,14 +147,12 @@ void LinuxIpcEvent::set() {
   }
 }
 
-void LinuxIpcEvent::reset() {
-  m_data->state.store(0, std::memory_order_release);
-}
+void LinuxIpcEvent::reset() { m_data->state.store(0, std::memory_order_release); }
 
 bool LinuxIpcEvent::wait(uint32_t timeoutMs) {
   struct timespec end_time;
   bool has_timeout = (timeoutMs != 0xFFFFFFFF);
-  
+
   if (has_timeout) {
     clock_gettime(CLOCK_MONOTONIC, &end_time);
     end_time.tv_sec += timeoutMs / 1000;
@@ -174,7 +166,8 @@ bool LinuxIpcEvent::wait(uint32_t timeoutMs) {
   while (true) {
     if (m_manualReset) {
       // Manual reset just waits for state == 1
-      if (m_data->state.load(std::memory_order_acquire) == 1) return true;
+      if (m_data->state.load(std::memory_order_acquire) == 1)
+        return true;
     } else {
       // Auto reset must claim the signal (atomically change 1 back to 0)
       uint32_t expected = 1;
@@ -209,8 +202,7 @@ bool LinuxIpcEvent::wait(uint32_t timeoutMs) {
   }
 }
 
-LinuxIpcSharedMemory::LinuxIpcSharedMemory(const char *name, size_t size)
-    : m_name(name), m_fd(-1), m_size(size), m_ptr(nullptr) {
+LinuxIpcSharedMemory::LinuxIpcSharedMemory(const char *name, size_t size) : m_name(name), m_fd(-1), m_size(size), m_ptr(nullptr) {
   std::string shmName = "/" + m_name;
   m_fd = shm_open(shmName.c_str(), O_CREAT | O_RDWR, 0666);
   if (m_fd == -1)
@@ -252,8 +244,7 @@ struct LinuxIpcBroadcast::BroadcastData {
   std::atomic<uint32_t> futex_word;
 };
 
-LinuxIpcBroadcast::LinuxIpcBroadcast(const char *name)
-    : m_name(name), m_fd(-1), m_data(nullptr) {
+LinuxIpcBroadcast::LinuxIpcBroadcast(const char *name) : m_name(name), m_fd(-1), m_data(nullptr) {
   std::string shmName = "/" + m_name + "_BCAST_SHM";
   m_fd = shm_open(shmName.c_str(), O_CREAT | O_EXCL | O_RDWR, 0666);
   bool initialize = false;
@@ -274,9 +265,7 @@ LinuxIpcBroadcast::LinuxIpcBroadcast(const char *name)
     }
   }
 
-  m_data = static_cast<BroadcastData *>(mmap(nullptr, sizeof(BroadcastData),
-                                             PROT_READ | PROT_WRITE, MAP_SHARED,
-                                             m_fd, 0));
+  m_data = static_cast<BroadcastData *>(mmap(nullptr, sizeof(BroadcastData), PROT_READ | PROT_WRITE, MAP_SHARED, m_fd, 0));
   if (m_data == MAP_FAILED) {
     m_data = nullptr;
     throw std::runtime_error("mmap failed");
@@ -321,16 +310,10 @@ void LinuxIpcBroadcast::notify_all() {
   syscall(SYS_futex, &m_data->futex_word, FUTEX_WAKE, INT_MAX, nullptr, nullptr, 0);
 }
 
-void* LinuxIpcMutex::get_native_handle() {
-    return reinterpret_cast<void*>(static_cast<uintptr_t>(m_fd));
-}
+void *LinuxIpcMutex::get_native_handle() { return reinterpret_cast<void *>(static_cast<uintptr_t>(m_fd)); }
 
-void* LinuxIpcEvent::get_native_handle() {
-    return reinterpret_cast<void*>(static_cast<uintptr_t>(m_fd));
-}
+void *LinuxIpcEvent::get_native_handle() { return reinterpret_cast<void *>(static_cast<uintptr_t>(m_fd)); }
 
-void* LinuxIpcSharedMemory::get_native_handle() {
-    return reinterpret_cast<void*>(static_cast<uintptr_t>(m_fd));
-}
+void *LinuxIpcSharedMemory::get_native_handle() { return reinterpret_cast<void *>(static_cast<uintptr_t>(m_fd)); }
 
 #endif // __linux__

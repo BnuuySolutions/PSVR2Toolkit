@@ -1,13 +1,11 @@
 #include <windows.h>
 
 BOOL RealDllMain(void) {
-  MessageBoxW(
-    NULL,
-    L"Hi there! You tried launching the official PlayStation VR2 App, which can cause issues while PlayStation VR2 Toolkit is installed."
-    L"\n\n"
-    L"Launching the official PlayStation VR2 App has been disabled, to prevent such issues from occuring.",
-    L"[TEMP] PlayStation VR2 Toolkit",
-    MB_ICONERROR | MB_OK);
+  MessageBoxW(NULL,
+              L"Hi there! You tried launching the official PlayStation VR2 App, which can cause issues while PlayStation VR2 Toolkit is installed."
+              L"\n\n"
+              L"Launching the official PlayStation VR2 App has been disabled, to prevent such issues from occuring.",
+              L"[TEMP] PlayStation VR2 Toolkit", MB_ICONERROR | MB_OK);
 
   TerminateProcess(GetCurrentProcess(), 0);
 
@@ -88,11 +86,7 @@ BOOL DllInit(void) {
 BOOL APIENTRY DllMain(HMODULE hModule, DWORD dwReason, LPVOID lpReserved) {
   if (dwReason == DLL_PROCESS_ATTACH) {
     if (!DllInit()) {
-      MessageBoxW(
-        NULL,
-        L"DLL initialization failed.",
-        L"PlayStation VR2 Toolkit",
-        MB_ICONERROR | MB_OK);
+      MessageBoxW(NULL, L"DLL initialization failed.", L"PlayStation VR2 Toolkit", MB_ICONERROR | MB_OK);
 
       return FALSE;
     }

@@ -8,91 +8,88 @@
 
 namespace psvr2_toolkit {
 
-  class DriverHostProxy : public vr::IVRServerDriverHost {
-  public:
-    DriverHostProxy();
+class DriverHostProxy : public vr::IVRServerDriverHost {
+public:
+  DriverHostProxy();
 
-    static DriverHostProxy *Instance();
+  static DriverHostProxy *Instance();
 
-    void SetDriverHost(vr::IVRServerDriverHost *pDriverHost);
-    void AddEventHandler(void (*pfnEventHandler)(vr::VREvent_t *)); // Required for intercepting polled events from the PS VR2 driver.
+  void SetDriverHost(vr::IVRServerDriverHost *pDriverHost);
+  void AddEventHandler(void (*pfnEventHandler)(vr::VREvent_t *)); // Required for intercepting polled events from the PS VR2 driver.
 
-    DeviceType GetDeviceType(vr::PropertyContainerHandle_t propertyContainer) const {
-      if (propertyContainer == hmdContainer) {
-        return DeviceType::HMD;
-      }
-      else if (propertyContainer == leftControllerContainer) {
-        return DeviceType::SenseControllerLeft;
-      }
-      else if (propertyContainer == rightControllerContainer) {
-        return DeviceType::SenseControllerRight;
-      }
-      return DeviceType::None;
+  DeviceType GetDeviceType(vr::PropertyContainerHandle_t propertyContainer) const {
+    if (propertyContainer == hmdContainer) {
+      return DeviceType::HMD;
+    } else if (propertyContainer == leftControllerContainer) {
+      return DeviceType::SenseControllerLeft;
+    } else if (propertyContainer == rightControllerContainer) {
+      return DeviceType::SenseControllerRight;
     }
+    return DeviceType::None;
+  }
 
-    DeviceType GetDeviceType(vr::TrackedDeviceIndex_t deviceIndex) const {
-      if (deviceIndex == hmdIndex) {
-        return DeviceType::HMD;
-      }
-      else if (deviceIndex == leftControllerIndex) {
-        return DeviceType::SenseControllerLeft;
-      }
-      else if (deviceIndex == rightControllerIndex) {
-        return DeviceType::SenseControllerRight;
-      }
-      return DeviceType::None;
+  DeviceType GetDeviceType(vr::TrackedDeviceIndex_t deviceIndex) const {
+    if (deviceIndex == hmdIndex) {
+      return DeviceType::HMD;
+    } else if (deviceIndex == leftControllerIndex) {
+      return DeviceType::SenseControllerLeft;
+    } else if (deviceIndex == rightControllerIndex) {
+      return DeviceType::SenseControllerRight;
     }
+    return DeviceType::None;
+  }
 
-    void SetDevice(DeviceType type, vr::PropertyContainerHandle_t propertyContainer, vr::TrackedDeviceIndex_t nDevice) {
-      switch (type) {
-        case DeviceType::HMD:
-          hmdContainer = propertyContainer;
-          hmdIndex = nDevice;
-          break;
-        case DeviceType::SenseControllerLeft:
-          leftControllerContainer = propertyContainer;
-          leftControllerIndex = nDevice;
-          break;
-        case DeviceType::SenseControllerRight:
-          rightControllerContainer = propertyContainer;
-          rightControllerIndex = nDevice;
-          break;
-        default:
-          break;
-      }
+  void SetDevice(DeviceType type, vr::PropertyContainerHandle_t propertyContainer, vr::TrackedDeviceIndex_t nDevice) {
+    switch (type) {
+    case DeviceType::HMD:
+      hmdContainer = propertyContainer;
+      hmdIndex = nDevice;
+      break;
+    case DeviceType::SenseControllerLeft:
+      leftControllerContainer = propertyContainer;
+      leftControllerIndex = nDevice;
+      break;
+    case DeviceType::SenseControllerRight:
+      rightControllerContainer = propertyContainer;
+      rightControllerIndex = nDevice;
+      break;
+    default:
+      break;
     }
+  }
 
-    /** IVRServerDriverHost **/
+  /** IVRServerDriverHost **/
 
-    bool TrackedDeviceAdded(const char *pchDeviceSerialNumber, vr::ETrackedDeviceClass eDeviceClass, vr::ITrackedDeviceServerDriver *pDriver) override;
-    void TrackedDevicePoseUpdated(uint32_t unWhichDevice, const vr::DriverPose_t &newPose, uint32_t unPoseStructSize) override;
-    void VsyncEvent(double vsyncTimeOffsetSeconds) override;
-    void VendorSpecificEvent(uint32_t unWhichDevice, vr::EVREventType eventType, const vr::VREvent_Data_t &eventData, double eventTimeOffset) override;
-    bool IsExiting() override;
-    bool PollNextEvent(vr::VREvent_t *pEvent, uint32_t uncbVREvent) override;
-    void GetRawTrackedDevicePoses(float fPredictedSecondsFromNow, vr::TrackedDevicePose_t *pTrackedDevicePoseArray, uint32_t unTrackedDevicePoseArrayCount) override;
-    void RequestRestart(const char *pchLocalizedReason, const char *pchExecutableToStart, const char *pchArguments, const char *pchWorkingDirectory) override;
-    uint32_t GetFrameTimings(vr::Compositor_FrameTiming *pTiming, uint32_t nFrames) override;
-    void SetDisplayEyeToHead(uint32_t unWhichDevice, const vr::HmdMatrix34_t &eyeToHeadLeft, const vr::HmdMatrix34_t &eyeToHeadRight) override;
-    void SetDisplayProjectionRaw(uint32_t unWhichDevice, const vr::HmdRect2_t &eyeLeft, const vr::HmdRect2_t &eyeRight) override;
-    void SetRecommendedRenderTargetSize(uint32_t unWhichDevice, uint32_t nWidth, uint32_t nHeight) override;
+  bool TrackedDeviceAdded(const char *pchDeviceSerialNumber, vr::ETrackedDeviceClass eDeviceClass, vr::ITrackedDeviceServerDriver *pDriver) override;
+  void TrackedDevicePoseUpdated(uint32_t unWhichDevice, const vr::DriverPose_t &newPose, uint32_t unPoseStructSize) override;
+  void VsyncEvent(double vsyncTimeOffsetSeconds) override;
+  void VendorSpecificEvent(uint32_t unWhichDevice, vr::EVREventType eventType, const vr::VREvent_Data_t &eventData, double eventTimeOffset) override;
+  bool IsExiting() override;
+  bool PollNextEvent(vr::VREvent_t *pEvent, uint32_t uncbVREvent) override;
+  void GetRawTrackedDevicePoses(float fPredictedSecondsFromNow, vr::TrackedDevicePose_t *pTrackedDevicePoseArray,
+                                uint32_t unTrackedDevicePoseArrayCount) override;
+  void RequestRestart(const char *pchLocalizedReason, const char *pchExecutableToStart, const char *pchArguments, const char *pchWorkingDirectory) override;
+  uint32_t GetFrameTimings(vr::Compositor_FrameTiming *pTiming, uint32_t nFrames) override;
+  void SetDisplayEyeToHead(uint32_t unWhichDevice, const vr::HmdMatrix34_t &eyeToHeadLeft, const vr::HmdMatrix34_t &eyeToHeadRight) override;
+  void SetDisplayProjectionRaw(uint32_t unWhichDevice, const vr::HmdRect2_t &eyeLeft, const vr::HmdRect2_t &eyeRight) override;
+  void SetRecommendedRenderTargetSize(uint32_t unWhichDevice, uint32_t nWidth, uint32_t nHeight) override;
 
-  private:
-    static DriverHostProxy *m_pInstance;
+private:
+  static DriverHostProxy *m_pInstance;
 
-    vr::IVRServerDriverHost *m_pDriverHost;
-    std::list<void (*)(vr::VREvent_t *)> m_pfnEventHandlers;
+  vr::IVRServerDriverHost *m_pDriverHost;
+  std::list<void (*)(vr::VREvent_t *)> m_pfnEventHandlers;
 
-    // Used internally for controller pose correction.
-    vr::DriverPose_t GetPose(DeviceType type, const vr::DriverPose_t &originalPose);
+  // Used internally for controller pose correction.
+  vr::DriverPose_t GetPose(DeviceType type, const vr::DriverPose_t &originalPose);
 
-    vr::PropertyContainerHandle_t hmdContainer = vr::k_ulInvalidPropertyContainer;
-    vr::PropertyContainerHandle_t leftControllerContainer = vr::k_ulInvalidPropertyContainer;
-    vr::PropertyContainerHandle_t rightControllerContainer = vr::k_ulInvalidPropertyContainer;
+  vr::PropertyContainerHandle_t hmdContainer = vr::k_ulInvalidPropertyContainer;
+  vr::PropertyContainerHandle_t leftControllerContainer = vr::k_ulInvalidPropertyContainer;
+  vr::PropertyContainerHandle_t rightControllerContainer = vr::k_ulInvalidPropertyContainer;
 
-    vr::TrackedDeviceIndex_t hmdIndex = vr::k_unTrackedDeviceIndexInvalid;
-    vr::TrackedDeviceIndex_t leftControllerIndex = vr::k_unTrackedDeviceIndexInvalid;
-    vr::TrackedDeviceIndex_t rightControllerIndex = vr::k_unTrackedDeviceIndexInvalid;
-  };
+  vr::TrackedDeviceIndex_t hmdIndex = vr::k_unTrackedDeviceIndexInvalid;
+  vr::TrackedDeviceIndex_t leftControllerIndex = vr::k_unTrackedDeviceIndexInvalid;
+  vr::TrackedDeviceIndex_t rightControllerIndex = vr::k_unTrackedDeviceIndexInvalid;
+};
 
-} // psvr2_toolkit
+} // namespace psvr2_toolkit

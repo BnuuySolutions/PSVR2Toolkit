@@ -6,21 +6,17 @@
 #include "pad_trigger_effect.h"
 
 #ifndef PSVR2TK_EXPORT
-  #ifdef _WIN32
-    #define PSVR2TK_EXPORT __declspec(dllexport)
-  #else
-    #define PSVR2TK_EXPORT __attribute__((visibility("default")))
-  #endif
+#ifdef _WIN32
+#define PSVR2TK_EXPORT __declspec(dllexport)
+#else
+#define PSVR2TK_EXPORT __attribute__((visibility("default")))
+#endif
 #endif
 
 constexpr int k_senseChunkSize = 32;
 constexpr int k_senseSampleRate = 3000;
 
-enum class VRControllerType : uint8_t {
-  Left = 0,
-  Right = 1,
-  Both = 2
-};
+enum class VRControllerType : uint8_t { Left = 0, Right = 1, Both = 2 };
 
 #pragma pack(push, 1)
 struct TriggerEffectCommandPayload {
@@ -53,12 +49,7 @@ enum GazeCalibrationStatus : uint16_t {
   SettingEye = 7
 };
 
-enum GazeCalibrationResult : uint8_t {
-  Success = 0,
-  Failure = 1,
-  Discarded = 2,
-  Waiting = 3
-};
+enum GazeCalibrationResult : uint8_t { Success = 0, Failure = 1, Discarded = 2, Waiting = 3 };
 
 struct GazeCalibrationPacket {
   float x;
@@ -86,12 +77,7 @@ struct UsbConnectionCommand {
   bool isConnected;
 };
 
-enum class DriverCommandType : uint32_t {
-  GazeCalibrationSet = 0,
-  GazeCalibrationGet = 1,
-  HeadsetRumbleSet = 2,
-  UsbConnectionStateSet = 3
-};
+enum class DriverCommandType : uint32_t { GazeCalibrationSet = 0, GazeCalibrationGet = 1, HeadsetRumbleSet = 2, UsbConnectionStateSet = 3 };
 
 struct DriverCommand {
   DriverCommandType type;

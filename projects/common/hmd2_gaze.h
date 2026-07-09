@@ -2,16 +2,9 @@
 
 #include <stdint.h>
 
-typedef enum hmd2_gaze_bool_t : uint32_t {
-  HMD2_GAZE_BOOL_FALSE,
-  HMD2_GAZE_BOOL_TRUE
-} hmd2_gaze_bool_t;
+typedef enum hmd2_gaze_bool_t : uint32_t { HMD2_GAZE_BOOL_FALSE, HMD2_GAZE_BOOL_TRUE } hmd2_gaze_bool_t;
 
-typedef enum hmd2_gaze_enabled_eye_t : uint8_t {
-  HMD2_GAZE_ENABLED_EYE_LEFT,
-  HMD2_GAZE_ENABLED_EYE_RIGHT,
-  HMD2_GAZE_ENABLED_EYE_BOTH
-} hmd2_gaze_enabled_eye_t;
+typedef enum hmd2_gaze_enabled_eye_t : uint8_t { HMD2_GAZE_ENABLED_EYE_LEFT, HMD2_GAZE_ENABLED_EYE_RIGHT, HMD2_GAZE_ENABLED_EYE_BOTH } hmd2_gaze_enabled_eye_t;
 
 typedef struct hmd2_gaze_vec2_t {
   float x, y;

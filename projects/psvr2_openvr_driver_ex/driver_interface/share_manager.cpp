@@ -11,71 +11,63 @@ using namespace psvr2_toolkit;
 #include <thread>
 #include <atomic>
 
-static const char *SharedResourceNames[][2] = {
-    {"SHARE_VRT2_WIN_COMMON_EVT", "SHARE_VRT2_WIN_COMMON_MTX"},
-    {"SHARE_VRT2_WIN_STATUS_EVT", "SHARE_VRT2_WIN_STATUS_MTX"},
-    {"SHARE_VRT2_WIN_CALIB_EVT", "SHARE_VRT2_WIN_CALIB_MTX"},
-    {"SHARE_VRT2_WIN_INPUT_HMD_EVT", "SHARE_VRT2_WIN_INPUT_HMD_MTX"},
-    {"SHARE_VRT2_WIN_INPUT_CONT_R_EVT", "SHARE_VRT2_WIN_INPUT_CONT_R_MTX"},
-    {"SHARE_VRT2_WIN_INPUT_CONT_L_EVT", "SHARE_VRT2_WIN_INPUT_CONT_L_MTX"},
-    {"SHARE_VRT2_WIN_POSE_HMD_EVT", "SHARE_VRT2_WIN_POSE_HMD_MTX"},
-    {"SHARE_VRT2_WIN_POSE_CONT_R_EVT", "SHARE_VRT2_WIN_POSE_CONT_R_MTX"},
-    {"SHARE_VRT2_WIN_POSE_CONT_L_EVT", "SHARE_VRT2_WIN_POSE_CONT_L_MTX"},
-    {"SHARE_VRT2_WIN_IMAGE_EVT", "SHARE_VRT2_WIN_IMAGE_MTX"},
-    {"SHARE_VRT2_WIN_EVF_EVT", "SHARE_VRT2_WIN_EVF_MTX"},
-    {"SHARE_VRT2_WIN_PLAYAREA_RESULT_EVT", "SHARE_VRT2_WIN_PLAYAREA_RESULT_MTX"},
-    {"SHARE_VRT2_WIN_IMAGE_SETTING_EVT", "SHARE_VRT2_WIN_IMAGE_SETTING_MTX"},
-    {"SHARE_VRT2_WIN_BLOB_CONFIG_EVT", "SHARE_VRT2_WIN_BLOB_CONFIG_MTX"},
-    {"SHARE_VRT2_WIN_IR_CAM_SETTING_EVT", "SHARE_VRT2_WIN_IR_CAM_SETTING_MTX"},
-    {"SHARE_VRT2_WIN_CONT_CONFIG_EVT", "SHARE_VRT2_WIN_CONT_CONFIG_MTX"},
-    {"SHARE_VRT2_WIN_ARM_MODEL_EVT", "SHARE_VRT2_WIN_ARM_MODEL_MTX"},
-    {"SHARE_VRT2_WIN_CONT_LED_INFO_EVT", "SHARE_VRT2_WIN_CONT_LED_INFO_MTX"},
-    {"SHARE_VRT2_WIN_BLUETOOTH_QUALITY_INFO_EVT", "SHARE_VRT2_WIN_BLUETOOTH_QUALITY_INFO_MTX"},
-    {"SHARE_VRT2_WIN_FW_INFO_EVT", "SHARE_VRT2_WIN_FW_INFO_MTX"},
-    {"SHARE_VRT2_WIN_FW_INFO_EVT", "SHARE_VRT2_WIN_FW_INFO_MTX"}, // Duplicated in binary
-    {"SHARE_VRT2_WIN_VR_DIALOG_EVT", "SHARE_VRT2_WIN_VR_DIALOG_MTX"},
-    {"SHARE_VRT2_WIN_APPLICATION_EVT", "SHARE_VRT2_WIN_APPLICATION_MTX"},
-    {"SHARE_VRT2_WIN_VRTREACE_DATA_EVT", "SHARE_VRT2_WIN_VRTRACE_DATA_MTX"}, // Note spelling: VRTREACE
-    {"SHARE_VRT2_WIN_DEBUG_DATA_EVT", "SHARE_VRT2_WIN_DEBUG_DATA_MTX"},
-    {"SHARE_VRT2_WIN_LIBPAD_ACCESS_EVT", "SHARE_VRT2_WIN_LIBPAD_ACCESS_MTX"},
-    {"SHARE_VRT2_WIN_LIBPAD_REQUEST_STEAM_VR_PLUGIN_EVT", "SHARE_VRT2_WIN_LIBPAD_REQUEST_STEAM_VR_PLUGIN_MTX"},
-    {"SHARE_VRT2_WIN_LIBPAD_REQUEST_ASSITANT_APP_EVT", "SHARE_VRT2_WIN_LIBPAD_REQUEST_ASSITANT_APP_MTX"},
-    {"SHARE_VRT2_WIN_GENERAL_CONFIG_EVT", "SHARE_VRT2_WIN_GENERAL_CONFIG_MTX"},
-    {"SHARE_VRT2_WIN_LOG_EVT", "SHARE_VRT2_WIN_LOG_MTX"},
-    {"SHARE_VRT2_WIN_TELEMETRY_DEV_INFO_EVT", "SHARE_VRT2_WIN_TELEMETRY_DEV_INFO_MTX"},
-    {"SHARE_VRT2_WIN_TELEMETRY_TRACKING_INFO_EVT", "SHARE_VRT2_WIN_TELEMETRY_TRACKING_INFO_MTX"},
-    {"SHARE_VRT2_WIN_TELEMETRY_TRACKING_PC_INFO_EVT", "SHARE_VRT2_WIN_TELEMETRY_TRACKING_PC_INFO_MTX"},
-    {"SHARE_VRT2_WIN_VR_APP_SCENE_INFO_EVT", "SHARE_VRT2_WIN_VR_APP_SCENE_INFO_MTX"},
-    {"SHARE_VRT2_WIN_INITIAL_SETUP_INFO_EVT", "SHARE_VRT2_WIN_INITIAL_SETUP_INFO_MTX"},
-    {"SHARE_VRT2_WIN_PLAYAREA_SETUP_INFO_EVT", "SHARE_VRT2_WIN_PLAYAREA_SETUP_INFO_MTX"}
-};
+static const char *SharedResourceNames[][2] = {{"SHARE_VRT2_WIN_COMMON_EVT", "SHARE_VRT2_WIN_COMMON_MTX"},
+                                               {"SHARE_VRT2_WIN_STATUS_EVT", "SHARE_VRT2_WIN_STATUS_MTX"},
+                                               {"SHARE_VRT2_WIN_CALIB_EVT", "SHARE_VRT2_WIN_CALIB_MTX"},
+                                               {"SHARE_VRT2_WIN_INPUT_HMD_EVT", "SHARE_VRT2_WIN_INPUT_HMD_MTX"},
+                                               {"SHARE_VRT2_WIN_INPUT_CONT_R_EVT", "SHARE_VRT2_WIN_INPUT_CONT_R_MTX"},
+                                               {"SHARE_VRT2_WIN_INPUT_CONT_L_EVT", "SHARE_VRT2_WIN_INPUT_CONT_L_MTX"},
+                                               {"SHARE_VRT2_WIN_POSE_HMD_EVT", "SHARE_VRT2_WIN_POSE_HMD_MTX"},
+                                               {"SHARE_VRT2_WIN_POSE_CONT_R_EVT", "SHARE_VRT2_WIN_POSE_CONT_R_MTX"},
+                                               {"SHARE_VRT2_WIN_POSE_CONT_L_EVT", "SHARE_VRT2_WIN_POSE_CONT_L_MTX"},
+                                               {"SHARE_VRT2_WIN_IMAGE_EVT", "SHARE_VRT2_WIN_IMAGE_MTX"},
+                                               {"SHARE_VRT2_WIN_EVF_EVT", "SHARE_VRT2_WIN_EVF_MTX"},
+                                               {"SHARE_VRT2_WIN_PLAYAREA_RESULT_EVT", "SHARE_VRT2_WIN_PLAYAREA_RESULT_MTX"},
+                                               {"SHARE_VRT2_WIN_IMAGE_SETTING_EVT", "SHARE_VRT2_WIN_IMAGE_SETTING_MTX"},
+                                               {"SHARE_VRT2_WIN_BLOB_CONFIG_EVT", "SHARE_VRT2_WIN_BLOB_CONFIG_MTX"},
+                                               {"SHARE_VRT2_WIN_IR_CAM_SETTING_EVT", "SHARE_VRT2_WIN_IR_CAM_SETTING_MTX"},
+                                               {"SHARE_VRT2_WIN_CONT_CONFIG_EVT", "SHARE_VRT2_WIN_CONT_CONFIG_MTX"},
+                                               {"SHARE_VRT2_WIN_ARM_MODEL_EVT", "SHARE_VRT2_WIN_ARM_MODEL_MTX"},
+                                               {"SHARE_VRT2_WIN_CONT_LED_INFO_EVT", "SHARE_VRT2_WIN_CONT_LED_INFO_MTX"},
+                                               {"SHARE_VRT2_WIN_BLUETOOTH_QUALITY_INFO_EVT", "SHARE_VRT2_WIN_BLUETOOTH_QUALITY_INFO_MTX"},
+                                               {"SHARE_VRT2_WIN_FW_INFO_EVT", "SHARE_VRT2_WIN_FW_INFO_MTX"},
+                                               {"SHARE_VRT2_WIN_FW_INFO_EVT", "SHARE_VRT2_WIN_FW_INFO_MTX"}, // Duplicated in binary
+                                               {"SHARE_VRT2_WIN_VR_DIALOG_EVT", "SHARE_VRT2_WIN_VR_DIALOG_MTX"},
+                                               {"SHARE_VRT2_WIN_APPLICATION_EVT", "SHARE_VRT2_WIN_APPLICATION_MTX"},
+                                               {"SHARE_VRT2_WIN_VRTREACE_DATA_EVT", "SHARE_VRT2_WIN_VRTRACE_DATA_MTX"}, // Note spelling: VRTREACE
+                                               {"SHARE_VRT2_WIN_DEBUG_DATA_EVT", "SHARE_VRT2_WIN_DEBUG_DATA_MTX"},
+                                               {"SHARE_VRT2_WIN_LIBPAD_ACCESS_EVT", "SHARE_VRT2_WIN_LIBPAD_ACCESS_MTX"},
+                                               {"SHARE_VRT2_WIN_LIBPAD_REQUEST_STEAM_VR_PLUGIN_EVT", "SHARE_VRT2_WIN_LIBPAD_REQUEST_STEAM_VR_PLUGIN_MTX"},
+                                               {"SHARE_VRT2_WIN_LIBPAD_REQUEST_ASSITANT_APP_EVT", "SHARE_VRT2_WIN_LIBPAD_REQUEST_ASSITANT_APP_MTX"},
+                                               {"SHARE_VRT2_WIN_GENERAL_CONFIG_EVT", "SHARE_VRT2_WIN_GENERAL_CONFIG_MTX"},
+                                               {"SHARE_VRT2_WIN_LOG_EVT", "SHARE_VRT2_WIN_LOG_MTX"},
+                                               {"SHARE_VRT2_WIN_TELEMETRY_DEV_INFO_EVT", "SHARE_VRT2_WIN_TELEMETRY_DEV_INFO_MTX"},
+                                               {"SHARE_VRT2_WIN_TELEMETRY_TRACKING_INFO_EVT", "SHARE_VRT2_WIN_TELEMETRY_TRACKING_INFO_MTX"},
+                                               {"SHARE_VRT2_WIN_TELEMETRY_TRACKING_PC_INFO_EVT", "SHARE_VRT2_WIN_TELEMETRY_TRACKING_PC_INFO_MTX"},
+                                               {"SHARE_VRT2_WIN_VR_APP_SCENE_INFO_EVT", "SHARE_VRT2_WIN_VR_APP_SCENE_INFO_MTX"},
+                                               {"SHARE_VRT2_WIN_INITIAL_SETUP_INFO_EVT", "SHARE_VRT2_WIN_INITIAL_SETUP_INFO_MTX"},
+                                               {"SHARE_VRT2_WIN_PLAYAREA_SETUP_INFO_EVT", "SHARE_VRT2_WIN_PLAYAREA_SETUP_INFO_MTX"}};
 
 class ProcessOwnedMutexManager {
 public:
-  enum Action {
-    ACT_LOCK,
-    ACT_TRY_LOCK,
-    ACT_UNLOCK,
-    ACT_TRY_LOCK_AND_UNLOCK,
-    ACT_EXIT
-  };
+  enum Action { ACT_LOCK, ACT_TRY_LOCK, ACT_UNLOCK, ACT_TRY_LOCK_AND_UNLOCK, ACT_EXIT };
 
   struct Request {
     Action action;
-    IIpcMutex* mutex;
-    std::mutex* callerMtx;
-    std::condition_variable* callerCv;
-    bool* doneFlag;
-    bool* resultBool;
+    IIpcMutex *mutex;
+    std::mutex *callerMtx;
+    std::condition_variable *callerCv;
+    bool *doneFlag;
+    bool *resultBool;
   };
 
-  static ProcessOwnedMutexManager& GetInstance() {
+  static ProcessOwnedMutexManager &GetInstance() {
     static ProcessOwnedMutexManager instance;
     return instance;
   }
 
-  void QueueRequest(Action action, IIpcMutex* mutex, std::mutex* callerMtx, std::condition_variable* callerCv, bool* doneFlag, bool* resultBool) {
-    Request req = { action, mutex, callerMtx, callerCv, doneFlag, resultBool };
+  void QueueRequest(Action action, IIpcMutex *mutex, std::mutex *callerMtx, std::condition_variable *callerCv, bool *doneFlag, bool *resultBool) {
+    Request req = {action, mutex, callerMtx, callerCv, doneFlag, resultBool};
     {
       std::lock_guard<std::mutex> lock(m_queueMtx);
       m_requests.push_back(req);
@@ -87,7 +79,7 @@ public:
     m_exiting = true;
     {
       std::lock_guard<std::mutex> lock(m_queueMtx);
-      Request req = { ACT_EXIT, nullptr, nullptr, nullptr, nullptr, nullptr };
+      Request req = {ACT_EXIT, nullptr, nullptr, nullptr, nullptr, nullptr};
       m_requests.push_back(req);
     }
     SetEvent(m_hWakeEvent);
@@ -119,7 +111,7 @@ private:
   }
 
   void ThreadLoop() {
-    auto completeRequest = [](const Request& req, bool success) {
+    auto completeRequest = [](const Request &req, bool success) {
       if (req.callerMtx && req.doneFlag && req.resultBool && req.callerCv) {
         std::lock_guard<std::mutex> lock(*req.callerMtx);
         *req.doneFlag = true;
@@ -145,7 +137,7 @@ private:
         m_requests.clear();
       }
 
-      for (const auto& req : localRequests) {
+      for (const auto &req : localRequests) {
         if (req.action == ACT_EXIT) {
           m_exiting = true;
           break;
@@ -155,7 +147,7 @@ private:
           if (req.mutex) {
             IpcMutex_Unlock(req.mutex);
           }
-          for (auto it = pendingLocks.begin(); it != pendingLocks.end(); ) {
+          for (auto it = pendingLocks.begin(); it != pendingLocks.end();) {
             if (it->mutex == req.mutex) {
               it = pendingLocks.erase(it);
             } else {
@@ -163,15 +155,13 @@ private:
             }
           }
           completeRequest(req, true);
-        }
-        else if (req.action == ACT_LOCK) {
+        } else if (req.action == ACT_LOCK) {
           if (req.mutex) {
             pendingLocks.push_back(req);
           } else {
             completeRequest(req, false);
           }
-        }
-        else { // ACT_TRY_LOCK or ACT_TRY_LOCK_AND_UNLOCK
+        } else { // ACT_TRY_LOCK or ACT_TRY_LOCK_AND_UNLOCK
           bool success = false;
           if (req.mutex) {
             success = IpcMutex_TryLock(req.mutex);
@@ -188,7 +178,7 @@ private:
       }
 
       // Poll pending locks (which includes any newly added lock requests)
-      for (auto it = pendingLocks.begin(); it != pendingLocks.end(); ) {
+      for (auto it = pendingLocks.begin(); it != pendingLocks.end();) {
         if (IpcMutex_TryLock(it->mutex)) {
           completeRequest(*it, true);
           it = pendingLocks.erase(it);
@@ -206,18 +196,11 @@ private:
   std::atomic<bool> m_exiting;
 };
 
-static bool QueueAndWaitForRequest(ProcessOwnedMutex* target, std::unique_lock<std::mutex>& lock, ProcessOwnedMutexManager::Action action) {
+static bool QueueAndWaitForRequest(ProcessOwnedMutex *target, std::unique_lock<std::mutex> &lock, ProcessOwnedMutexManager::Action action) {
   bool done = false;
   bool result = false;
 
-  ProcessOwnedMutexManager::GetInstance().QueueRequest(
-      action,
-      target->ipcMutex,
-      &target->localMtx,
-      &target->cv,
-      &done,
-      &result
-  );
+  ProcessOwnedMutexManager::GetInstance().QueueRequest(action, target->ipcMutex, &target->localMtx, &target->cv, &done, &result);
 
   while (!done) {
     target->cv.wait(lock);
@@ -227,7 +210,8 @@ static bool QueueAndWaitForRequest(ProcessOwnedMutex* target, std::unique_lock<s
 }
 
 void ProcessOwnedMutex::Lock() {
-  if (!ipcMutex) return;
+  if (!ipcMutex)
+    return;
   std::unique_lock<std::mutex> lock(localMtx);
   while (isLocking) {
     cv.wait(lock);
@@ -247,7 +231,8 @@ void ProcessOwnedMutex::Lock() {
 }
 
 bool ProcessOwnedMutex::TryLock() {
-  if (!ipcMutex) return false;
+  if (!ipcMutex)
+    return false;
   std::unique_lock<std::mutex> lock(localMtx);
   if (isLocking) {
     return false;
@@ -266,7 +251,8 @@ bool ProcessOwnedMutex::TryLock() {
 }
 
 void ProcessOwnedMutex::Unlock() {
-  if (!ipcMutex) return;
+  if (!ipcMutex)
+    return;
   std::unique_lock<std::mutex> lock(localMtx);
   if (!isAcquired) {
     return;
@@ -279,7 +265,8 @@ void ProcessOwnedMutex::Unlock() {
 }
 
 bool ProcessOwnedMutex::IsFreeOrOwned() {
-  if (!ipcMutex) return false;
+  if (!ipcMutex)
+    return false;
   std::unique_lock<std::mutex> lock(localMtx);
   if (isAcquired) {
     return true;
@@ -326,15 +313,8 @@ ShareManager::~ShareManager() {
   if (m_pEventContext) {
     HANDLE hThread = nullptr;
     if (m_pEventContext->threadInfo) {
-      DuplicateHandle(
-          GetCurrentProcess(),
-          *reinterpret_cast<HANDLE *>(m_pEventContext->threadInfo),
-          GetCurrentProcess(),
-          &hThread,
-          0,
-          FALSE,
-          DUPLICATE_SAME_ACCESS
-      );
+      DuplicateHandle(GetCurrentProcess(), *reinterpret_cast<HANDLE *>(m_pEventContext->threadInfo), GetCurrentProcess(), &hThread, 0, FALSE,
+                      DUPLICATE_SAME_ACCESS);
     }
 
     m_pEventContext->exitFlag = 1;
@@ -410,11 +390,11 @@ ShareManager *ShareManager::GetInstance() {
 
 void ShareManager::InitializeInstance(DWORD processInstanceId) {
   s_isInitialized = true;
-  
+
   if (s_instance == nullptr) {
     s_instance = new ShareManager();
   }
-  
+
   s_instance->Initialize(processInstanceId);
 }
 
@@ -614,7 +594,7 @@ void ShareManager::Initialize(this ShareManager &self, DWORD processInstanceId) 
       }
     }
   }
-  
+
   for (int group = 0; group < 3; group++) {
     for (int slot = 0; slot < 64; slot++) {
       PoseSlotMeta &slotMeta = self.m_pMem->pose_meta.groups[group].slots[slot];
@@ -1536,35 +1516,35 @@ uint32_t ShareManager::WaitShareEvent(this ShareManager &self, int groupIdx, DWO
   return 0xFFFFFFFF;
 }
 
-#define IMPL_READ_MEMCPY_RET(FuncName, GroupIdx, MemGroup, MemData, Size)                                                                                                                              \
-  uint32_t ShareManager::FuncName(this ShareManager &self, void *outData) {                                                                                                                            \
-    self.Lock(GroupIdx);                                                                                                                                                                               \
-    if (outData)                                                                                                                                                                                       \
-      memcpy(outData, self.m_pMem->MemGroup.MemData, Size);                                                                                                                                            \
-    uint32_t cnt = self.m_pMem->MemGroup.ctr;                                                                                                                                                          \
-    self.Unlock(GroupIdx);                                                                                                                                                                             \
-    return cnt;                                                                                                                                                                                        \
+#define IMPL_READ_MEMCPY_RET(FuncName, GroupIdx, MemGroup, MemData, Size)                                                                                      \
+  uint32_t ShareManager::FuncName(this ShareManager &self, void *outData) {                                                                                    \
+    self.Lock(GroupIdx);                                                                                                                                       \
+    if (outData)                                                                                                                                               \
+      memcpy(outData, self.m_pMem->MemGroup.MemData, Size);                                                                                                    \
+    uint32_t cnt = self.m_pMem->MemGroup.ctr;                                                                                                                  \
+    self.Unlock(GroupIdx);                                                                                                                                     \
+    return cnt;                                                                                                                                                \
   }
 
-#define IMPL_READ_MEMCPY_OUT(FuncName, GroupIdx, MemGroup, MemData, Size)                                                                                                                              \
-  uint32_t ShareManager::FuncName(this ShareManager &self, void *outData, uint32_t *outCounter) {                                                                                                      \
-    self.Lock(GroupIdx);                                                                                                                                                                               \
-    if (outData)                                                                                                                                                                                       \
-      memcpy(outData, self.m_pMem->MemGroup.MemData, Size);                                                                                                                                            \
-    if (outCounter)                                                                                                                                                                                    \
-      *outCounter = self.m_pMem->MemGroup.ctr;                                                                                                                                                         \
-    self.Unlock(GroupIdx);                                                                                                                                                                             \
-    return 0;                                                                                                                                                                                          \
+#define IMPL_READ_MEMCPY_OUT(FuncName, GroupIdx, MemGroup, MemData, Size)                                                                                      \
+  uint32_t ShareManager::FuncName(this ShareManager &self, void *outData, uint32_t *outCounter) {                                                              \
+    self.Lock(GroupIdx);                                                                                                                                       \
+    if (outData)                                                                                                                                               \
+      memcpy(outData, self.m_pMem->MemGroup.MemData, Size);                                                                                                    \
+    if (outCounter)                                                                                                                                            \
+      *outCounter = self.m_pMem->MemGroup.ctr;                                                                                                                 \
+    self.Unlock(GroupIdx);                                                                                                                                     \
+    return 0;                                                                                                                                                  \
   }
 
-#define IMPL_WRITE_MEMCPY(FuncName, GroupIdx, MemGroup, MemData, Size)                                                                                                                                 \
-  int ShareManager::FuncName(this ShareManager &self, void *data) {                                                                                                                                    \
-    self.Lock(GroupIdx);                                                                                                                                                                               \
-    if (data)                                                                                                                                                                                          \
-      memcpy(self.m_pMem->MemGroup.MemData, data, Size);                                                                                                                                               \
-    int cnt = ++self.m_pMem->MemGroup.ctr;                                                                                                                                                             \
-    self.Unlock(GroupIdx);                                                                                                                                                                             \
-    return cnt;                                                                                                                                                                                        \
+#define IMPL_WRITE_MEMCPY(FuncName, GroupIdx, MemGroup, MemData, Size)                                                                                         \
+  int ShareManager::FuncName(this ShareManager &self, void *data) {                                                                                            \
+    self.Lock(GroupIdx);                                                                                                                                       \
+    if (data)                                                                                                                                                  \
+      memcpy(self.m_pMem->MemGroup.MemData, data, Size);                                                                                                       \
+    int cnt = ++self.m_pMem->MemGroup.ctr;                                                                                                                     \
+    self.Unlock(GroupIdx);                                                                                                                                     \
+    return cnt;                                                                                                                                                \
   }
 
 // Group 1: Status

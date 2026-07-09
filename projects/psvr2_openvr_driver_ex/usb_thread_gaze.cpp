@@ -8,7 +8,6 @@
 #include <fstream>
 #include <vector>
 
-
 #define GAZE_MAGIC_0 'G'
 #define GAZE_MAGIC_1_CAL 'C'
 #define GAZE_MAGIC_1_RAW 'R'
@@ -18,19 +17,15 @@ using namespace psvr2_toolkit;
 
 CaesarUsbThreadGaze *CaesarUsbThreadGaze::m_pInstance = nullptr;
 
-uint8_t CaesarUsbThreadGaze::GetInterface() {
-  return 5;
-}
+uint8_t CaesarUsbThreadGaze::GetInterface() { return 5; }
 
-uint8_t CaesarUsbThreadGaze::GetEndpoint() {
-  return 0x85;
-}
+uint8_t CaesarUsbThreadGaze::GetEndpoint() { return 0x85; }
 
 void CaesarUsbThreadGaze::OnConnected() {
   vr::ETrackedPropertyError err;
   vr::PropertyContainerHandle_t container = vr::VRDriverHandle();
   uint32_t propSize = vr::VRProperties()->GetStringProperty(container, vr::Prop_UserConfigPath_String, nullptr, 0, &err);
-  
+
   if (propSize > 0) {
     std::string configPath(propSize - 1, '\0');
     vr::VRProperties()->GetStringProperty(container, vr::Prop_UserConfigPath_String, configPath.data(), propSize, &err);
@@ -58,7 +53,7 @@ void CaesarUsbThreadGaze::OnConnected() {
 
 int CaesarUsbThreadGaze::PollAndProcess() {
   static hmd2_gaze_status_t state;
-  int result = this->TransferPipe(GetEndpoint(), reinterpret_cast<char*>(&state), sizeof(state), 500);
+  int result = this->TransferPipe(GetEndpoint(), reinterpret_cast<char *>(&state), sizeof(state), 500);
 
   if (result == 0) {
     // If we timed out, we should try sending the gaze enable again.
@@ -70,10 +65,10 @@ int CaesarUsbThreadGaze::PollAndProcess() {
   if (result < 0) {
     return -1;
   }
-  
+
   if (state.magic[0] == GAZE_MAGIC_0 && state.magic[1] == GAZE_MAGIC_1_STATE) {
     HmdDeviceHooks::UpdateGaze(&state, sizeof(hmd2_gaze_status_t));
-    CustomShareManager* pShareManager = CustomShareManager::getSingleton();
+    CustomShareManager *pShareManager = CustomShareManager::getSingleton();
     pShareManager->setGazeStatus(&state);
   }
 

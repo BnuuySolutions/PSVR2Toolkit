@@ -23,131 +23,115 @@
 
 namespace psvr2_toolkit {
 
-  DeviceProviderProxy *DeviceProviderProxy::m_pInstance = nullptr;
+DeviceProviderProxy *DeviceProviderProxy::m_pInstance = nullptr;
 
-  DeviceProviderProxy::DeviceProviderProxy()
-    : m_initOnce(false)
-    , m_pDeviceProvider(nullptr)
-  {
+DeviceProviderProxy::DeviceProviderProxy() : m_initOnce(false), m_pDeviceProvider(nullptr) {}
+
+DeviceProviderProxy *DeviceProviderProxy::Instance() {
+  if (!m_pInstance) {
+    m_pInstance = new DeviceProviderProxy;
   }
 
-  DeviceProviderProxy *DeviceProviderProxy::Instance() {
-    if (!m_pInstance) {
-      m_pInstance = new DeviceProviderProxy;
-    }
+  return m_pInstance;
+}
 
-    return m_pInstance;
-  }
+void DeviceProviderProxy::SetDeviceProvider(vr::IServerTrackedDeviceProvider *pDeviceProvider) { m_pDeviceProvider = pDeviceProvider; }
 
-  void DeviceProviderProxy::SetDeviceProvider(vr::IServerTrackedDeviceProvider *pDeviceProvider) {
-    m_pDeviceProvider = pDeviceProvider;
-  }
-
-  vr::EVRInitError DeviceProviderProxy::Init(vr::IVRDriverContext *pDriverContext) {
+vr::EVRInitError DeviceProviderProxy::Init(vr::IVRDriverContext *pDriverContext) {
 #if _DEBUG
-    Sleep(2000);
+  Sleep(2000);
 #endif
 
-    VR_INIT_SERVER_DRIVER_CONTEXT(pDriverContext);
+  VR_INIT_SERVER_DRIVER_CONTEXT(pDriverContext);
 
-    if (!m_initOnce) {
-      InitOnce();
-      m_initOnce = true;
-    }
-
-    CustomShareManager::createSingleton();
-    CustomShareManager::getSingleton()->setupCAPIPath();
-    
-    CommandThread::Initialize();
-
-    static DriverContextProxy *pDriverContextProxy = DriverContextProxy::Instance();
-    pDriverContextProxy->SetDriverContext(pDriverContext);
-
-    return m_pDeviceProvider->Init(pDriverContextProxy);
+  if (!m_initOnce) {
+    InitOnce();
+    m_initOnce = true;
   }
 
-  void DeviceProviderProxy::Cleanup() {
-    if (VRSettings::GetBool(STEAMVR_SETTINGS_USE_ENHANCED_HAPTICS, SETTING_USE_TOOLKIT_SYNC_DEFAULT_VALUE)) {
-      SenseController::Destroy();
-    }
+  CustomShareManager::createSingleton();
+  CustomShareManager::getSingleton()->setupCAPIPath();
 
-    CommandThread::Stop();
-    
-    m_pDeviceProvider->Cleanup();
+  CommandThread::Initialize();
 
-    // The cleanup call above handles joining all CaesarUsbThread instances.
-    // We're taking care of tearing down global stuff like the libusb event thread.
-    CaesarUsbThread::Stop();
-    
-    VR_CLEANUP_SERVER_DRIVER_CONTEXT();
+  static DriverContextProxy *pDriverContextProxy = DriverContextProxy::Instance();
+  pDriverContextProxy->SetDriverContext(pDriverContext);
+
+  return m_pDeviceProvider->Init(pDriverContextProxy);
+}
+
+void DeviceProviderProxy::Cleanup() {
+  if (VRSettings::GetBool(STEAMVR_SETTINGS_USE_ENHANCED_HAPTICS, SETTING_USE_TOOLKIT_SYNC_DEFAULT_VALUE)) {
+    SenseController::Destroy();
   }
 
-  const char *const *DeviceProviderProxy::GetInterfaceVersions() {
-    return m_pDeviceProvider->GetInterfaceVersions();
-  }
+  CommandThread::Stop();
 
-  void DeviceProviderProxy::RunFrame() {
-    m_pDeviceProvider->RunFrame();
-  }
+  m_pDeviceProvider->Cleanup();
 
-  bool DeviceProviderProxy::ShouldBlockStandbyMode() {
-    return m_pDeviceProvider->ShouldBlockStandbyMode();
-  }
+  // The cleanup call above handles joining all CaesarUsbThread instances.
+  // We're taking care of tearing down global stuff like the libusb event thread.
+  CaesarUsbThread::Stop();
 
-  void DeviceProviderProxy::EnterStandby() {
-    m_pDeviceProvider->EnterStandby();
-  }
+  VR_CLEANUP_SERVER_DRIVER_CONTEXT();
+}
 
-  void DeviceProviderProxy::LeaveStandby() {
-    m_pDeviceProvider->LeaveStandby();
-  }
+const char *const *DeviceProviderProxy::GetInterfaceVersions() { return m_pDeviceProvider->GetInterfaceVersions(); }
 
-  void DeviceProviderProxy::InitOnce() {
-    static bool isRunningOnWine = Util::IsRunningOnWine();
+void DeviceProviderProxy::RunFrame() { m_pDeviceProvider->RunFrame(); }
 
-    // Log ourselves here to show that we're proxied.
-    Util::DriverLog("PlayStation VR2 Toolkit - v{}.{}.{} [{}]", DRIVER_VERSION_MAJOR, DRIVER_VERSION_MINOR, DRIVER_VERSION_PATCH, DRIVER_VERSION_BRANCH);
+bool DeviceProviderProxy::ShouldBlockStandbyMode() { return m_pDeviceProvider->ShouldBlockStandbyMode(); }
+
+void DeviceProviderProxy::EnterStandby() { m_pDeviceProvider->EnterStandby(); }
+
+void DeviceProviderProxy::LeaveStandby() { m_pDeviceProvider->LeaveStandby(); }
+
+void DeviceProviderProxy::InitOnce() {
+  static bool isRunningOnWine = Util::IsRunningOnWine();
+
+  // Log ourselves here to show that we're proxied.
+  Util::DriverLog("PlayStation VR2 Toolkit - v{}.{}.{} [{}]", DRIVER_VERSION_MAJOR, DRIVER_VERSION_MINOR, DRIVER_VERSION_PATCH, DRIVER_VERSION_BRANCH);
 #if DRIVER_IS_PRERELEASE
-    Util::DriverLog("You are using a pre-release build of PlayStation VR2 Toolkit, please report any issues that may occur to the developers!");
+  Util::DriverLog("You are using a pre-release build of PlayStation VR2 Toolkit, please report any issues that may occur to the developers!");
 #elif DRIVER_IS_EXPERIMENTAL
-    Util::DriverLog("You are using an experimental build of PlayStation VR2 Toolkit, please report any issues that may occur to the developers!");
+  Util::DriverLog("You are using an experimental build of PlayStation VR2 Toolkit, please report any issues that may occur to the developers!");
 #endif
 
-    if (isRunningOnWine) {
-      Util::DriverLog("PlayStation VR2 Toolkit has detected itself running on Wine, compatibility patches will be applied.");
-    }
-
-    InitPatches();
-    InitSystems();
+  if (isRunningOnWine) {
+    Util::DriverLog("PlayStation VR2 Toolkit has detected itself running on Wine, compatibility patches will be applied.");
   }
 
-  void DeviceProviderProxy::InitPatches() {
-    static HmdDriverLoader *pHmdDriverLoader = HmdDriverLoader::Instance();
-    static bool isRunningOnWine = Util::IsRunningOnWine();
+  InitPatches();
+  InitSystems();
+}
 
-    // Remove signature checks.
-    INSTALL_STUB_RET0(reinterpret_cast<void *>(pHmdDriverLoader->GetBaseAddress() + 0x134FF0)); // VrDialogManager::VerifyLibrary
+void DeviceProviderProxy::InitPatches() {
+  static HmdDriverLoader *pHmdDriverLoader = HmdDriverLoader::Instance();
+  static bool isRunningOnWine = Util::IsRunningOnWine();
 
-    // Remove dashboard, dialog, and desktop app process launch.
-    INSTALL_STUB(reinterpret_cast<void*>(pHmdDriverLoader->GetBaseAddress() + 0x12F830)); // VrDialogManager::CreateDashboardProcess
-    INSTALL_STUB(reinterpret_cast<void*>(pHmdDriverLoader->GetBaseAddress() + 0x130020)); // VrDialogManager::CreateDialogProcess
-    INSTALL_STUB(reinterpret_cast<void*>(pHmdDriverLoader->GetBaseAddress() + 0x131D90)); // VrDialogManager::CreateDesktopAppProcess
+  // Remove signature checks.
+  INSTALL_STUB_RET0(reinterpret_cast<void *>(pHmdDriverLoader->GetBaseAddress() + 0x134FF0)); // VrDialogManager::VerifyLibrary
 
-    AstonManagerHooks::InstallHooks();
-    CaesarManagerHooks::InstallHooks();
-    CaesarUsbThread::InstallHooks();
-    HmdDeviceHooks::InstallHooks();
-    LibpadHooks::InstallHooks();
-    SenseDeviceHooks::InstallHooks();
-    ShareManager::InstallHooks();
-    UsbThreadHooks::InstallHooks();
+  // Remove dashboard, dialog, and desktop app process launch.
+  INSTALL_STUB(reinterpret_cast<void *>(pHmdDriverLoader->GetBaseAddress() + 0x12F830)); // VrDialogManager::CreateDashboardProcess
+  INSTALL_STUB(reinterpret_cast<void *>(pHmdDriverLoader->GetBaseAddress() + 0x130020)); // VrDialogManager::CreateDialogProcess
+  INSTALL_STUB(reinterpret_cast<void *>(pHmdDriverLoader->GetBaseAddress() + 0x131D90)); // VrDialogManager::CreateDesktopAppProcess
+
+  AstonManagerHooks::InstallHooks();
+  CaesarManagerHooks::InstallHooks();
+  CaesarUsbThread::InstallHooks();
+  HmdDeviceHooks::InstallHooks();
+  LibpadHooks::InstallHooks();
+  SenseDeviceHooks::InstallHooks();
+  ShareManager::InstallHooks();
+  UsbThreadHooks::InstallHooks();
+}
+
+void DeviceProviderProxy::InitSystems() {
+  TriggerEffectManager::Instance()->Initialize();
+  if (VRSettings::GetBool(STEAMVR_SETTINGS_USE_ENHANCED_HAPTICS, SETTING_USE_TOOLKIT_SYNC_DEFAULT_VALUE)) {
+    SenseController::Initialize();
   }
+}
 
-  void DeviceProviderProxy::InitSystems() {
-    TriggerEffectManager::Instance()->Initialize();
-    if (VRSettings::GetBool(STEAMVR_SETTINGS_USE_ENHANCED_HAPTICS, SETTING_USE_TOOLKIT_SYNC_DEFAULT_VALUE)) {
-      SenseController::Initialize();
-    }
-  }
-
-} // psvr2_toolkit
+} // namespace psvr2_toolkit

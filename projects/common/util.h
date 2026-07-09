@@ -11,8 +11,7 @@ inline bool IsRunningInWine() {
   static bool wine_check_done = false;
 
   if (!wine_check_done) {
-    is_running_in_wine = (GetProcAddress(GetModuleHandleA("ntdll"),
-                                         "wine_get_version") != nullptr);
+    is_running_in_wine = (GetProcAddress(GetModuleHandleA("ntdll"), "wine_get_version") != nullptr);
     wine_check_done = true;
   }
 
@@ -21,8 +20,7 @@ inline bool IsRunningInWine() {
 
 inline std::string WineGetDosFileName(const std::string &filename) {
   static LPWSTR (*CDECL wine_get_dos_file_name_ptr)(LPCSTR) =
-      (decltype(wine_get_dos_file_name_ptr))GetProcAddress(
-          GetModuleHandleA("KERNEL32"), "wine_get_dos_file_name");
+      (decltype(wine_get_dos_file_name_ptr))GetProcAddress(GetModuleHandleA("KERNEL32"), "wine_get_dos_file_name");
 
   if (!wine_get_dos_file_name_ptr) {
     throw std::runtime_error("wine_get_dos_file_name not found");
@@ -46,8 +44,7 @@ inline std::string WineGetDosFileName(const std::string &filename) {
 
 inline std::string WineGetUnixFileName(const std::string &filename) {
   static LPSTR (*CDECL wine_get_unix_file_name_ptr)(LPCWSTR) =
-      (decltype(wine_get_unix_file_name_ptr))GetProcAddress(
-          GetModuleHandleA("KERNEL32"), "wine_get_unix_file_name");
+      (decltype(wine_get_unix_file_name_ptr))GetProcAddress(GetModuleHandleA("KERNEL32"), "wine_get_unix_file_name");
 
   if (!wine_get_unix_file_name_ptr) {
     throw std::runtime_error("wine_get_unix_file_name not found");
@@ -79,10 +76,8 @@ inline std::string GetSystemTempFolder() {
         }
         return wine_tmp;
       }
-    }
-    catch (const std::exception &e) {
-      MessageBoxA(NULL, "Unable to find /tmp. Make sure Z: is mounted.",
-                  "libcustomshare error", 0);
+    } catch (const std::exception &e) {
+      MessageBoxA(NULL, "Unable to find /tmp. Make sure Z: is mounted.", "libcustomshare error", 0);
 
       throw e;
     }
@@ -100,7 +95,7 @@ inline std::string GetSystemTempFolder() {
 
 #else
 inline std::string GetSystemTempFolder() {
-  const char* tmpdir = getenv("TMPDIR");
+  const char *tmpdir = getenv("TMPDIR");
   if (tmpdir && tmpdir[0] != '\0') {
     return std::string(tmpdir) + "/";
   }

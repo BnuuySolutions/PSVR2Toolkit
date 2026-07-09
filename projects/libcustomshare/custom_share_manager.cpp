@@ -11,22 +11,18 @@
 #include <windows.h>
 #endif
 
-void GazeStatus::set(const hmd2_gaze_status_t* pGazeStatus) {
-  std::memcpy(&data, pGazeStatus, sizeof(data));
-}
+void GazeStatus::set(const hmd2_gaze_status_t *pGazeStatus) { std::memcpy(&data, pGazeStatus, sizeof(data)); }
 
-void GazeStatus::get(hmd2_gaze_status_t* pGazeStatus) const {
-  std::memcpy(pGazeStatus, &data, sizeof(data));
-}
+void GazeStatus::get(hmd2_gaze_status_t *pGazeStatus) const { std::memcpy(pGazeStatus, &data, sizeof(data)); }
 
-void GazeImage::pushToCircularBuffer(const unsigned char* pGazeImage) {
+void GazeImage::pushToCircularBuffer(const unsigned char *pGazeImage) {
   int index = counter % 8;
   // TODO: size shouldn't be 0x200100?
   std::memcpy(&images[0x200100 * index], pGazeImage, 0x200100);
   counter++;
 }
 
-int GazeImage::getFromCircularBuffer(unsigned char** gazeImageBuffer) {
+int GazeImage::getFromCircularBuffer(unsigned char **gazeImageBuffer) {
   if (counter == 0) {
     *gazeImageBuffer = nullptr;
     return -1;
@@ -37,34 +33,38 @@ int GazeImage::getFromCircularBuffer(unsigned char** gazeImageBuffer) {
   return index;
 }
 
-void TriggerEffectBuffer::push(int slot, const TriggerEffectCommandPayload& payload) {
+void TriggerEffectBuffer::push(int slot, const TriggerEffectCommandPayload &payload) {
   int next_head = (head + 1) % 256;
-  if (next_head == tail) return;
+  if (next_head == tail)
+    return;
   commands[head].slot = slot;
   commands[head].payload = payload;
   head = next_head;
 }
 
-bool TriggerEffectBuffer::pop(TriggerEffectCommand& outCommand) {
-  if (head == tail) return false;
+bool TriggerEffectBuffer::pop(TriggerEffectCommand &outCommand) {
+  if (head == tail)
+    return false;
   outCommand = commands[tail];
   tail = (tail + 1) % 256;
   return true;
 }
 
-DriverCommand* CommandBuffer::push(const DriverCommand& command) {
+DriverCommand *CommandBuffer::push(const DriverCommand &command) {
   int next_head = (head + 1) % 256;
-  if (next_head == tail) return nullptr;
-  DriverCommand* ptr = &commands[head];
+  if (next_head == tail)
+    return nullptr;
+  DriverCommand *ptr = &commands[head];
   *ptr = command;
   ptr->isFulfilled = false;
   head = next_head;
   return ptr;
 }
 
-DriverCommand* CommandBuffer::pop() {
-  if (head == tail) return nullptr;
-  DriverCommand* ptr = &commands[tail];
+DriverCommand *CommandBuffer::pop() {
+  if (head == tail)
+    return nullptr;
+  DriverCommand *ptr = &commands[tail];
   tail = (tail + 1) % 256;
   return ptr;
 }
@@ -80,7 +80,7 @@ void CustomShareManager::createSingleton() {
   CustomShareManager *pInstance = m_pInstance;
   if (!m_pInstance) {
     pInstance = new CustomShareManager;
-  
+
     pInstance->initialize();
     m_pInstance = pInstance;
   }
@@ -88,7 +88,7 @@ void CustomShareManager::createSingleton() {
 
 CustomShareManager *CustomShareManager::getSingleton() {
   std::lock_guard<std::mutex> lock(m_instanceMutex);
-  
+
   CustomShareManager *pInstance = m_pInstance;
   if (!m_pInstance) {
     pInstance = new CustomShareManager;
@@ -119,7 +119,7 @@ void CustomShareManager::initialize() {
   m_commandMutex = CreateIpcMutex("CUSTOM_SHARE_VRT2_WIN_COMMAND_MTX");
 
   m_sharedMemory = CreateIpcSharedMemory("CUSTOM_SHARE_VRT2_WIN", sizeof(BufferData));
-  m_pBufferData = static_cast<BufferData*>(IpcSharedMemory_Map(m_sharedMemory));
+  m_pBufferData = static_cast<BufferData *>(IpcSharedMemory_Map(m_sharedMemory));
 }
 
 #ifdef _WIN32
@@ -129,8 +129,8 @@ void CustomShareManager::setupCAPIPath() {
     std::filesystem::path path_file = temp_folder / "psvr2tk_capi_path.txt";
 
     HMODULE hModule = NULL;
-    GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
-                       (LPCSTR)&CustomShareManager::createSingleton, &hModule);
+    GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, (LPCSTR)&CustomShareManager::createSingleton,
+                       &hModule);
     if (hModule != NULL) {
       char path[MAX_PATH];
       if (GetModuleFileNameA(hModule, path, MAX_PATH) > 0) {
@@ -141,8 +141,7 @@ void CustomShareManager::setupCAPIPath() {
         if (outFile.is_open()) {
           if (IsRunningInWine()) {
             outFile << WineGetUnixFileName(capiPath.string());
-          }
-          else {
+          } else {
             outFile << capiPath.string();
           }
         }
@@ -153,7 +152,7 @@ void CustomShareManager::setupCAPIPath() {
 }
 #endif
 
-void CustomShareManager::setGazeStatus(const hmd2_gaze_status_t* pGazeStatus) {
+void CustomShareManager::setGazeStatus(const hmd2_gaze_status_t *pGazeStatus) {
   IpcMutex_Lock(m_gazeStatusMutex);
   m_pBufferData->gazeStatus.set(pGazeStatus);
   m_pBufferData->gazeStatus.counter++;
@@ -161,14 +160,15 @@ void CustomShareManager::setGazeStatus(const hmd2_gaze_status_t* pGazeStatus) {
   IpcBroadcast_NotifyAll(m_gazeStatusBroadcast);
 }
 
-bool CustomShareManager::getGazeStatus(hmd2_gaze_status_t* pGazeStatus, int* lastCounter, uint32_t timeoutMs) {
+bool CustomShareManager::getGazeStatus(hmd2_gaze_status_t *pGazeStatus, int *lastCounter, uint32_t timeoutMs) {
   auto start = std::chrono::steady_clock::now();
   while (true) {
     IpcMutex_Lock(m_gazeStatusMutex);
     int currentCounter = m_pBufferData->gazeStatus.counter;
     if (!lastCounter || *lastCounter != currentCounter) {
       m_pBufferData->gazeStatus.get(pGazeStatus);
-      if (lastCounter) *lastCounter = currentCounter;
+      if (lastCounter)
+        *lastCounter = currentCounter;
       IpcMutex_Unlock(m_gazeStatusMutex);
       return true;
     }
@@ -193,21 +193,22 @@ bool CustomShareManager::getGazeStatus(hmd2_gaze_status_t* pGazeStatus, int* las
   }
 }
 
-void CustomShareManager::setGazeImage(const unsigned char* pGazeImage) {
+void CustomShareManager::setGazeImage(const unsigned char *pGazeImage) {
   IpcMutex_Lock(m_gazeImageMutex);
   m_pBufferData->gazeImage.pushToCircularBuffer(pGazeImage);
   IpcMutex_Unlock(m_gazeImageMutex);
   IpcBroadcast_NotifyAll(m_gazeImageBroadcast);
 }
 
-bool CustomShareManager::getGazeImageBuffer(unsigned char** gazeImageBuffer, int* lastCounter, uint32_t timeoutMs) {
+bool CustomShareManager::getGazeImageBuffer(unsigned char **gazeImageBuffer, int *lastCounter, uint32_t timeoutMs) {
   auto start = std::chrono::steady_clock::now();
   while (true) {
     IpcMutex_Lock(m_gazeImageMutex);
     int currentCounter = m_pBufferData->gazeImage.counter;
     if (!lastCounter || *lastCounter != currentCounter) {
       m_pBufferData->gazeImage.getFromCircularBuffer(gazeImageBuffer);
-      if (lastCounter) *lastCounter = currentCounter;
+      if (lastCounter)
+        *lastCounter = currentCounter;
       IpcMutex_Unlock(m_gazeImageMutex);
       return true;
     }
@@ -238,9 +239,11 @@ void CustomShareManager::signalPcmUpdate() {
   IpcBroadcast_NotifyAll(m_pcmBroadcast);
 }
 
-void CustomShareManager::readPcm(int slot, unsigned char* pcmLeft, unsigned char* pcmRight) {
-  if (pcmLeft) std::memcpy(pcmLeft, m_pBufferData->pcmLeft[slot], k_senseChunkSize);
-  if (pcmRight) std::memcpy(pcmRight, m_pBufferData->pcmRight[slot], k_senseChunkSize);
+void CustomShareManager::readPcm(int slot, unsigned char *pcmLeft, unsigned char *pcmRight) {
+  if (pcmLeft)
+    std::memcpy(pcmLeft, m_pBufferData->pcmLeft[slot], k_senseChunkSize);
+  if (pcmRight)
+    std::memcpy(pcmRight, m_pBufferData->pcmRight[slot], k_senseChunkSize);
 }
 
 int CustomShareManager::claimSlot() {
@@ -259,7 +262,8 @@ void CustomShareManager::releaseSlot(int slot) {
 }
 
 bool CustomShareManager::isSlotAlive(int slot) {
-  if (slot < 0 || slot >= k_maxSlots) return false;
+  if (slot < 0 || slot >= k_maxSlots)
+    return false;
   if (IpcMutex_TryLock(m_slotOwnerMutex[slot])) {
     IpcMutex_Unlock(m_slotOwnerMutex[slot]);
     return false;
@@ -267,8 +271,9 @@ bool CustomShareManager::isSlotAlive(int slot) {
   return true;
 }
 
-void CustomShareManager::writePcm(int slot, VRControllerType controllerType, const unsigned char* pcm) {
-  if (slot < 0 || slot >= k_maxSlots) return;
+void CustomShareManager::writePcm(int slot, VRControllerType controllerType, const unsigned char *pcm) {
+  if (slot < 0 || slot >= k_maxSlots)
+    return;
   if (controllerType == VRControllerType::Left || controllerType == VRControllerType::Both) {
     std::memcpy(m_pBufferData->pcmLeft[slot], pcm, k_senseChunkSize);
   }
@@ -277,29 +282,28 @@ void CustomShareManager::writePcm(int slot, VRControllerType controllerType, con
   }
 }
 
-void CustomShareManager::waitForPcmUpdate() {
-  IpcBroadcast_Wait(m_pcmBroadcast, 0xFFFFFFFF);
-}
+void CustomShareManager::waitForPcmUpdate() { IpcBroadcast_Wait(m_pcmBroadcast, 0xFFFFFFFF); }
 
-void CustomShareManager::pushTriggerEffect(int slot, const TriggerEffectCommandPayload& payload) {
+void CustomShareManager::pushTriggerEffect(int slot, const TriggerEffectCommandPayload &payload) {
   IpcMutex_Lock(m_triggerEffectMutex);
   m_pBufferData->triggerEffectBuffer.push(slot, payload);
   IpcMutex_Unlock(m_triggerEffectMutex);
 }
 
-bool CustomShareManager::popTriggerEffect(TriggerEffectCommand& outCommand) {
+bool CustomShareManager::popTriggerEffect(TriggerEffectCommand &outCommand) {
   IpcMutex_Lock(m_triggerEffectMutex);
   bool result = m_pBufferData->triggerEffectBuffer.pop(outCommand);
   IpcMutex_Unlock(m_triggerEffectMutex);
   return result;
 }
 
-void CustomShareManager::submitCommand(DriverCommand& command) {
+void CustomShareManager::submitCommand(DriverCommand &command) {
   IpcMutex_Lock(m_commandMutex);
-  DriverCommand* ptr = m_pBufferData->commandBuffer.push(command);
+  DriverCommand *ptr = m_pBufferData->commandBuffer.push(command);
   IpcMutex_Unlock(m_commandMutex);
 
-  if (!ptr) return; // Buffer full
+  if (!ptr)
+    return; // Buffer full
 
   IpcBroadcast_NotifyAll(m_commandBroadcast);
 
@@ -310,23 +314,25 @@ void CustomShareManager::submitCommand(DriverCommand& command) {
   command = *ptr;
 }
 
-DriverCommand* CustomShareManager::popCommand(uint32_t timeoutMs) {
+DriverCommand *CustomShareManager::popCommand(uint32_t timeoutMs) {
   auto start = std::chrono::steady_clock::now();
   while (true) {
     IpcMutex_Lock(m_commandMutex);
-    DriverCommand* result = m_pBufferData->commandBuffer.pop();
+    DriverCommand *result = m_pBufferData->commandBuffer.pop();
     IpcMutex_Unlock(m_commandMutex);
 
-    if (result) return result;
-    
+    if (result)
+      return result;
+
     auto now = std::chrono::steady_clock::now();
     uint32_t elapsed = static_cast<uint32_t>(std::chrono::duration_cast<std::chrono::milliseconds>(now - start).count());
-    if (elapsed >= timeoutMs) return nullptr;
+    if (elapsed >= timeoutMs)
+      return nullptr;
     IpcBroadcast_Wait(m_commandBroadcast, timeoutMs - elapsed);
   }
 }
 
-void CustomShareManager::fulfillCommand(DriverCommand* command) {
+void CustomShareManager::fulfillCommand(DriverCommand *command) {
   command->isFulfilled = true;
   IpcBroadcast_NotifyAll(m_commandBroadcast);
 }

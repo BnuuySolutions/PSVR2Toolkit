@@ -6,7 +6,6 @@
 #include "linux_ipc.h"
 #endif
 
-
 extern "C" {
 IIpcMutex *CreateIpcMutex(const char *name) {
 #ifdef WINDOWS_IPC
@@ -37,71 +36,37 @@ IIpcBroadcast *CreateIpcBroadcast(const char *name) {
 #endif
 }
 
-void DestroyIpcMutex(IIpcMutex *mutex) {
-  delete mutex;
-}
+void DestroyIpcMutex(IIpcMutex *mutex) { delete mutex; }
 
-void IpcMutex_Lock(IIpcMutex *mutex) {
-  mutex->lock();
-}
+void IpcMutex_Lock(IIpcMutex *mutex) { mutex->lock(); }
 
-bool IpcMutex_TryLock(IIpcMutex *mutex) {
-  return mutex->try_lock();
-}
+bool IpcMutex_TryLock(IIpcMutex *mutex) { return mutex->try_lock(); }
 
-void IpcMutex_Unlock(IIpcMutex *mutex) {
-  mutex->unlock();
-}
+void IpcMutex_Unlock(IIpcMutex *mutex) { mutex->unlock(); }
 
-void *IpcMutex_GetNativeHandle(IIpcMutex *mutex) {
-  return mutex ? mutex->get_native_handle() : nullptr;
-}
+void *IpcMutex_GetNativeHandle(IIpcMutex *mutex) { return mutex ? mutex->get_native_handle() : nullptr; }
 
-void DestroyIpcEvent(IIpcEvent *event) {
-  delete event;
-}
+void DestroyIpcEvent(IIpcEvent *event) { delete event; }
 
-void IpcEvent_Set(IIpcEvent *event) {
-  event->set();
-}
+void IpcEvent_Set(IIpcEvent *event) { event->set(); }
 
-bool IpcEvent_Wait(IIpcEvent *event, uint32_t timeoutMs) {
-  return event->wait(timeoutMs);
-}
+bool IpcEvent_Wait(IIpcEvent *event, uint32_t timeoutMs) { return event->wait(timeoutMs); }
 
-void IpcEvent_Reset(IIpcEvent *event) {
-  event->reset();
-}
+void IpcEvent_Reset(IIpcEvent *event) { event->reset(); }
 
-void *IpcEvent_GetNativeHandle(IIpcEvent *event) {
-  return event ? event->get_native_handle() : nullptr;
-}
+void *IpcEvent_GetNativeHandle(IIpcEvent *event) { return event ? event->get_native_handle() : nullptr; }
 
-void DestroyIpcSharedMemory(IIpcSharedMemory *shm) {
-  delete shm;
-}
+void DestroyIpcSharedMemory(IIpcSharedMemory *shm) { delete shm; }
 
-void *IpcSharedMemory_Map(IIpcSharedMemory *shm) {
-  return shm->map();
-}
+void *IpcSharedMemory_Map(IIpcSharedMemory *shm) { return shm->map(); }
 
-void IpcSharedMemory_Unmap(IIpcSharedMemory *shm) {
-  shm->unmap();
-}
+void IpcSharedMemory_Unmap(IIpcSharedMemory *shm) { shm->unmap(); }
 
-void *IpcSharedMemory_GetNativeHandle(IIpcSharedMemory *shm) {
-  return shm ? shm->get_native_handle() : nullptr;
-}
+void *IpcSharedMemory_GetNativeHandle(IIpcSharedMemory *shm) { return shm ? shm->get_native_handle() : nullptr; }
 
-void DestroyIpcBroadcast(IIpcBroadcast *broadcast) {
-  delete broadcast;
-}
+void DestroyIpcBroadcast(IIpcBroadcast *broadcast) { delete broadcast; }
 
-bool IpcBroadcast_Wait(IIpcBroadcast *broadcast, uint32_t timeoutMs) {
-  return broadcast->wait(timeoutMs);
-}
+bool IpcBroadcast_Wait(IIpcBroadcast *broadcast, uint32_t timeoutMs) { return broadcast->wait(timeoutMs); }
 
-void IpcBroadcast_NotifyAll(IIpcBroadcast *broadcast) {
-  broadcast->notify_all();
-}
+void IpcBroadcast_NotifyAll(IIpcBroadcast *broadcast) { broadcast->notify_all(); }
 }

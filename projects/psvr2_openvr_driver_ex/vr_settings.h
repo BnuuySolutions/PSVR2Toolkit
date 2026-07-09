@@ -22,26 +22,25 @@
 
 namespace psvr2_toolkit {
 
-  class VRSettings {
-  public:
-    static bool GetBool(const char *pchSettingsKey, bool defaultValue) {
-      vr::EVRSettingsError error;
-      bool value = vr::VRSettings()->GetBool(STEAMVR_SETTINGS_SECTION_PLAYSTATION_VR2_EX, pchSettingsKey, &error);
-      if (error != vr::EVRSettingsError::VRSettingsError_None) {
-        value = defaultValue;
-      }
-      return value;
+class VRSettings {
+public:
+  static bool GetBool(const char *pchSettingsKey, bool defaultValue) {
+    vr::EVRSettingsError error;
+    bool value = vr::VRSettings()->GetBool(STEAMVR_SETTINGS_SECTION_PLAYSTATION_VR2_EX, pchSettingsKey, &error);
+    if (error != vr::EVRSettingsError::VRSettingsError_None) {
+      value = defaultValue;
     }
+    return value;
+  }
 
-    static int GetInt32(const char *pchSettingsKey, int defaultValue) {
-      vr::EVRSettingsError error;
-      int value = vr::VRSettings()->GetInt32(STEAMVR_SETTINGS_SECTION_PLAYSTATION_VR2_EX, pchSettingsKey, &error);
-      if (error != vr::EVRSettingsError::VRSettingsError_None) {
-        value = defaultValue;
-      }
-      return value;
+  static int GetInt32(const char *pchSettingsKey, int defaultValue) {
+    vr::EVRSettingsError error;
+    int value = vr::VRSettings()->GetInt32(STEAMVR_SETTINGS_SECTION_PLAYSTATION_VR2_EX, pchSettingsKey, &error);
+    if (error != vr::EVRSettingsError::VRSettingsError_None) {
+      value = defaultValue;
     }
+    return value;
+  }
+};
 
-  };
-
-} // psvr2_toolkit
+} // namespace psvr2_toolkit

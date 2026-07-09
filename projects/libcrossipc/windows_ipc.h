@@ -7,7 +7,6 @@
 
 #include "cross_ipc.h"
 
-
 class WindowsIpcMutex : public IIpcMutex {
 public:
   explicit WindowsIpcMutex(const char *name);
@@ -16,7 +15,7 @@ public:
   void lock() override;
   bool try_lock() override;
   void unlock() override;
-  void* get_native_handle() override;
+  void *get_native_handle() override;
 
 private:
   HANDLE m_hMutex;
@@ -30,7 +29,7 @@ public:
   void set() override;
   bool wait(uint32_t timeoutMs = 0xFFFFFFFF) override;
   void reset() override;
-  void* get_native_handle() override;
+  void *get_native_handle() override;
 
 private:
   HANDLE m_hEvent;
@@ -43,7 +42,7 @@ public:
 
   void *map() override;
   void unmap() override;
-  void* get_native_handle() override;
+  void *get_native_handle() override;
 
 private:
   HANDLE m_hFileMapping;

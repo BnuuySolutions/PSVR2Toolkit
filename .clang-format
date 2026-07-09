@@ -1,1 +1,5 @@
 BasedOnStyle: LLVM
+ColumnLimit: 160
+SortIncludes: false
+AlwaysBreakAfterDefinitionReturnType: None
+AlwaysBreakAfterReturnType: None

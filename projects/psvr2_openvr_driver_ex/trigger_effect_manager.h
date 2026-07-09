@@ -5,23 +5,23 @@
 
 namespace psvr2_toolkit {
 
-  class TriggerEffectManager {
-  public:
-    TriggerEffectManager();
+class TriggerEffectManager {
+public:
+  TriggerEffectManager();
 
-    static TriggerEffectManager *Instance();
+  static TriggerEffectManager *Instance();
 
-    bool IsInitialized();
-    void Initialize();
+  bool IsInitialized();
+  void Initialize();
 
-    void Update();
+  void Update();
 
-  private:
-    static psvr2_toolkit::TriggerEffectManager *m_pInstance;
+private:
+  static psvr2_toolkit::TriggerEffectManager *m_pInstance;
 
-    bool m_initialized;
+  bool m_initialized;
 
-    void SetTriggerEffectCommand(VRControllerType controllerType, ScePadTriggerEffectCommand command);
-  };
+  void SetTriggerEffectCommand(VRControllerType controllerType, ScePadTriggerEffectCommand command);
+};
 
-} // psvr2_toolkit
+} // namespace psvr2_toolkit
