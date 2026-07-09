@@ -249,6 +249,12 @@ namespace psvr2_toolkit {
         break;
       case LedPhase::BG:
         ledCommand->payload.syncPhase.period = k_bgPhasePeriod;
+
+        if (ledSync->phase == LedPhase::STABLE) {
+          // If we're going from STABLE to BG, do the reverse of what we did going from BG to STABLE
+          ledCommand->payload.syncPhase.offset = (ledSync->oneSubGridTime * (k_stablePhasePeriod - k_bgPhasePeriod));
+        }
+        
         break;
       case LedPhase::STABLE:
         ledCommand->payload.syncPhase.period = k_stablePhasePeriod;
