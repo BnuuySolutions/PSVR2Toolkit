@@ -1,5 +1,3 @@
-#include <cstring>
-
 #include "psvr2tk_capi.h"
 #include "common.h"
 #include "psvr2tk_capi_private.h"
@@ -12,7 +10,9 @@ extern "C" {
 
   int psvr2_toolkit_init() {
     CustomShareManager::createSingleton();
-    g_slot = CustomShareManager::getSingleton()->claimSlot();
+    if (g_slot < 0) {
+      g_slot = CustomShareManager::getSingleton()->claimSlot();
+    }
     return g_slot >= 0 ? 0 : -1;
   }
 
