@@ -15,11 +15,11 @@ IIpcMutex *CreateIpcMutex(const char *name) {
   return new LinuxIpcMutex(name);
 #endif
 }
-IIpcEvent *CreateIpcEvent(const char *name) {
+IIpcEvent *CreateIpcEvent(const char *name, bool manualReset) {
 #ifdef WINDOWS_IPC
-  return new WindowsIpcEvent(name);
+  return new WindowsIpcEvent(name, manualReset);
 #else
-  return new LinuxIpcEvent(name);
+  return new LinuxIpcEvent(name, manualReset);
 #endif
 }
 IIpcSharedMemory *CreateIpcSharedMemory(const char *name, size_t size) {
@@ -53,6 +53,10 @@ void IpcMutex_Unlock(IIpcMutex *mutex) {
   mutex->unlock();
 }
 
+void *IpcMutex_GetNativeHandle(IIpcMutex *mutex) {
+  return mutex ? mutex->get_native_handle() : nullptr;
+}
+
 void DestroyIpcEvent(IIpcEvent *event) {
   delete event;
 }
@@ -65,6 +69,14 @@ bool IpcEvent_Wait(IIpcEvent *event, uint32_t timeoutMs) {
   return event->wait(timeoutMs);
 }
 
+void IpcEvent_Reset(IIpcEvent *event) {
+  event->reset();
+}
+
+void *IpcEvent_GetNativeHandle(IIpcEvent *event) {
+  return event ? event->get_native_handle() : nullptr;
+}
+
 void DestroyIpcSharedMemory(IIpcSharedMemory *shm) {
   delete shm;
 }
@@ -75,6 +87,10 @@ void *IpcSharedMemory_Map(IIpcSharedMemory *shm) {
 
 void IpcSharedMemory_Unmap(IIpcSharedMemory *shm) {
   shm->unmap();
+}
+
+void *IpcSharedMemory_GetNativeHandle(IIpcSharedMemory *shm) {
+  return shm ? shm->get_native_handle() : nullptr;
 }
 
 void DestroyIpcBroadcast(IIpcBroadcast *broadcast) {

@@ -43,8 +43,8 @@ void WindowsIpcMutex::unlock() {
   }
 }
 
-WindowsIpcEvent::WindowsIpcEvent(const char *name) {
-  m_hEvent = CreateEventA(NULL, FALSE, FALSE, name);
+WindowsIpcEvent::WindowsIpcEvent(const char *name, bool manualReset) {
+  m_hEvent = CreateEventA(NULL, manualReset ? TRUE : FALSE, FALSE, name);
   if (!m_hEvent) {
     throw std::runtime_error("CreateEventA failed. Error: " +
                              std::to_string(GetLastError()));
@@ -60,6 +60,13 @@ WindowsIpcEvent::~WindowsIpcEvent() {
 void WindowsIpcEvent::set() {
   if (!SetEvent(m_hEvent)) {
     throw std::runtime_error("SetEvent failed. Error: " +
+                             std::to_string(GetLastError()));
+  }
+}
+
+void WindowsIpcEvent::reset() {
+  if (!ResetEvent(m_hEvent)) {
+    throw std::runtime_error("ResetEvent failed. Error: " +
                              std::to_string(GetLastError()));
   }
 }
@@ -210,6 +217,18 @@ void WindowsIpcBroadcast::notify_all() {
   SetEvent(m_hEvents[prevCount % NUM_EVENTS]); 
 
   ReleaseMutex(m_hMutex);
+}
+
+void* WindowsIpcMutex::get_native_handle() {
+  return m_hMutex;
+}
+
+void* WindowsIpcEvent::get_native_handle() {
+  return m_hEvent;
+}
+
+void* WindowsIpcSharedMemory::get_native_handle() {
+  return m_hFileMapping;
 }
 
 #endif // _WIN32

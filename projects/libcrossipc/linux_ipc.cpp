@@ -18,6 +18,7 @@ LinuxIpcMutex::LinuxIpcMutex(const char *name)
   std::string shmName = "/" + m_name + "_MTX_SHM";
   m_fd = shm_open(shmName.c_str(), O_CREAT | O_EXCL | O_RDWR, 0666);
   bool initialize = false;
+  
   if (m_fd != -1) {
     initialize = true;
     if (ftruncate(m_fd, sizeof(pthread_mutex_t)) == -1)
@@ -49,6 +50,18 @@ LinuxIpcMutex::LinuxIpcMutex(const char *name)
     pthread_mutexattr_setrobust(&attr, PTHREAD_MUTEX_ROBUST);
     pthread_mutex_init(m_mutex, &attr);
     pthread_mutexattr_destroy(&attr);
+  } else {
+    int ret = pthread_mutex_trylock(m_mutex);
+    if (ret == 0) {
+      pthread_mutex_unlock(m_mutex);
+    } else if (ret == EOWNERDEAD) {
+      pthread_mutex_consistent(m_mutex);
+      pthread_mutex_unlock(m_mutex);
+    } else if (ret == ENOTRECOVERABLE) {
+      throw std::runtime_error("Mutex is ENOTRECOVERABLE. Please delete /dev/shm" + shmName);
+    } else if (ret != EBUSY) {
+      throw std::runtime_error("Unexpected mutex state on attach: " + std::to_string(ret));
+    }
   }
 }
 
@@ -81,16 +94,15 @@ bool LinuxIpcMutex::try_lock() {
 void LinuxIpcMutex::unlock() { pthread_mutex_unlock(m_mutex); }
 
 struct LinuxIpcEvent::EventData {
-  pthread_mutex_t mutex;
-  pthread_cond_t cond;
-  bool signaled;
+  std::atomic<uint32_t> state;
 };
 
-LinuxIpcEvent::LinuxIpcEvent(const char *name)
-    : m_name(name), m_fd(-1), m_data(nullptr) {
+LinuxIpcEvent::LinuxIpcEvent(const char *name, bool manualReset)
+    : m_name(name), m_fd(-1), m_data(nullptr), m_manualReset(manualReset) {
   std::string shmName = "/" + m_name + "_EVT_SHM";
   m_fd = shm_open(shmName.c_str(), O_CREAT | O_EXCL | O_RDWR, 0666);
   bool initialize = false;
+  
   if (m_fd != -1) {
     initialize = true;
     if (ftruncate(m_fd, sizeof(EventData)) == -1)
@@ -116,21 +128,7 @@ LinuxIpcEvent::LinuxIpcEvent(const char *name)
   }
 
   if (initialize) {
-    pthread_mutexattr_t m_attr;
-    pthread_mutexattr_init(&m_attr);
-    pthread_mutexattr_setpshared(&m_attr, PTHREAD_PROCESS_SHARED);
-    pthread_mutexattr_setrobust(&m_attr, PTHREAD_MUTEX_ROBUST);
-    pthread_mutex_init(&m_data->mutex, &m_attr);
-    pthread_mutexattr_destroy(&m_attr);
-
-    pthread_condattr_t c_attr;
-    pthread_condattr_init(&c_attr);
-    pthread_condattr_setpshared(&c_attr, PTHREAD_PROCESS_SHARED);
-    pthread_condattr_setclock(&c_attr, CLOCK_MONOTONIC);
-    pthread_cond_init(&m_data->cond, &c_attr);
-    pthread_condattr_destroy(&c_attr);
-
-    m_data->signaled = false;
+    m_data->state.store(0, std::memory_order_relaxed);
   }
 }
 
@@ -142,54 +140,73 @@ LinuxIpcEvent::~LinuxIpcEvent() {
 }
 
 void LinuxIpcEvent::set() {
-  int ret = pthread_mutex_lock(&m_data->mutex);
-  if (ret == EOWNERDEAD)
-    pthread_mutex_consistent(&m_data->mutex);
+  if (m_manualReset) {
+    // Manual reset: Set to 1 and wake EVERYONE waiting
+    m_data->state.store(1, std::memory_order_release);
+    syscall(SYS_futex, &m_data->state, FUTEX_WAKE, INT_MAX, nullptr, nullptr, 0);
+  } else {
+    // Auto reset: Set to 1, but only wake ONE waiting thread
+    uint32_t expected = 0;
+    if (m_data->state.compare_exchange_strong(expected, 1, std::memory_order_release)) {
+      syscall(SYS_futex, &m_data->state, FUTEX_WAKE, 1, nullptr, nullptr, 0);
+    }
+  }
+}
 
-  m_data->signaled = true;
-  pthread_cond_signal(&m_data->cond);
-
-  pthread_mutex_unlock(&m_data->mutex);
+void LinuxIpcEvent::reset() {
+  m_data->state.store(0, std::memory_order_release);
 }
 
 bool LinuxIpcEvent::wait(uint32_t timeoutMs) {
-  int ret = pthread_mutex_lock(&m_data->mutex);
-  if (ret == EOWNERDEAD)
-    pthread_mutex_consistent(&m_data->mutex);
-
-  bool success = true;
-  if (!m_data->signaled) {
-    if (timeoutMs == 0xFFFFFFFF) {
-      while (!m_data->signaled) {
-        pthread_cond_wait(&m_data->cond, &m_data->mutex);
-      }
-    } else {
-      struct timespec ts;
-      clock_gettime(CLOCK_MONOTONIC, &ts);
-      ts.tv_sec += timeoutMs / 1000;
-      ts.tv_nsec += (timeoutMs % 1000) * 1000000;
-      if (ts.tv_nsec >= 1000000000) {
-        ts.tv_sec += 1;
-        ts.tv_nsec -= 1000000000;
-      }
-
-      while (!m_data->signaled) {
-        int err = pthread_cond_timedwait(&m_data->cond, &m_data->mutex, &ts);
-        if (err == ETIMEDOUT) {
-          if (!m_data->signaled)
-            success = false;
-          break;
-        }
-      }
+  struct timespec end_time;
+  bool has_timeout = (timeoutMs != 0xFFFFFFFF);
+  
+  if (has_timeout) {
+    clock_gettime(CLOCK_MONOTONIC, &end_time);
+    end_time.tv_sec += timeoutMs / 1000;
+    end_time.tv_nsec += (timeoutMs % 1000) * 1000000;
+    if (end_time.tv_nsec >= 1000000000) {
+      end_time.tv_sec += 1;
+      end_time.tv_nsec -= 1000000000;
     }
   }
 
-  if (success) {
-    m_data->signaled = false; // Auto-reset behavior
-  }
+  while (true) {
+    if (m_manualReset) {
+      // Manual reset just waits for state == 1
+      if (m_data->state.load(std::memory_order_acquire) == 1) return true;
+    } else {
+      // Auto reset must claim the signal (atomically change 1 back to 0)
+      uint32_t expected = 1;
+      if (m_data->state.compare_exchange_strong(expected, 0, std::memory_order_acquire)) {
+        return true;
+      }
+    }
 
-  pthread_mutex_unlock(&m_data->mutex);
-  return success;
+    // Calculate remaining timeout
+    struct timespec ts;
+    struct timespec *ts_ptr = nullptr;
+    if (has_timeout) {
+      struct timespec now;
+      clock_gettime(CLOCK_MONOTONIC, &now);
+      ts.tv_sec = end_time.tv_sec - now.tv_sec;
+      ts.tv_nsec = end_time.tv_nsec - now.tv_nsec;
+      if (ts.tv_nsec < 0) {
+        ts.tv_sec -= 1;
+        ts.tv_nsec += 1000000000;
+      }
+      if (ts.tv_sec < 0) {
+        return false; // Timed out
+      }
+      ts_ptr = &ts;
+    }
+
+    // Wait until state is no longer 0
+    int ret = syscall(SYS_futex, &m_data->state, FUTEX_WAIT, 0, ts_ptr, nullptr, 0);
+    if (ret == -1 && errno == ETIMEDOUT) {
+      return false;
+    }
+  }
 }
 
 LinuxIpcSharedMemory::LinuxIpcSharedMemory(const char *name, size_t size)
@@ -302,6 +319,18 @@ bool LinuxIpcBroadcast::wait(uint32_t timeoutMs) {
 void LinuxIpcBroadcast::notify_all() {
   m_data->futex_word.fetch_add(1, std::memory_order_release);
   syscall(SYS_futex, &m_data->futex_word, FUTEX_WAKE, INT_MAX, nullptr, nullptr, 0);
+}
+
+void* LinuxIpcMutex::get_native_handle() {
+    return reinterpret_cast<void*>(static_cast<uintptr_t>(m_fd));
+}
+
+void* LinuxIpcEvent::get_native_handle() {
+    return reinterpret_cast<void*>(static_cast<uintptr_t>(m_fd));
+}
+
+void* LinuxIpcSharedMemory::get_native_handle() {
+    return reinterpret_cast<void*>(static_cast<uintptr_t>(m_fd));
 }
 
 #endif // __linux__
