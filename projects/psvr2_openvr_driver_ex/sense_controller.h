@@ -168,9 +168,6 @@ namespace psvr2_toolkit {
     void SetLatencyOffset(int32_t newOffsetLatency) {
       std::scoped_lock<std::mutex> lock(this->controllerMutex);
       this->offsetLatency = newOffsetLatency;
-
-      // Reset filtered offset value to ensure everything is fresh
-      this->filteredOffset = this->timeStampOffset;
     }
 
     double GetTimestampOffset() {
