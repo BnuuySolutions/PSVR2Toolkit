@@ -8,7 +8,7 @@ namespace psvr2 {
   // A faithful reimplementation of the ServerDriver class from the original PS VR2 driver.
   class ServerDriver : public vr::IServerTrackedDeviceProvider {
   public:
-    /** IServerTrackedDeviceProvider **/
+    /** vr::IServerTrackedDeviceProvider **/
 
     vr::EVRInitError Init(vr::IVRDriverContext *pDriverContext) override;
     void Cleanup() override;
