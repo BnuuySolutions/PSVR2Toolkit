@@ -27,6 +27,15 @@ void CaesarManager__shutdownHook(CaesarManager *thisptr) {
   CaesarManager__shutdown(thisptr);
 }
 
+void *(*CaesarManager__setupManager)(CaesarManager *, void *, void *) = nullptr;
+void *CaesarManager__setupManagerHook(CaesarManager *thisptr, void *arg1, void *arg2) {
+  void *result = CaesarManager__setupManager(thisptr, arg1, arg2);
+  
+  thisptr->_firmwareFlag = 0;
+
+  return result;
+}
+
 void CaesarManagerHooks::InstallHooks() {
   static HmdDriverLoader *pHmdDriverLoader = HmdDriverLoader::Instance();
 
@@ -41,6 +50,10 @@ void CaesarManagerHooks::InstallHooks() {
     // CaesarManager::shutdown
     HookLib::InstallHook(reinterpret_cast<void *>(pHmdDriverLoader->GetBaseAddress() + 0x128320), reinterpret_cast<void *>(CaesarManager__shutdownHook),
                          reinterpret_cast<void **>(&CaesarManager__shutdown));
+
+    // CaesarManager::setupManager
+    HookLib::InstallHook(reinterpret_cast<void *>(pHmdDriverLoader->GetBaseAddress() + 0x123130), reinterpret_cast<void *>(CaesarManager__setupManagerHook),
+                         reinterpret_cast<void **>(&CaesarManager__setupManager));
   }
 }
 

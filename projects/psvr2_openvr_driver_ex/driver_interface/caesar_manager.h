@@ -21,6 +21,8 @@ public:
   CaesarUsbThread *relocPreThread;
   CaesarUsbThread *logThread;
 
+  uint8_t _firmwareFlag;
+
   static CaesarManager *GetInstance() {
     if (!CaesarManager__getInstance) {
       HmdDriverLoader *pHmdDriverLoader = HmdDriverLoader::Instance();
