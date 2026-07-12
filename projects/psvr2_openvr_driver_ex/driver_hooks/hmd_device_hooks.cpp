@@ -237,7 +237,7 @@ void HmdDeviceHooks::UpdateGaze(void *pData, size_t dwSize) {
 
   int64_t hmdToHostOffset;
 
-  CaesarManager::GetIMUTimestampOffset(CaesarManager::GetInstance(), &hmdToHostOffset);
+  CaesarManager::getSingleton()->getIMUTimestampOffset(&hmdToHostOffset);
 
   double timeOffset = ((static_cast<int64_t>(pGazeState->wearable.timestamp) + hmdToHostOffset) - GetHostTimestamp()) / 1e6;
 

@@ -28,7 +28,7 @@ void CommandThread::Stop() {
 void CommandThread::ThreadLoop() {
   while (m_running) {
     DriverCommand *command = CustomShareManager::getSingleton()->popCommand(10);
-    CaesarManager *caesarManager = CaesarManager::GetInstance();
+    CaesarManager *caesarManager = CaesarManager::getSingleton();
 
     if (command) {
       if (caesarManager && caesarManager->imuStatusThread) {

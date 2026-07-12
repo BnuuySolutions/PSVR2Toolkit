@@ -156,7 +156,7 @@ int CaesarUsbThreadImage__pollHook(void *thisptr) {
         static HmdDeviceCamera *pHmdDeviceCamera = HmdDeviceCamera::Instance();
 
         int64_t hmdToHostOffset;
-        CaesarManager::GetIMUTimestampOffset(CaesarManager::GetInstance(), &hmdToHostOffset);
+        CaesarManager::getSingleton()->getIMUTimestampOffset(&hmdToHostOffset);
 
         double timeOffset = (static_cast<int64_t>(a1->image_data.timestamp) + hmdToHostOffset) / 1e6;
 
