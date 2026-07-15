@@ -1516,92 +1516,92 @@ uint32_t ShareManager::WaitShareEvent(this ShareManager &self, int groupIdx, DWO
   return 0xFFFFFFFF;
 }
 
-#define IMPL_READ_MEMCPY_RET(FuncName, GroupIdx, MemGroup, MemData, Size)                                                                                      \
+#define IMPL_READ_MEMCPY_RET(FuncName, GroupIdx, MemGroup, CtrField, MemData, Size)                                                                            \
   uint32_t ShareManager::FuncName(this ShareManager &self, void *outData) {                                                                                    \
     self.Lock(GroupIdx);                                                                                                                                       \
     if (outData)                                                                                                                                               \
       memcpy(outData, self.m_pMem->MemGroup.MemData, Size);                                                                                                    \
-    uint32_t cnt = self.m_pMem->MemGroup.ctr;                                                                                                                  \
+    uint32_t cnt = self.m_pMem->MemGroup.CtrField;                                                                                                             \
     self.Unlock(GroupIdx);                                                                                                                                     \
     return cnt;                                                                                                                                                \
   }
 
-#define IMPL_READ_MEMCPY_OUT(FuncName, GroupIdx, MemGroup, MemData, Size)                                                                                      \
+#define IMPL_READ_MEMCPY_OUT(FuncName, GroupIdx, MemGroup, CtrField, MemData, Size)                                                                            \
   uint32_t ShareManager::FuncName(this ShareManager &self, void *outData, uint32_t *outCounter) {                                                              \
     self.Lock(GroupIdx);                                                                                                                                       \
     if (outData)                                                                                                                                               \
       memcpy(outData, self.m_pMem->MemGroup.MemData, Size);                                                                                                    \
     if (outCounter)                                                                                                                                            \
-      *outCounter = self.m_pMem->MemGroup.ctr;                                                                                                                 \
+      *outCounter = self.m_pMem->MemGroup.CtrField;                                                                                                            \
     self.Unlock(GroupIdx);                                                                                                                                     \
     return 0;                                                                                                                                                  \
   }
 
-#define IMPL_WRITE_MEMCPY(FuncName, GroupIdx, MemGroup, MemData, Size)                                                                                         \
+#define IMPL_WRITE_MEMCPY(FuncName, GroupIdx, MemGroup, CtrField, MemData, Size)                                                                               \
   int ShareManager::FuncName(this ShareManager &self, void *data) {                                                                                            \
     self.Lock(GroupIdx);                                                                                                                                       \
     if (data)                                                                                                                                                  \
       memcpy(self.m_pMem->MemGroup.MemData, data, Size);                                                                                                       \
-    int cnt = ++self.m_pMem->MemGroup.ctr;                                                                                                                     \
+    int cnt = ++self.m_pMem->MemGroup.CtrField;                                                                                                                \
     self.Unlock(GroupIdx);                                                                                                                                     \
     return cnt;                                                                                                                                                \
   }
 
 // Group 1: Status
-IMPL_READ_MEMCPY_RET(ReadStatus_0x2c, 1, status_0x2c, data_0x2c, sizeof(self.m_pMem->status_0x2c.data_0x2c))
-IMPL_WRITE_MEMCPY(WriteStatus_0x2c, 1, status_0x2c, data_0x2c, sizeof(self.m_pMem->status_0x2c.data_0x2c))
+IMPL_READ_MEMCPY_RET(ReadStatus_0x2c, 1, status_0x2c, ctr, data_0x2c, sizeof(self.m_pMem->status_0x2c.data_0x2c))
+IMPL_WRITE_MEMCPY(WriteStatus_0x2c, 1, status_0x2c, ctr, data_0x2c, sizeof(self.m_pMem->status_0x2c.data_0x2c))
 
 // Group 2: Calibration Blocks
-IMPL_READ_MEMCPY_OUT(ReadCalib_0x70, 2, calib_0x70, data_0x70, sizeof(self.m_pMem->calib_0x70.data_0x70))
-IMPL_WRITE_MEMCPY(WriteCalib_0x70, 2, calib_0x70, data_0x70, sizeof(self.m_pMem->calib_0x70.data_0x70))
-IMPL_READ_MEMCPY_OUT(ReadCalib_0x170, 2, calib_170, data_0x170, sizeof(self.m_pMem->calib_170.data_0x170))
-IMPL_WRITE_MEMCPY(WriteCalib_0x170, 2, calib_170, data_0x170, sizeof(self.m_pMem->calib_170.data_0x170))
-IMPL_READ_MEMCPY_OUT(ReadCalib_0x370, 2, calib_370, data_0x370, sizeof(self.m_pMem->calib_370.data_0x370))
-IMPL_WRITE_MEMCPY(WriteCalib_0x370, 2, calib_370, data_0x370, sizeof(self.m_pMem->calib_370.data_0x370))
-IMPL_READ_MEMCPY_OUT(ReadCalib_0x3f0, 2, calib_3f0, data_0x3f0, sizeof(self.m_pMem->calib_3f0.data_0x3f0))
-IMPL_WRITE_MEMCPY(WriteCalib_0x3f0, 2, calib_3f0, data_0x3f0, sizeof(self.m_pMem->calib_3f0.data_0x3f0))
-IMPL_READ_MEMCPY_OUT(ReadCalib_0x41c, 2, calib_41c, data_0x41c, sizeof(self.m_pMem->calib_41c.data_0x41c))
-IMPL_WRITE_MEMCPY(WriteCalib_0x41c, 2, calib_41c, data_0x41c, sizeof(self.m_pMem->calib_41c.data_0x41c))
-IMPL_READ_MEMCPY_OUT(ReadCalib_0x50c, 2, calib_50c, data_0x50c, sizeof(self.m_pMem->calib_50c.data_0x50c))
-IMPL_WRITE_MEMCPY(WriteCalib_0x50c, 2, calib_50c, data_0x50c, sizeof(self.m_pMem->calib_50c.data_0x50c))
-IMPL_READ_MEMCPY_OUT(ReadCalib_0xd0c, 2, calib_d0c, data_0xd0c, sizeof(self.m_pMem->calib_d0c.data_0xd0c))
-IMPL_WRITE_MEMCPY(WriteCalib_0xd0c, 2, calib_d0c, data_0xd0c, sizeof(self.m_pMem->calib_d0c.data_0xd0c))
+IMPL_READ_MEMCPY_OUT(ReadCalib_0x70, 2, calib, ctr_70, data_0x70, sizeof(self.m_pMem->calib.data_0x70))
+IMPL_WRITE_MEMCPY(WriteCalib_0x70, 2, calib, ctr_70, data_0x70, sizeof(self.m_pMem->calib.data_0x70))
+IMPL_READ_MEMCPY_OUT(ReadCalib_0x170, 2, calib, ctr_170, data_0x170, sizeof(self.m_pMem->calib.data_0x170))
+IMPL_WRITE_MEMCPY(WriteCalib_0x170, 2, calib, ctr_170, data_0x170, sizeof(self.m_pMem->calib.data_0x170))
+IMPL_READ_MEMCPY_OUT(ReadCalib_0x370, 2, calib, ctr_370, data_0x370, sizeof(self.m_pMem->calib.data_0x370))
+IMPL_WRITE_MEMCPY(WriteCalib_0x370, 2, calib, ctr_370, data_0x370, sizeof(self.m_pMem->calib.data_0x370))
+IMPL_READ_MEMCPY_OUT(ReadCalib_0x3f0, 2, calib, ctr_3f0, data_0x3f0, sizeof(self.m_pMem->calib.data_0x3f0))
+IMPL_WRITE_MEMCPY(WriteCalib_0x3f0, 2, calib, ctr_3f0, data_0x3f0, sizeof(self.m_pMem->calib.data_0x3f0))
+IMPL_READ_MEMCPY_OUT(ReadCalib_0x41c, 2, calib, ctr_41c, data_0x41c, sizeof(self.m_pMem->calib.data_0x41c))
+IMPL_WRITE_MEMCPY(WriteCalib_0x41c, 2, calib, ctr_41c, data_0x41c, sizeof(self.m_pMem->calib.data_0x41c))
+IMPL_READ_MEMCPY_OUT(ReadCalib_0x50c, 2, calib, ctr_50c, data_0x50c, sizeof(self.m_pMem->calib.data_0x50c))
+IMPL_WRITE_MEMCPY(WriteCalib_0x50c, 2, calib, ctr_50c, data_0x50c, sizeof(self.m_pMem->calib.data_0x50c))
+IMPL_READ_MEMCPY_OUT(ReadCalib_0xd0c, 2, calib, ctr_d0c, data_0xd0c, sizeof(self.m_pMem->calib.data_0xd0c))
+IMPL_WRITE_MEMCPY(WriteCalib_0xd0c, 2, calib, ctr_d0c, data_0xd0c, sizeof(self.m_pMem->calib.data_0xd0c))
 
 // Groups 12-19: Configs & Info
-IMPL_READ_MEMCPY_OUT(ReadImageSetting_0x803c, 12, img_setting_803c, data, sizeof(self.m_pMem->img_setting_803c.data))
-IMPL_WRITE_MEMCPY(WriteImageSetting_0x803c, 12, img_setting_803c, data, sizeof(self.m_pMem->img_setting_803c.data))
-IMPL_READ_MEMCPY_OUT(ReadBlobConfig_0x8058, 13, blob_cfg_8058, data, sizeof(self.m_pMem->blob_cfg_8058.data))
-IMPL_WRITE_MEMCPY(WriteBlobConfig_0x8058, 13, blob_cfg_8058, data, sizeof(self.m_pMem->blob_cfg_8058.data))
-IMPL_READ_MEMCPY_OUT(ReadIrCamSetting_0x807c, 14, ir_cam_807c, data, sizeof(self.m_pMem->ir_cam_807c.data))
-IMPL_WRITE_MEMCPY(WriteIrCamSetting_0x807c, 14, ir_cam_807c, data, sizeof(self.m_pMem->ir_cam_807c.data))
-IMPL_READ_MEMCPY_RET(ReadContConfig_0x8098, 15, cont_cfg_8098, data, sizeof(self.m_pMem->cont_cfg_8098.data))
-IMPL_WRITE_MEMCPY(WriteContConfig_0x8098, 15, cont_cfg_8098, data, sizeof(self.m_pMem->cont_cfg_8098.data))
-IMPL_READ_MEMCPY_RET(ReadContLedInfo_0x855c, 17, cont_led_855c, data, sizeof(self.m_pMem->cont_led_855c.data))
-IMPL_WRITE_MEMCPY(WriteContLedInfo_0x855c, 17, cont_led_855c, data, sizeof(self.m_pMem->cont_led_855c.data))
-IMPL_READ_MEMCPY_RET(ReadFwInfo1_0x922c, 19, fw_info1_922c, data, sizeof(self.m_pMem->fw_info1_922c.data))
-IMPL_WRITE_MEMCPY(WriteFwInfo1_0x922c, 19, fw_info1_922c, data, sizeof(self.m_pMem->fw_info1_922c.data))
+IMPL_READ_MEMCPY_OUT(ReadImageSetting_0x803c, 12, img_setting_803c, ctr, data, sizeof(self.m_pMem->img_setting_803c.data))
+IMPL_WRITE_MEMCPY(WriteImageSetting_0x803c, 12, img_setting_803c, ctr, data, sizeof(self.m_pMem->img_setting_803c.data))
+IMPL_READ_MEMCPY_OUT(ReadBlobConfig_0x8058, 13, blob_cfg_8058, ctr, data, sizeof(self.m_pMem->blob_cfg_8058.data))
+IMPL_WRITE_MEMCPY(WriteBlobConfig_0x8058, 13, blob_cfg_8058, ctr, data, sizeof(self.m_pMem->blob_cfg_8058.data))
+IMPL_READ_MEMCPY_OUT(ReadIrCamSetting_0x807c, 14, ir_cam_807c, ctr, data, sizeof(self.m_pMem->ir_cam_807c.data))
+IMPL_WRITE_MEMCPY(WriteIrCamSetting_0x807c, 14, ir_cam_807c, ctr, data, sizeof(self.m_pMem->ir_cam_807c.data))
+IMPL_READ_MEMCPY_RET(ReadContConfig_0x8098, 15, cont_cfg_8098, ctr, data, sizeof(self.m_pMem->cont_cfg_8098.data))
+IMPL_WRITE_MEMCPY(WriteContConfig_0x8098, 15, cont_cfg_8098, ctr, data, sizeof(self.m_pMem->cont_cfg_8098.data))
+IMPL_READ_MEMCPY_RET(ReadContLedInfo_0x855c, 17, cont_led_855c, ctr, data, sizeof(self.m_pMem->cont_led_855c.data))
+IMPL_WRITE_MEMCPY(WriteContLedInfo_0x855c, 17, cont_led_855c, ctr, data, sizeof(self.m_pMem->cont_led_855c.data))
+IMPL_READ_MEMCPY_RET(ReadFwInfo1_0x922c, 19, fw_info1_922c, ctr, data, sizeof(self.m_pMem->fw_info1_922c.data))
+IMPL_WRITE_MEMCPY(WriteFwInfo1_0x922c, 19, fw_info1_922c, ctr, data, sizeof(self.m_pMem->fw_info1_922c.data))
 
 // Groups 20-24: Application & Debug
-IMPL_READ_MEMCPY_RET(ReadFwInfo2_0x9280, 20, fw_info2_9280, data, sizeof(self.m_pMem->fw_info2_9280.data))
-IMPL_READ_MEMCPY_RET(ReadVrDialog_0x9ae0, 21, vr_dialog_9ae0, data, sizeof(self.m_pMem->vr_dialog_9ae0.data))
-IMPL_WRITE_MEMCPY(WriteVrDialog_0x9ae0, 21, vr_dialog_9ae0, data, sizeof(self.m_pMem->vr_dialog_9ae0.data))
-IMPL_READ_MEMCPY_RET(ReadApplication_0x9b3c, 22, app_9b3c, data, sizeof(self.m_pMem->app_9b3c.data))
-IMPL_READ_MEMCPY_RET(ReadVrTraceData_0x9b7c, 23, vr_trace_9b7c, data, sizeof(self.m_pMem->vr_trace_9b7c.data))
-IMPL_WRITE_MEMCPY(WriteVrTraceData_0x9b7c, 23, vr_trace_9b7c, data, sizeof(self.m_pMem->vr_trace_9b7c.data))
-IMPL_READ_MEMCPY_RET(ReadDebugData_0x9c8c, 24, dbg_data_9c8c, data, sizeof(self.m_pMem->dbg_data_9c8c.data))
-IMPL_WRITE_MEMCPY(WriteDebugData_0x9c8c, 24, dbg_data_9c8c, data, sizeof(self.m_pMem->dbg_data_9c8c.data))
+IMPL_READ_MEMCPY_RET(ReadFwInfo2_0x9280, 20, fw_info2_9280, ctr, data, sizeof(self.m_pMem->fw_info2_9280.data))
+IMPL_READ_MEMCPY_RET(ReadVrDialog_0x9ae0, 21, vr_dialog_9ae0, ctr, data, sizeof(self.m_pMem->vr_dialog_9ae0.data))
+IMPL_WRITE_MEMCPY(WriteVrDialog_0x9ae0, 21, vr_dialog_9ae0, ctr, data, sizeof(self.m_pMem->vr_dialog_9ae0.data))
+IMPL_READ_MEMCPY_RET(ReadApplication_0x9b3c, 22, app_9b3c, ctr, data, sizeof(self.m_pMem->app_9b3c.data))
+IMPL_READ_MEMCPY_RET(ReadVrTraceData_0x9b7c, 23, vr_trace_9b7c, ctr, data, sizeof(self.m_pMem->vr_trace_9b7c.data))
+IMPL_WRITE_MEMCPY(WriteVrTraceData_0x9b7c, 23, vr_trace_9b7c, ctr, data, sizeof(self.m_pMem->vr_trace_9b7c.data))
+IMPL_READ_MEMCPY_RET(ReadDebugData_0x9c8c, 24, dbg_data_9c8c, ctr, data, sizeof(self.m_pMem->dbg_data_9c8c.data))
+IMPL_WRITE_MEMCPY(WriteDebugData_0x9c8c, 24, dbg_data_9c8c, ctr, data, sizeof(self.m_pMem->dbg_data_9c8c.data))
 
 // Groups 30-34: Telemetry & Setup
-IMPL_READ_MEMCPY_RET(ReadSceneInfo_0x9de4, 33, scene_info_9de4, data, sizeof(self.m_pMem->scene_info_9de4.data))
-IMPL_WRITE_MEMCPY(WriteSceneInfo_0x9de4, 33, scene_info_9de4, data, sizeof(self.m_pMem->scene_info_9de4.data))
-IMPL_READ_MEMCPY_RET(ReadTelDevInfo_0xa984, 30, tel_dev_a984, data, sizeof(self.m_pMem->tel_dev_a984.data))
-IMPL_WRITE_MEMCPY(WriteTelDevInfo_0xa984, 30, tel_dev_a984, data, sizeof(self.m_pMem->tel_dev_a984.data))
-IMPL_READ_MEMCPY_RET(ReadTelTrkInfo_0xaaa0, 31, tel_trk_aaa0, data, sizeof(self.m_pMem->tel_trk_aaa0.data))
-IMPL_WRITE_MEMCPY(WriteTelTrkInfo_0xaaa0, 31, tel_trk_aaa0, data, sizeof(self.m_pMem->tel_trk_aaa0.data))
-IMPL_READ_MEMCPY_RET(ReadTelPcInfo_0xc600, 32, tel_pc_c600, data, sizeof(self.m_pMem->tel_pc_c600.data))
-IMPL_WRITE_MEMCPY(WriteTelPcInfo_0xc600, 32, tel_pc_c600, data, sizeof(self.m_pMem->tel_pc_c600.data))
-IMPL_READ_MEMCPY_RET(ReadInitSetup_0xc73c, 34, init_setup_c73c, data, sizeof(self.m_pMem->init_setup_c73c.data))
-IMPL_WRITE_MEMCPY(WriteInitSetup_0xc73c, 34, init_setup_c73c, data, sizeof(self.m_pMem->init_setup_c73c.data))
+IMPL_READ_MEMCPY_RET(ReadSceneInfo_0x9de4, 33, scene_info_9de4, ctr, data, sizeof(self.m_pMem->scene_info_9de4.data))
+IMPL_WRITE_MEMCPY(WriteSceneInfo_0x9de4, 33, scene_info_9de4, ctr, data, sizeof(self.m_pMem->scene_info_9de4.data))
+IMPL_READ_MEMCPY_RET(ReadTelDevInfo_0xa984, 30, tel_dev_a984, ctr, data, sizeof(self.m_pMem->tel_dev_a984.data))
+IMPL_WRITE_MEMCPY(WriteTelDevInfo_0xa984, 30, tel_dev_a984, ctr, data, sizeof(self.m_pMem->tel_dev_a984.data))
+IMPL_READ_MEMCPY_RET(ReadTelTrkInfo_0xaaa0, 31, tel_trk_aaa0, ctr, data, sizeof(self.m_pMem->tel_trk_aaa0.data))
+IMPL_WRITE_MEMCPY(WriteTelTrkInfo_0xaaa0, 31, tel_trk_aaa0, ctr, data, sizeof(self.m_pMem->tel_trk_aaa0.data))
+IMPL_READ_MEMCPY_RET(ReadTelPcInfo_0xc600, 32, tel_pc_c600, ctr, data, sizeof(self.m_pMem->tel_pc_c600.data))
+IMPL_WRITE_MEMCPY(WriteTelPcInfo_0xc600, 32, tel_pc_c600, ctr, data, sizeof(self.m_pMem->tel_pc_c600.data))
+IMPL_READ_MEMCPY_RET(ReadInitSetup_0xc73c, 34, init_setup_c73c, ctr, data, sizeof(self.m_pMem->init_setup_c73c.data))
+IMPL_WRITE_MEMCPY(WriteInitSetup_0xc73c, 34, init_setup_c73c, ctr, data, sizeof(self.m_pMem->init_setup_c73c.data))
 
 unsigned __stdcall ShareManager::WorkerThread_Unconditional(void *pContext) {
   GlobalEventContext *pEvtStruct = *reinterpret_cast<GlobalEventContext **>(pContext);

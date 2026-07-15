@@ -91,270 +91,335 @@ struct LogMetadata {
 struct VRSharedMemory {
   union {
     uint8_t raw[0x2000000];
+    struct {
+      // Offset 0x0
+      uint8_t pad_0x0[8];
 
-    struct {
-      uint8_t pad[0x8];
-      uint32_t counter_0x8;
-      uint32_t pad_0xC;
-      uint64_t data_0x10;
-    } common_0x10;
+      // Offset 0x8
+      struct {
+        uint32_t counter_0x8;
+        uint32_t pad_0xC;
+        uint64_t data_0x10;
+      } common_0x10;
 
-    struct {
-      uint8_t pad[0x18];
-      uint16_t data_0x18;
-    } common_0x18;
+      // Offset 0x18
+      struct {
+        uint16_t data_0x18;
+      } common_0x18;
 
-    struct {
-      uint8_t pad[0x9dc8];
-      uint32_t counter_0x9dc8;
-      uint32_t pad_0x9dcc;
-      uint64_t data_0x9dd0;
-    } common_9dd0;
+      // Offset 0x1A - 0x28
+      uint8_t pad_0x1a[14];
 
-    struct {
-      uint8_t pad[0xc728];
-      uint32_t ctr;
-      uint8_t data_0xc72c;
-    } common_c72c;
-
-    struct {
-      uint8_t pad[0x28];
-      uint32_t ctr;
-      uint32_t data_0x2c[9];
-    } status_0x2c;
-
-    struct {
-      uint8_t pad[0x54];
-      uint32_t ctr;
-      uint8_t pad_0x58[0x18];
-      uint8_t data_0x70[0x100];
-    } calib_0x70;
-
-    struct {
-      uint8_t pad[0x58];
-      uint32_t ctr;
-      uint8_t pad_0x5c[0x114];
-      uint8_t data_0x170[0x200];
-    } calib_170;
-
-    struct {
-      uint8_t pad[0x5c];
-      uint32_t ctr;
-      uint8_t pad_0x60[0x310];
-      uint8_t data_0x370[120];
-    } calib_370;
-
-    struct {
-      uint8_t pad[0x60];
-      uint32_t ctr;
-      uint8_t pad_0x64[0x384];
-      uint8_t data_0x3f0[52];
-    } calib_3f0;
-
-    struct {
-      uint8_t pad[0x64];
-      uint32_t ctr;
-      uint8_t pad_0x68[0x3B4];
-      uint8_t data_0x41c[0xF0];
-    } calib_41c;
-
-    struct {
-      uint8_t pad[0x68];
-      uint32_t ctr;
-      uint8_t pad_0x6c[0x4a0];
-      uint8_t data_0x50c[0x800];
-    } calib_50c;
-
-    struct {
-      uint8_t pad[0x6c];
-      uint32_t ctr;
-      uint8_t pad_0x70[0xc9c];
-      uint8_t data_0xd0c[0x800];
-    } calib_d0c;
-
-    struct {
-      uint8_t pad[0x152c];
-      uint32_t counters[0x30];
-    } tracking_40_meta;
-
-    struct {
-      uint8_t pad[0x150c];
-      InputGroupMeta groups[3];
-    } input_meta;
-
-    struct {
-      uint8_t pad[0x1e10];
-      PoseGroupMeta groups[3];
-    } pose_meta;
-
-    struct {
-      uint8_t pad[0x3c10];
-      ImageSlotMeta slots[8];
-    } image_meta;
-
-    struct {
-      uint8_t pad[0x100000];
-      uint8_t slots[3][64][64];
-    } input_data;
-
-    struct {
-      uint8_t pad[0x103000];
-      PoseSlotData slots[4][64];
-    } pose_data;
-
-    struct {
-      uint8_t pad[0x10ba00];
-      ImageSlotData slots[8];
-    } image_data;
-
-    struct {
-      uint8_t pad[0x7fd0];
-      PlayareaSlotState playarea_states[8];
-    } playarea_meta;
-
-    struct {
-      uint8_t pad[0x110c208];
-      uint8_t playarea_slots[8][64];
-    } playarea_ring;
-
-    struct {
-      uint8_t pad[0x8038];
-      uint32_t ctr;
-      uint32_t data[4];
-    } img_setting_803c;
-    struct {
-      uint8_t pad[0x8054];
-      uint32_t ctr;
-      uint32_t data[6];
-    } blob_cfg_8058;
-    struct {
-      uint8_t pad[0x8078];
-      uint32_t ctr;
-      uint32_t data[4];
-    } ir_cam_807c;
-    struct {
-      uint8_t pad[0x8094];
-      uint32_t ctr;
-      uint8_t data[0x400];
-    } cont_cfg_8098;
-    struct {
-      uint8_t pad[0x84a0];
-      struct ArmModelSlot {
+      // Offset 0x28
+      struct {
         uint32_t ctr;
-        uint8_t data[80];
-        uint8_t pad[8];
-      } slots[2];
-    } arm_model_84a4;
-    struct {
-      uint8_t pad[0x8558];
-      uint32_t ctr;
-      uint8_t data[0xC00];
-    } cont_led_855c;
-    struct {
-      uint8_t pad[0x9168];
-      struct BtQualitySlot {
+        uint32_t data_0x2c[9];
+      } status_0x2c;
+
+      // Offset 0x50 - 0x54
+      uint8_t pad_0x50[4];
+
+      // Offset 0x54 - 0x150C
+      struct {
+        uint32_t ctr_70;
+        uint32_t ctr_170;
+        uint32_t ctr_370;
+        uint32_t ctr_3f0;
+        uint32_t ctr_41c;
+        uint32_t ctr_50c;
+        uint32_t ctr_d0c;
+
+        uint8_t data_0x70[0x100];
+        uint8_t data_0x170[0x200];
+        uint8_t data_0x370[120];
+        uint8_t data_0x3f0[52];
+        uint8_t data_0x41c[0xF0];
+        uint8_t data_0x50c[0x800];
+        uint8_t data_0xd0c[0x800];
+      } calib;
+
+      // Offset 0x150C - 0x1E0C
+      struct {
+        InputGroupMeta groups[3];
+      } input_meta;
+
+      // Offset 0x1E0C - 0x1E10
+      uint8_t pad_0x1e0c[4];
+
+      // Offset 0x1E10
+      struct {
+        PoseGroupMeta groups[3];
+      } pose_meta;
+
+      // Offset 0x3C10
+      struct {
+        ImageSlotMeta slots[8];
+      } image_meta;
+
+      // Offset 0x7FD0
+      struct {
+        PlayareaSlotState playarea_states[8];
+      } playarea_meta;
+
+      // Offset 0x8030 - 0x8038
+      uint8_t pad_0x8030[8];
+
+      // Offset 0x8038
+      struct {
         uint32_t ctr;
-        uint32_t pad;
-        uint8_t data[80];
-        uint8_t unused_pad[8];
-      } slots[2];
-    } bt_qual_9170;
-    struct {
-      uint8_t pad[0x9228];
-      uint32_t ctr;
-      uint8_t data[0x48];
-    } fw_info1_922c;
-    struct {
-      uint8_t pad[0x927c];
-      uint32_t ctr;
-      uint8_t data[0x850];
-    } fw_info2_9280;
-    struct {
-      uint8_t pad[0x9ad8];
-      uint32_t ctr;
-      uint32_t pad2;
-      uint8_t data[0x50];
-    } vr_dialog_9ae0;
-    struct {
-      uint8_t pad[0x9b38];
-      uint32_t ctr;
-      uint8_t data[49];
-    } app_9b3c;
-    struct {
-      uint8_t pad[0x9b78];
-      uint32_t ctr;
-      uint8_t data[0x80];
-    } vr_trace_9b7c;
-    struct {
-      uint8_t pad[0x9c88];
-      uint32_t ctr;
-      uint8_t data[0x131];
-    } dbg_data_9c8c;
-    struct {
-      uint8_t pad[0x9de0];
-      uint32_t ctr;
-      uint32_t data[4];
-    } scene_info_9de4;
-    struct {
-      uint8_t pad[0xa980];
-      uint32_t ctr;
-      uint8_t data[0x90];
-    } tel_dev_a984;
-    struct {
-      uint8_t pad[0xaa9c];
-      uint32_t ctr;
-      uint8_t data[0x1B50];
-    } tel_trk_aaa0;
-    struct {
-      uint8_t pad[0xc5f8];
-      uint32_t ctr;
-      uint8_t data[0xA0];
-    } tel_pc_c600;
-    struct {
-      uint8_t pad[0xc738];
-      uint32_t ctr;
-      uint8_t data[200];
-    } init_setup_c73c;
-    struct {
-      uint8_t pad[0xc810];
-      uint32_t ctr;
-      uint32_t data;
-    } playarea_setup_c814;
+        uint32_t data[4];
+      } img_setting_803c;
 
-    struct {
-      uint8_t pad[0x9dfc];
-      struct ConfigSlot {
-        uint32_t counter;
-        char stringData[264];
-      } str_configs[16];
-    } configs_9e00;
+      // Offset 0x804C - 0x8054
+      uint8_t pad_0x804c[8];
 
-    struct {
-      uint8_t pad[0x110c408];
-      uint8_t log_head;
-      uint8_t log_tail;
-      uint8_t pad2[0xFE];
-      LogMetadata log_meta[256];
-      uint8_t pad3[0x3fb00];
-      char log_strings[256][0x100];
-    } logs;
+      // Offset 0x8054
+      struct {
+        uint32_t ctr;
+        uint32_t data[6];
+      } blob_cfg_8058;
 
-    struct {
-      uint8_t pad[0xffc00];
-      double timestamps[11];
-      DWORD pids[11];
-      uint32_t states[11];
-    } watchdog;
+      // Offset 0x8070 - 0x8078
+      uint8_t pad_0x8070[8];
+
+      // Offset 0x8078
+      struct {
+        uint32_t ctr;
+        uint32_t data[4];
+      } ir_cam_807c;
+
+      // Offset 0x808C - 0x8094
+      uint8_t pad_0x808c[8];
+
+      // Offset 0x8094
+      struct {
+        uint32_t ctr;
+        uint8_t data[0x400];
+      } cont_cfg_8098;
+
+      // Offset 0x8498 - 0x84A0
+      uint8_t pad_0x8498[8];
+
+      // Offset 0x84A0
+      struct {
+        struct ArmModelSlot {
+          uint32_t ctr;
+          uint8_t data[80];
+          uint8_t pad[8];
+        } slots[2];
+      } arm_model_84a4;
+
+      // Offset 0x8558
+      struct {
+        uint32_t ctr;
+        uint8_t data[0xC00];
+      } cont_led_855c;
+
+      // Offset 0x915C - 0x9168
+      uint8_t pad_0x915c[12];
+
+      // Offset 0x9168
+      struct {
+        struct BtQualitySlot {
+          uint32_t ctr;
+          uint32_t pad;
+          uint8_t data[80];
+          uint8_t unused_pad[8];
+        } slots[2];
+      } bt_qual_9170;
+
+      // Offset 0x9228
+      struct {
+        uint32_t ctr;
+        uint8_t data[0x48];
+      } fw_info1_922c;
+
+      // Offset 0x9274 - 0x927C
+      uint8_t pad_0x9274[8];
+
+      // Offset 0x927C
+      struct {
+        uint32_t ctr;
+        uint8_t data[0x850];
+      } fw_info2_9280;
+
+      // Offset 0x9AD0 - 0x9AD8
+      uint8_t pad_0x9ad0[8];
+
+      // Offset 0x9AD8
+      struct {
+        uint32_t ctr;
+        uint32_t pad2;
+        uint8_t data[0x50];
+      } vr_dialog_9ae0;
+
+      // Offset 0x9B30 - 0x9B38
+      uint8_t pad_0x9b30[8];
+
+      // Offset 0x9B38
+      struct {
+        uint32_t ctr;
+        uint8_t data[49];
+      } app_9b3c;
+
+      // Offset 0x9B6D - 0x9B78
+      uint8_t pad_0x9b6d[11];
+
+      // Offset 0x9B78
+      struct {
+        uint32_t ctr;
+        uint8_t data[0x80];
+      } vr_trace_9b7c;
+
+      // Offset 0x9BFC - 0x9C88
+      uint8_t pad_0x9bfc[140];
+
+      // Offset 0x9C88
+      struct {
+        uint32_t ctr;
+        uint8_t data[0x131];
+      } dbg_data_9c8c;
+
+      // Offset 0x9DBD - 0x9DC8
+      uint8_t pad_0x9dbd[11];
+
+      // Offset 0x9DC8
+      struct {
+        uint32_t counter_0x9dc8;
+        uint32_t pad_0x9dcc;
+        uint64_t data_0x9dd0;
+      } common_9dd0;
+
+      // Offset 0x9DD8 - 0x9DE0
+      uint8_t pad_0x9dd8[8];
+
+      // Offset 0x9DE0
+      struct {
+        uint32_t ctr;
+        uint32_t data[4];
+      } scene_info_9de4;
+
+      // Offset 0x9DF4 - 0x9DFC
+      uint8_t pad_0x9df4[8];
+
+      // Offset 0x9DFC (yes, config and telemetry overlap)
+      union {
+        struct {
+          struct ConfigSlot {
+            uint32_t counter;
+            char stringData[264];
+          } str_configs[16];
+        } configs_9e00;
+
+        struct {
+          uint8_t pad_to_a980[0xB84];
+          struct {
+            uint32_t ctr;
+            uint8_t data[0x90];
+          } tel_dev_a984;
+
+          uint8_t pad_to_aa9c[0x88];
+          struct {
+            uint32_t ctr;
+            uint8_t data[0x1B50];
+          } tel_trk_aaa0;
+
+          uint8_t pad_to_c5f8[8];
+          struct {
+            uint32_t ctr;
+            uint8_t data[0xA0];
+          } tel_pc_c600;
+        };
+      };
+
+      // Offset 0xC69C - 0xC728
+      uint8_t pad_to_c728[0x8C];
+
+      // Offset 0xC728
+      struct {
+        uint32_t ctr;
+        uint8_t data_0xc72c;
+      } common_c72c;
+
+      // Offset 0xC72D - 0xC738
+      uint8_t pad_to_c738[11];
+
+      // Offset 0xC738
+      struct {
+        uint32_t ctr;
+        uint8_t data[200];
+      } init_setup_c73c;
+
+      // Offset 0xC804 - 0xC810
+      uint8_t pad_to_c810[12];
+
+      // Offset 0xC810
+      struct {
+        uint32_t ctr;
+        uint32_t data;
+      } playarea_setup_c814;
+
+      // Offset 0xC818 - 0xFFC00
+      uint8_t pad_to_ffc00[0xF33E8];
+
+      // Offset 0xFFC00
+      struct {
+        double timestamps[11];
+        DWORD pids[11];
+        uint32_t states[11];
+      } watchdog;
+
+      // Offset 0xFFCB0 - 0x100000
+      uint8_t pad_to_100000[0x350];
+
+      // Offset 0x100000
+      struct {
+        uint8_t slots[3][64][64];
+      } input_data;
+
+      // Offset 0x103000
+      union {
+        struct {
+          PoseSlotData slots[4][64];
+        } pose_data;
+
+        struct {
+          uint8_t pad_to_10ba00[0x8A00];
+          ImageSlotData slots[8];
+        } image_data;
+      };
+
+      // Offset 0x110C200 - 0x110C208
+      uint8_t pad_to_110c208[8];
+
+      // Offset 0x110C208
+      struct {
+        uint8_t playarea_slots[8][64];
+      } playarea_ring;
+
+      // Offset 0x110C408
+      struct {
+        uint8_t log_head;
+        uint8_t log_tail;
+        uint8_t pad2[0xFE];
+        LogMetadata log_meta[256];
+        uint8_t pad3[0x3fb00];
+        char log_strings[256][0x100];
+      } logs;
+
+      // Pad to end of 32MB
+      uint8_t pad_to_end[0xEA3BF8];
+    };
   };
 };
 
 #pragma pack(pop)
 
-#define DEF_READ_MEMCPY_RET(FuncName, GroupIdx, MemGroup, MemData, Size) uint32_t FuncName(this ShareManager &self, void *outData);
+#define DEF_READ_MEMCPY_RET(FuncName) uint32_t FuncName(this ShareManager &self, void *outData);
 
-#define DEF_READ_MEMCPY_OUT(FuncName, GroupIdx, MemGroup, MemData, Size) uint32_t FuncName(this ShareManager &self, void *outData, uint32_t *outCounter);
+#define DEF_READ_MEMCPY_OUT(FuncName) uint32_t FuncName(this ShareManager &self, void *outData, uint32_t *outCounter);
 
-#define DEF_WRITE_MEMCPY(FuncName, GroupIdx, MemGroup, MemData, Size) int FuncName(this ShareManager &self, void *data);
+#define DEF_WRITE_MEMCPY(FuncName) int FuncName(this ShareManager &self, void *data);
 
 enum ShareResourceIndex {
   SR_Common = 0,
@@ -496,60 +561,60 @@ public:
   uint32_t WaitShareEvent(this ShareManager &self, int groupIdx, DWORD timeoutMs);
 
   // Group 1: Status
-  DEF_READ_MEMCPY_RET(ReadStatus_0x2c, 1, status_0x2c, data_0x2c, sizeof(self.m_pMem->status_0x2c.data_0x2c))
-  DEF_WRITE_MEMCPY(WriteStatus_0x2c, 1, status_0x2c, data_0x2c, sizeof(self.m_pMem->status_0x2c.data_0x2c))
+  DEF_READ_MEMCPY_RET(ReadStatus_0x2c)
+  DEF_WRITE_MEMCPY(WriteStatus_0x2c)
 
   // Group 2: Calibration Blocks
-  DEF_READ_MEMCPY_OUT(ReadCalib_0x70, 2, calib_0x70, data_0x70, sizeof(self.m_pMem->calib_0x70.data_0x70))
-  DEF_WRITE_MEMCPY(WriteCalib_0x70, 2, calib_0x70, data_0x70, sizeof(self.m_pMem->calib_0x70.data_0x70))
-  DEF_READ_MEMCPY_OUT(ReadCalib_0x170, 2, calib_170, data_0x170, sizeof(self.m_pMem->calib_170.data_0x170))
-  DEF_WRITE_MEMCPY(WriteCalib_0x170, 2, calib_170, data_0x170, sizeof(self.m_pMem->calib_170.data_0x170))
-  DEF_READ_MEMCPY_OUT(ReadCalib_0x370, 2, calib_370, data_0x370, sizeof(self.m_pMem->calib_370.data_0x370))
-  DEF_WRITE_MEMCPY(WriteCalib_0x370, 2, calib_370, data_0x370, sizeof(self.m_pMem->calib_370.data_0x370))
-  DEF_READ_MEMCPY_OUT(ReadCalib_0x3f0, 2, calib_3f0, data_0x3f0, sizeof(self.m_pMem->calib_3f0.data_0x3f0))
-  DEF_WRITE_MEMCPY(WriteCalib_0x3f0, 2, calib_3f0, data_0x3f0, sizeof(self.m_pMem->calib_3f0.data_0x3f0))
-  DEF_READ_MEMCPY_OUT(ReadCalib_0x41c, 2, calib_41c, data_0x41c, sizeof(self.m_pMem->calib_41c.data_0x41c))
-  DEF_WRITE_MEMCPY(WriteCalib_0x41c, 2, calib_41c, data_0x41c, sizeof(self.m_pMem->calib_41c.data_0x41c))
-  DEF_READ_MEMCPY_OUT(ReadCalib_0x50c, 2, calib_50c, data_0x50c, sizeof(self.m_pMem->calib_50c.data_0x50c))
-  DEF_WRITE_MEMCPY(WriteCalib_0x50c, 2, calib_50c, data_0x50c, sizeof(self.m_pMem->calib_50c.data_0x50c))
-  DEF_READ_MEMCPY_OUT(ReadCalib_0xd0c, 2, calib_d0c, data_0xd0c, sizeof(self.m_pMem->calib_d0c.data_0xd0c))
-  DEF_WRITE_MEMCPY(WriteCalib_0xd0c, 2, calib_d0c, data_0xd0c, sizeof(self.m_pMem->calib_d0c.data_0xd0c))
+  DEF_READ_MEMCPY_OUT(ReadCalib_0x70)
+  DEF_WRITE_MEMCPY(WriteCalib_0x70)
+  DEF_READ_MEMCPY_OUT(ReadCalib_0x170)
+  DEF_WRITE_MEMCPY(WriteCalib_0x170)
+  DEF_READ_MEMCPY_OUT(ReadCalib_0x370)
+  DEF_WRITE_MEMCPY(WriteCalib_0x370)
+  DEF_READ_MEMCPY_OUT(ReadCalib_0x3f0)
+  DEF_WRITE_MEMCPY(WriteCalib_0x3f0)
+  DEF_READ_MEMCPY_OUT(ReadCalib_0x41c)
+  DEF_WRITE_MEMCPY(WriteCalib_0x41c)
+  DEF_READ_MEMCPY_OUT(ReadCalib_0x50c)
+  DEF_WRITE_MEMCPY(WriteCalib_0x50c)
+  DEF_READ_MEMCPY_OUT(ReadCalib_0xd0c)
+  DEF_WRITE_MEMCPY(WriteCalib_0xd0c)
 
   // Groups 12-19: Configs & Info
-  DEF_READ_MEMCPY_OUT(ReadImageSetting_0x803c, 12, img_setting_803c, data, sizeof(self.m_pMem->img_setting_803c.data))
-  DEF_WRITE_MEMCPY(WriteImageSetting_0x803c, 12, img_setting_803c, data, sizeof(self.m_pMem->img_setting_803c.data))
-  DEF_READ_MEMCPY_OUT(ReadBlobConfig_0x8058, 13, blob_cfg_8058, data, sizeof(self.m_pMem->blob_cfg_8058.data))
-  DEF_WRITE_MEMCPY(WriteBlobConfig_0x8058, 13, blob_cfg_8058, data, sizeof(self.m_pMem->blob_cfg_8058.data))
-  DEF_READ_MEMCPY_OUT(ReadIrCamSetting_0x807c, 14, ir_cam_807c, data, sizeof(self.m_pMem->ir_cam_807c.data))
-  DEF_WRITE_MEMCPY(WriteIrCamSetting_0x807c, 14, ir_cam_807c, data, sizeof(self.m_pMem->ir_cam_807c.data))
-  DEF_READ_MEMCPY_RET(ReadContConfig_0x8098, 15, cont_cfg_8098, data, sizeof(self.m_pMem->cont_cfg_8098.data))
-  DEF_WRITE_MEMCPY(WriteContConfig_0x8098, 15, cont_cfg_8098, data, sizeof(self.m_pMem->cont_cfg_8098.data))
-  DEF_READ_MEMCPY_RET(ReadContLedInfo_0x855c, 17, cont_led_855c, data, sizeof(self.m_pMem->cont_led_855c.data))
-  DEF_WRITE_MEMCPY(WriteContLedInfo_0x855c, 17, cont_led_855c, data, sizeof(self.m_pMem->cont_led_855c.data))
-  DEF_READ_MEMCPY_RET(ReadFwInfo1_0x922c, 19, fw_info1_922c, data, sizeof(self.m_pMem->fw_info1_922c.data))
-  DEF_WRITE_MEMCPY(WriteFwInfo1_0x922c, 19, fw_info1_922c, data, sizeof(self.m_pMem->fw_info1_922c.data))
+  DEF_READ_MEMCPY_OUT(ReadImageSetting_0x803c)
+  DEF_WRITE_MEMCPY(WriteImageSetting_0x803c)
+  DEF_READ_MEMCPY_OUT(ReadBlobConfig_0x8058)
+  DEF_WRITE_MEMCPY(WriteBlobConfig_0x8058)
+  DEF_READ_MEMCPY_OUT(ReadIrCamSetting_0x807c)
+  DEF_WRITE_MEMCPY(WriteIrCamSetting_0x807c)
+  DEF_READ_MEMCPY_RET(ReadContConfig_0x8098)
+  DEF_WRITE_MEMCPY(WriteContConfig_0x8098)
+  DEF_READ_MEMCPY_RET(ReadContLedInfo_0x855c)
+  DEF_WRITE_MEMCPY(WriteContLedInfo_0x855c)
+  DEF_READ_MEMCPY_RET(ReadFwInfo1_0x922c)
+  DEF_WRITE_MEMCPY(WriteFwInfo1_0x922c)
 
   // Groups 20-24: Application & Debug
-  DEF_READ_MEMCPY_RET(ReadFwInfo2_0x9280, 20, fw_info2_9280, data, sizeof(self.m_pMem->fw_info2_9280.data))
-  DEF_READ_MEMCPY_RET(ReadVrDialog_0x9ae0, 21, vr_dialog_9ae0, data, sizeof(self.m_pMem->vr_dialog_9ae0.data))
-  DEF_WRITE_MEMCPY(WriteVrDialog_0x9ae0, 21, vr_dialog_9ae0, data, sizeof(self.m_pMem->vr_dialog_9ae0.data))
-  DEF_READ_MEMCPY_RET(ReadApplication_0x9b3c, 22, app_9b3c, data, sizeof(self.m_pMem->app_9b3c.data))
-  DEF_READ_MEMCPY_RET(ReadVrTraceData_0x9b7c, 23, vr_trace_9b7c, data, sizeof(self.m_pMem->vr_trace_9b7c.data))
-  DEF_WRITE_MEMCPY(WriteVrTraceData_0x9b7c, 23, vr_trace_9b7c, data, sizeof(self.m_pMem->vr_trace_9b7c.data))
-  DEF_READ_MEMCPY_RET(ReadDebugData_0x9c8c, 24, dbg_data_9c8c, data, sizeof(self.m_pMem->dbg_data_9c8c.data))
-  DEF_WRITE_MEMCPY(WriteDebugData_0x9c8c, 24, dbg_data_9c8c, data, sizeof(self.m_pMem->dbg_data_9c8c.data))
+  DEF_READ_MEMCPY_RET(ReadFwInfo2_0x9280)
+  DEF_READ_MEMCPY_RET(ReadVrDialog_0x9ae0)
+  DEF_WRITE_MEMCPY(WriteVrDialog_0x9ae0)
+  DEF_READ_MEMCPY_RET(ReadApplication_0x9b3c)
+  DEF_READ_MEMCPY_RET(ReadVrTraceData_0x9b7c)
+  DEF_WRITE_MEMCPY(WriteVrTraceData_0x9b7c)
+  DEF_READ_MEMCPY_RET(ReadDebugData_0x9c8c)
+  DEF_WRITE_MEMCPY(WriteDebugData_0x9c8c)
 
   // Groups 30-34: Telemetry & Setup
-  DEF_READ_MEMCPY_RET(ReadSceneInfo_0x9de4, 33, scene_info_9de4, data, sizeof(self.m_pMem->scene_info_9de4.data))
-  DEF_WRITE_MEMCPY(WriteSceneInfo_0x9de4, 33, scene_info_9de4, data, sizeof(self.m_pMem->scene_info_9de4.data))
-  DEF_READ_MEMCPY_RET(ReadTelDevInfo_0xa984, 30, tel_dev_a984, data, sizeof(self.m_pMem->tel_dev_a984.data))
-  DEF_WRITE_MEMCPY(WriteTelDevInfo_0xa984, 30, tel_dev_a984, data, sizeof(self.m_pMem->tel_dev_a984.data))
-  DEF_READ_MEMCPY_RET(ReadTelTrkInfo_0xaaa0, 31, tel_trk_aaa0, data, sizeof(self.m_pMem->tel_trk_aaa0.data))
-  DEF_WRITE_MEMCPY(WriteTelTrkInfo_0xaaa0, 31, tel_trk_aaa0, data, sizeof(self.m_pMem->tel_trk_aaa0.data))
-  DEF_READ_MEMCPY_RET(ReadTelPcInfo_0xc600, 32, tel_pc_c600, data, sizeof(self.m_pMem->tel_pc_c600.data))
-  DEF_WRITE_MEMCPY(WriteTelPcInfo_0xc600, 32, tel_pc_c600, data, sizeof(self.m_pMem->tel_pc_c600.data))
-  DEF_READ_MEMCPY_RET(ReadInitSetup_0xc73c, 34, init_setup_c73c, data, sizeof(self.m_pMem->init_setup_c73c.data))
-  DEF_WRITE_MEMCPY(WriteInitSetup_0xc73c, 34, init_setup_c73c, data, sizeof(self.m_pMem->init_setup_c73c.data))
+  DEF_READ_MEMCPY_RET(ReadSceneInfo_0x9de4)
+  DEF_WRITE_MEMCPY(WriteSceneInfo_0x9de4)
+  DEF_READ_MEMCPY_RET(ReadTelDevInfo_0xa984)
+  DEF_WRITE_MEMCPY(WriteTelDevInfo_0xa984)
+  DEF_READ_MEMCPY_RET(ReadTelTrkInfo_0xaaa0)
+  DEF_WRITE_MEMCPY(WriteTelTrkInfo_0xaaa0)
+  DEF_READ_MEMCPY_RET(ReadTelPcInfo_0xc600)
+  DEF_WRITE_MEMCPY(WriteTelPcInfo_0xc600)
+  DEF_READ_MEMCPY_RET(ReadInitSetup_0xc73c)
+  DEF_WRITE_MEMCPY(WriteInitSetup_0xc73c)
 
 private:
   uint8_t m_pad_offset0[8]; // Offset 0x0
