@@ -30,7 +30,7 @@ void CaesarManager__shutdownHook(CaesarManager *thisptr) {
 void *(*CaesarManager__setupManager)(CaesarManager *, void *, void *) = nullptr;
 void *CaesarManager__setupManagerHook(CaesarManager *thisptr, void *arg1, void *arg2) {
   void *result = CaesarManager__setupManager(thisptr, arg1, arg2);
-  
+
   thisptr->firmwareLoaded = false;
   thisptr->firmwareVersion = 0;
 

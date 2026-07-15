@@ -8,10 +8,7 @@
 
 class CaesarManager {
 public:
-  enum EdidType : uint8_t {
-    EDID_TYPE_90HZ_120HZ,
-    EDID_TYPE_90HZ_ONLY
-  };
+  enum EdidType : uint8_t { EDID_TYPE_90HZ_120HZ, EDID_TYPE_90HZ_ONLY };
 
   static constexpr uintptr_t k_getSingletonRVA = 0x124C90;
   static constexpr uintptr_t k_getEdidTypeRVA = 0x124970;
@@ -34,7 +31,7 @@ public:
   uint32_t firmwareVersion;
   uint8_t unk1[8];
 
-  static CaesarManager* getSingleton() {
+  static CaesarManager *getSingleton() {
     if (!CaesarManager__getSingleton) {
       psvr2_toolkit::HmdDriverLoader *pHmdDriverLoader = psvr2_toolkit::HmdDriverLoader::Instance();
       CaesarManager__getSingleton = decltype(CaesarManager__getSingleton)(pHmdDriverLoader->GetBaseAddress() + k_getSingletonRVA);
