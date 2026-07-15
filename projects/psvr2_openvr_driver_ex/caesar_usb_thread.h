@@ -1,9 +1,11 @@
 #pragma once
 
-#include <libusb-1.0/libusb.h>
 #include <windows.h>
-#include <winusb.h>
 #include <cstdint>
+
+struct libusb_context;
+struct libusb_device_handle;
+struct libusb_device_descriptor;
 
 #define INVALID_CONTEXT_HANDLE ((libusb_context *)-1)
 #define INVALID_DEVICE_HANDLE ((libusb_device_handle *)-1)
