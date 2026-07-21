@@ -439,22 +439,12 @@ void CaesarUsbThread::ThreadLoopHook(CaesarUsbThread *thisptr) {
         Sleep(500);
       }
     } else if (thisptr->m_state == 2) { // Connected State
-      int result = 0;
-      __try {
-        result = thisptr->PollAndProcess();
-      } __except (EXCEPTION_EXECUTE_HANDLER) {
-        Util::DriverLog("PollAndProcess threw an exception for interface {}. Disconnecting.", thisptr->GetInterface());
-        result = -1;
-      }
+      int result = thisptr->PollAndProcess();
 
       if (result != 0) {
         Util::DriverLog("PollAndProcess failed for interface {}. Disconnecting. Result: {}", thisptr->GetInterface(), result);
 
-        __try {
-          thisptr->OnDisconnect();
-        } __except (EXCEPTION_EXECUTE_HANDLER) {
-          Util::DriverLog("OnDisconnect threw an exception for interface {}.", thisptr->GetInterface());
-        }
+        thisptr->OnDisconnect();
         thisptr->m_state = 1;
 
         if (IS_HANDLE_VALID(thisptr->m_devHandle)) {
