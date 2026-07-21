@@ -100,7 +100,34 @@ void CaesarUsbThread::SetUsbConnectionState(bool connected) {
   }
 }
 
+void CaesarUsbThread::WaitForDeviceHandle() {
+  if (IS_HANDLE_VALID(g_devHandle.load())) {
+    if (this->m_devHandle != g_devHandle.load()) {
+      this->m_devHandle = g_devHandle.load();
+    }
+  } else {
+    this->m_devHandle = INVALID_DEVICE_HANDLE;
+  }
+
+  int waitTimeMs = 0;
+  while (waitTimeMs < 1000) {
+    if (this->m_stopRequested != 0 || g_usbSimulatedDisconnect) {
+      break;
+    }
+    if (IS_HANDLE_VALID(g_devHandle.load())) {
+      this->m_devHandle = g_devHandle.load();
+      break;
+    } else {
+      this->m_devHandle = INVALID_DEVICE_HANDLE;
+    }
+    Sleep(10);
+    waitTimeMs += 10;
+  }
+}
+
 int CaesarUsbThread::TransferPipe(uint8_t pipeId, char *buffer, size_t length, uint64_t timeoutMs) {
+  this->WaitForDeviceHandle();
+
   std::shared_lock<std::shared_mutex> lock(g_pendingOperationsMutex);
   if (this->m_stopRequested != 0 || g_usbSimulatedDisconnect) {
     this->m_lastError = 0xfffffe74;
@@ -165,6 +192,8 @@ int CaesarUsbThread::TransferPipe(uint8_t pipeId, char *buffer, size_t length, u
 
 int CaesarUsbThread::ControlCommand(uint8_t bIsSet, uint16_t reportId, void *buffer, uint16_t length, uint16_t value, uint16_t index, uint16_t &subcmd,
                                     uint64_t timeoutMs) {
+  this->WaitForDeviceHandle();
+
   std::shared_lock<std::shared_mutex> lock(g_pendingOperationsMutex);
   if (this->m_stopRequested != 0 || g_usbSimulatedDisconnect) {
     this->m_lastError = 0xfffffdd4;
@@ -257,6 +286,8 @@ int CaesarUsbThread::ControlCommand(uint8_t bIsSet, uint16_t reportId, void *buf
 }
 
 int CaesarUsbThread::GetDescriptor(libusb_device_descriptor *pDest) {
+  this->WaitForDeviceHandle();
+
   std::shared_lock<std::shared_mutex> lock(g_pendingOperationsMutex);
   if (g_usbSimulatedDisconnect || !IS_HANDLE_VALID(this->m_devHandle) || this->m_devHandle != g_devHandle.load()) {
     Util::DriverLog("No dev for descriptor");
@@ -408,12 +439,22 @@ void CaesarUsbThread::ThreadLoopHook(CaesarUsbThread *thisptr) {
         Sleep(500);
       }
     } else if (thisptr->m_state == 2) { // Connected State
-      int result = thisptr->PollAndProcess();
+      int result = 0;
+      __try {
+        result = thisptr->PollAndProcess();
+      } __except (EXCEPTION_EXECUTE_HANDLER) {
+        Util::DriverLog("PollAndProcess threw an exception for interface {}. Disconnecting.", thisptr->GetInterface());
+        result = -1;
+      }
 
       if (result != 0) {
         Util::DriverLog("PollAndProcess failed for interface {}. Disconnecting. Result: {}", thisptr->GetInterface(), result);
 
-        thisptr->OnDisconnect();
+        __try {
+          thisptr->OnDisconnect();
+        } __except (EXCEPTION_EXECUTE_HANDLER) {
+          Util::DriverLog("OnDisconnect threw an exception for interface {}.", thisptr->GetInterface());
+        }
         thisptr->m_state = 1;
 
         if (IS_HANDLE_VALID(thisptr->m_devHandle)) {

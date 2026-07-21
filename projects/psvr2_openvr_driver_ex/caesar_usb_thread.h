@@ -83,6 +83,8 @@ public:
   static void Stop();
 
 private:
+  void WaitForDeviceHandle();
+
   static void (*orig_destructor)(CaesarUsbThread *thisptr, bool shouldFree);
   static void (*orig_threadLoop)(CaesarUsbThread *thisptr);
   static void (*orig_joinThread)(CaesarUsbThread *thisptr);
