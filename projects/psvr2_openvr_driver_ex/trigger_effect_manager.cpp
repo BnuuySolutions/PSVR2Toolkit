@@ -8,17 +8,15 @@
 
 namespace psvr2_toolkit {
 
-// State tracking for the 4 slots
-static TriggerEffectCommandPayload g_slotEffects[k_maxSlots][2];
-static bool g_slotAlive[k_maxSlots];
-static TriggerEffectCommandPayload g_lastLeft = {VRControllerType::Left, {}};
-static TriggerEffectCommandPayload g_lastRight = {VRControllerType::Right, {}};
-
-int (*scePadSetTriggerEffect)(int handle, ScePadTriggerEffectParam *param);
-
 TriggerEffectManager *TriggerEffectManager::m_pInstance = nullptr;
 
-TriggerEffectManager::TriggerEffectManager() : m_initialized(false) {}
+TriggerEffectManager::TriggerEffectManager()
+    : m_initialized(false), m_sequenceCounter(0), m_lastLeft{VRControllerType::Left, {}}, m_lastRight{VRControllerType::Right, {}},
+      m_scePadSetTriggerEffect(nullptr) {
+  std::memset(m_slotEffects, 0, sizeof(m_slotEffects));
+  std::memset(m_slotSequence, 0, sizeof(m_slotSequence));
+  std::memset(m_slotAlive, 0, sizeof(m_slotAlive));
+}
 
 TriggerEffectManager *TriggerEffectManager::Instance() {
   if (!m_pInstance) {
@@ -37,9 +35,27 @@ void TriggerEffectManager::Initialize() {
     return;
   }
 
-  scePadSetTriggerEffect = decltype(scePadSetTriggerEffect)(pHmdDriverLoader->GetBaseAddress() + 0x1BF060);
+  m_scePadSetTriggerEffect = decltype(m_scePadSetTriggerEffect)(pHmdDriverLoader->GetBaseAddress() + 0x1BF060);
 
   m_initialized = true;
+}
+
+void TriggerEffectManager::SetSlotEffect(int slot, const TriggerEffectCommandPayload &payload) {
+  if (slot >= 0 && slot < k_maxSlots) {
+    m_sequenceCounter++;
+    if (payload.controllerType == VRControllerType::Left || payload.controllerType == VRControllerType::Both) {
+      m_slotEffects[slot][0] = payload;
+      m_slotEffects[slot][0].controllerType = VRControllerType::Left;
+      m_slotSequence[slot][0] = m_sequenceCounter;
+    }
+    if (payload.controllerType == VRControllerType::Right || payload.controllerType == VRControllerType::Both) {
+      m_slotEffects[slot][1] = payload;
+      m_slotEffects[slot][1].controllerType = VRControllerType::Right;
+      m_slotSequence[slot][1] = m_sequenceCounter;
+    }
+  }
+
+  Update();
 }
 
 void TriggerEffectManager::Update() {
@@ -47,27 +63,15 @@ void TriggerEffectManager::Update() {
   if (!pShareManager)
     return;
 
-  TriggerEffectCommand cmd;
-  while (pShareManager->popTriggerEffect(cmd)) {
-    if (cmd.slot >= 0 && cmd.slot < k_maxSlots) {
-      if (cmd.payload.controllerType == VRControllerType::Left || cmd.payload.controllerType == VRControllerType::Both) {
-        g_slotEffects[cmd.slot][0] = cmd.payload;
-        g_slotEffects[cmd.slot][0].controllerType = VRControllerType::Left;
-      }
-      if (cmd.payload.controllerType == VRControllerType::Right || cmd.payload.controllerType == VRControllerType::Both) {
-        g_slotEffects[cmd.slot][1] = cmd.payload;
-        g_slotEffects[cmd.slot][1].controllerType = VRControllerType::Right;
-      }
-    }
-  }
-
   for (int i = 0; i < k_maxSlots; i++) {
     bool alive = pShareManager->isSlotAlive(i);
-    if (g_slotAlive[i] && !alive) {
-      g_slotEffects[i][0].command.mode = ScePadTriggerEffectMode::SCE_PAD_TRIGGER_EFFECT_MODE_OFF;
-      g_slotEffects[i][1].command.mode = ScePadTriggerEffectMode::SCE_PAD_TRIGGER_EFFECT_MODE_OFF;
+    if (m_slotAlive[i] && !alive) {
+      m_slotEffects[i][0].command.mode = ScePadTriggerEffectMode::SCE_PAD_TRIGGER_EFFECT_MODE_OFF;
+      m_slotEffects[i][1].command.mode = ScePadTriggerEffectMode::SCE_PAD_TRIGGER_EFFECT_MODE_OFF;
+      m_slotSequence[i][0] = 0;
+      m_slotSequence[i][1] = 0;
     }
-    g_slotAlive[i] = alive;
+    m_slotAlive[i] = alive;
   }
 
   TriggerEffectCommandPayload finalLeft = {};
@@ -75,27 +79,41 @@ void TriggerEffectManager::Update() {
   TriggerEffectCommandPayload finalRight = {};
   finalRight.controllerType = VRControllerType::Right;
 
-  for (int i = k_maxSlots - 1; i >= 0; i--) {
-    if (g_slotAlive[i]) {
-      if (g_slotEffects[i][0].command.mode != ScePadTriggerEffectMode::SCE_PAD_TRIGGER_EFFECT_MODE_OFF)
-        finalLeft = g_slotEffects[i][0];
-      if (g_slotEffects[i][1].command.mode != ScePadTriggerEffectMode::SCE_PAD_TRIGGER_EFFECT_MODE_OFF)
-        finalRight = g_slotEffects[i][1];
+  uint64_t highestLeftSeq = 0;
+  uint64_t highestRightSeq = 0;
+
+  for (int i = 0; i < k_maxSlots; i++) {
+    if (m_slotAlive[i]) {
+      if (m_slotEffects[i][0].command.mode != ScePadTriggerEffectMode::SCE_PAD_TRIGGER_EFFECT_MODE_OFF) {
+        if (m_slotSequence[i][0] > highestLeftSeq) {
+          highestLeftSeq = m_slotSequence[i][0];
+          finalLeft = m_slotEffects[i][0];
+        }
+      }
+      if (m_slotEffects[i][1].command.mode != ScePadTriggerEffectMode::SCE_PAD_TRIGGER_EFFECT_MODE_OFF) {
+        if (m_slotSequence[i][1] > highestRightSeq) {
+          highestRightSeq = m_slotSequence[i][1];
+          finalRight = m_slotEffects[i][1];
+        }
+      }
     }
   }
 
-  if (std::memcmp(&finalLeft, &g_lastLeft, sizeof(TriggerEffectCommandPayload)) != 0) {
+  if (std::memcmp(&finalLeft, &m_lastLeft, sizeof(TriggerEffectCommandPayload)) != 0) {
     SetTriggerEffectCommand(finalLeft.controllerType, finalLeft.command);
-    g_lastLeft = finalLeft;
+    m_lastLeft = finalLeft;
   }
-  if (std::memcmp(&finalRight, &g_lastRight, sizeof(TriggerEffectCommandPayload)) != 0) {
+  if (std::memcmp(&finalRight, &m_lastRight, sizeof(TriggerEffectCommandPayload)) != 0) {
     SetTriggerEffectCommand(finalRight.controllerType, finalRight.command);
-    g_lastRight = finalRight;
+    m_lastRight = finalRight;
   }
 }
 
 void TriggerEffectManager::SetTriggerEffectCommand(VRControllerType controllerType, ScePadTriggerEffectCommand command) {
   AstonManager *pAstonManager = AstonManager::getSingleton();
+
+  if (!m_scePadSetTriggerEffect)
+    return;
 
   ScePadTriggerEffectParam param = {};
   switch (controllerType) {
@@ -122,7 +140,7 @@ void TriggerEffectManager::SetTriggerEffectCommand(VRControllerType controllerTy
       if (pAstonManager->contexts[1]) {
         int leftPadHandle = pAstonManager->contexts[1]->handle;
         if (leftPadHandle > -1) {
-          scePadSetTriggerEffect(leftPadHandle, &param);
+          m_scePadSetTriggerEffect(leftPadHandle, &param);
         }
       }
     }
@@ -130,7 +148,7 @@ void TriggerEffectManager::SetTriggerEffectCommand(VRControllerType controllerTy
       if (pAstonManager->contexts[0]) {
         int rightPadHandle = pAstonManager->contexts[0]->handle;
         if (rightPadHandle > -1) {
-          scePadSetTriggerEffect(rightPadHandle, &param);
+          m_scePadSetTriggerEffect(rightPadHandle, &param);
         }
       }
     }

@@ -24,20 +24,6 @@ struct GazeImage {
   int getFromCircularBuffer(unsigned char **gazeImageBuffer);
 };
 
-struct TriggerEffectCommand {
-  int slot;
-  TriggerEffectCommandPayload payload;
-};
-
-struct TriggerEffectBuffer {
-  int head;
-  int tail;
-  TriggerEffectCommand commands[256];
-
-  void push(int slot, const TriggerEffectCommandPayload &payload);
-  bool pop(TriggerEffectCommand &outCommand);
-};
-
 struct CommandBuffer {
   int head;
   int tail;
@@ -52,7 +38,6 @@ struct BufferData {
   GazeImage gazeImage;
   unsigned char pcmLeft[k_maxSlots][k_senseChunkSize];
   unsigned char pcmRight[k_maxSlots][k_senseChunkSize];
-  TriggerEffectBuffer triggerEffectBuffer;
   CommandBuffer commandBuffer;
 };
 
@@ -81,9 +66,6 @@ public:
   void writePcm(int slot, VRControllerType controllerType, const unsigned char *pcm);
   void waitForPcmUpdate();
 
-  void pushTriggerEffect(int slot, const TriggerEffectCommandPayload &payload);
-  bool popTriggerEffect(TriggerEffectCommand &outCommand);
-
   void submitCommand(DriverCommand &command);
   DriverCommand *popCommand(uint32_t timeoutMs);
   void fulfillCommand(DriverCommand *command);
@@ -103,8 +85,6 @@ private:
 
   IIpcBroadcast *m_pcmBroadcast;
   IIpcBroadcast *m_commandBroadcast;
-
-  IIpcMutex *m_triggerEffectMutex;
 
   IIpcMutex *m_commandMutex;
 

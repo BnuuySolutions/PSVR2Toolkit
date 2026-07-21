@@ -4,7 +4,6 @@
 #include "math_helpers.h"
 #include "sense_controller.h"
 #include "sense_crc.h"
-#include "trigger_effect_manager.h"
 #include "common.h"
 
 #include <algorithm>
@@ -249,9 +248,6 @@ void SenseThread() {
         }
       }
     }
-
-    // TODO: this should be moved out to support non-enhanced haptics path
-    TriggerEffectManager::Instance()->Update();
 
     leftController.SendToDevice();
     rightController.SendToDevice();

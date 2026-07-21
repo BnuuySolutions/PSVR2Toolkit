@@ -39,11 +39,14 @@ void psvr2_toolkit_write_pcm(VRControllerType controllerType, const unsigned cha
 void psvr2_toolkit_wait_for_pcm() { CustomShareManager::getSingleton()->waitForPcmUpdate(); }
 
 void psvr2_toolkit_set_trigger_effect(VRControllerType controllerType, const ScePadTriggerEffectCommand &command) {
-  TriggerEffectCommandPayload payload;
-  payload.controllerType = controllerType;
-  payload.command = command;
-  if (g_slot >= 0)
-    CustomShareManager::getSingleton()->pushTriggerEffect(g_slot, payload);
+  if (g_slot >= 0) {
+    DriverCommand drvCmd = {};
+    drvCmd.type = DriverCommandType::TriggerEffectSet;
+    drvCmd.triggerEffect.slot = g_slot;
+    drvCmd.triggerEffect.payload.controllerType = controllerType;
+    drvCmd.triggerEffect.payload.command = command;
+    CustomShareManager::getSingleton()->submitCommand(drvCmd);
+  }
 }
 
 void psvr2_toolkit_set_hmd_rumble(uint8_t rumbleHz) {

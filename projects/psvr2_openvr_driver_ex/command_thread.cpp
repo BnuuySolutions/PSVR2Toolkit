@@ -2,6 +2,7 @@
 #include "driver_interface/caesar_manager.h"
 #include "custom_share_manager.h"
 #include "caesar_usb_thread.h"
+#include "trigger_effect_manager.h"
 
 #include "command_thread.h"
 
@@ -30,6 +31,9 @@ void CommandThread::ThreadLoop() {
     DriverCommand *command = CustomShareManager::getSingleton()->popCommand(10);
     CaesarManager *caesarManager = CaesarManager::getSingleton();
 
+    // This should run about every 10ms since popCommand is set to timeout after 10ms.
+    TriggerEffectManager::Instance()->Update();
+
     if (command) {
       if (caesarManager && caesarManager->imuStatusThread) {
         switch (command->type) {
@@ -52,6 +56,11 @@ void CommandThread::ThreadLoop() {
         }
         case DriverCommandType::UsbConnectionStateSet: {
           CaesarUsbThread::SetUsbConnectionState(command->usbConnection.isConnected);
+
+          break;
+        }
+        case DriverCommandType::TriggerEffectSet: {
+          TriggerEffectManager::Instance()->SetSlotEffect(command->triggerEffect.slot, command->triggerEffect.payload);
 
           break;
         }

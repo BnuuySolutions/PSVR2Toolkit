@@ -33,23 +33,6 @@ int GazeImage::getFromCircularBuffer(unsigned char **gazeImageBuffer) {
   return index;
 }
 
-void TriggerEffectBuffer::push(int slot, const TriggerEffectCommandPayload &payload) {
-  int next_head = (head + 1) % 256;
-  if (next_head == tail)
-    return;
-  commands[head].slot = slot;
-  commands[head].payload = payload;
-  head = next_head;
-}
-
-bool TriggerEffectBuffer::pop(TriggerEffectCommand &outCommand) {
-  if (head == tail)
-    return false;
-  outCommand = commands[tail];
-  tail = (tail + 1) % 256;
-  return true;
-}
-
 DriverCommand *CommandBuffer::push(const DriverCommand &command) {
   int next_head = (head + 1) % 256;
   if (next_head == tail)
@@ -113,8 +96,6 @@ void CustomShareManager::initialize() {
 
   m_pcmBroadcast = CreateIpcBroadcast("CUSTOM_SHARE_VRT2_WIN_PCM_BCAST");
   m_commandBroadcast = CreateIpcBroadcast("CUSTOM_SHARE_VRT2_WIN_CMD_BCAST");
-
-  m_triggerEffectMutex = CreateIpcMutex("CUSTOM_SHARE_VRT2_WIN_TRIGGER_EFFECT_MTX");
 
   m_commandMutex = CreateIpcMutex("CUSTOM_SHARE_VRT2_WIN_COMMAND_MTX");
 
@@ -283,19 +264,6 @@ void CustomShareManager::writePcm(int slot, VRControllerType controllerType, con
 }
 
 void CustomShareManager::waitForPcmUpdate() { IpcBroadcast_Wait(m_pcmBroadcast, 0xFFFFFFFF); }
-
-void CustomShareManager::pushTriggerEffect(int slot, const TriggerEffectCommandPayload &payload) {
-  IpcMutex_Lock(m_triggerEffectMutex);
-  m_pBufferData->triggerEffectBuffer.push(slot, payload);
-  IpcMutex_Unlock(m_triggerEffectMutex);
-}
-
-bool CustomShareManager::popTriggerEffect(TriggerEffectCommand &outCommand) {
-  IpcMutex_Lock(m_triggerEffectMutex);
-  bool result = m_pBufferData->triggerEffectBuffer.pop(outCommand);
-  IpcMutex_Unlock(m_triggerEffectMutex);
-  return result;
-}
 
 void CustomShareManager::submitCommand(DriverCommand &command) {
   IpcMutex_Lock(m_commandMutex);

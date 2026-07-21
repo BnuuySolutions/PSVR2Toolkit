@@ -77,7 +77,18 @@ struct UsbConnectionCommand {
   bool isConnected;
 };
 
-enum class DriverCommandType : uint32_t { GazeCalibrationSet = 0, GazeCalibrationGet = 1, HeadsetRumbleSet = 2, UsbConnectionStateSet = 3 };
+struct TriggerEffectCommand {
+  int32_t slot;
+  TriggerEffectCommandPayload payload;
+};
+
+enum class DriverCommandType : uint32_t {
+  GazeCalibrationSet = 0,
+  GazeCalibrationGet = 1,
+  HeadsetRumbleSet = 2,
+  UsbConnectionStateSet = 3,
+  TriggerEffectSet = 4
+};
 
 struct DriverCommand {
   DriverCommandType type;
@@ -86,6 +97,7 @@ struct DriverCommand {
     GazeCalibrationCommand gazeCalibration;
     HeadsetRumbleCommand headsetRumble;
     UsbConnectionCommand usbConnection;
+    TriggerEffectCommand triggerEffect;
   };
 };
 #pragma pack(pop)
