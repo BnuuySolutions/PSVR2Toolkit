@@ -15,6 +15,7 @@ on:
 env:
   ARTIFACTS_DIR: ${{github.workspace}}/artifacts
   BUILD_TYPE: RelWithDebInfo
+  SIGNPATH_API_TOKEN_EXISTS: ${{ secrets.SIGNPATH_API_TOKEN != '' }}
 
 jobs:
   build:
@@ -42,6 +43,7 @@ jobs:
         path: ${{env.ARTIFACTS_DIR}}
 
     - name: Sign with SignPath
+      if: ${{ env.SIGNPATH_API_TOKEN_EXISTS == 'true' }}
       id: signpath-signing
       uses: signpath/github-action-submit-signing-request@v2
       with:
