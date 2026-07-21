@@ -657,6 +657,7 @@ private:
 
   static unsigned __stdcall WorkerThread_Unconditional(void *pContext);
   static unsigned __stdcall EvfWorkerThread_Conditional(void *pContext);
+  static unsigned __stdcall CameraMonitorThread(void *pContext);
   void InitializeSub_ad30(this ShareManager &self);
   void InitializeSub_bdb0(this ShareManager &self);
 

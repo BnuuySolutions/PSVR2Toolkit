@@ -3,6 +3,8 @@
 #include "img_utils.h"
 #include "util.h"
 
+#include "driver_interface/caesar_manager.h"
+
 #include <openvr_driver.h>
 
 psvr2_toolkit::HmdDeviceCamera *g_pHmdDeviceCamera;
@@ -73,6 +75,7 @@ bool HmdDeviceCamera::StartVideoStream() {
   vr::VRDriverLog()->Log(__FUNCTION__);
   // TODO: is this correct?
   shouldSubmit = true;
+  SetUserBit(CameraUser_Hmd, true);
   return true;
 }
 
@@ -80,6 +83,7 @@ void HmdDeviceCamera::StopVideoStream() {
   vr::VRDriverLog()->Log(__FUNCTION__);
   // TODO: is this correct?
   shouldSubmit = false;
+  SetUserBit(CameraUser_Hmd, false);
 }
 
 bool HmdDeviceCamera::IsVideoStreamActive(bool *pbPaused, float *pflElapsedTime) {
@@ -105,6 +109,7 @@ bool HmdDeviceCamera::PauseVideoStream() {
   vr::VRDriverLog()->Log(__FUNCTION__);
   // TODO: is this correct?
   shouldSubmit = false;
+  SetUserBit(CameraUser_Hmd, false);
   return true;
 }
 
@@ -112,6 +117,9 @@ bool HmdDeviceCamera::ResumeVideoStream() {
   vr::VRDriverLog()->Log(__FUNCTION__);
   // TODO: is this correct?
   shouldSubmit = true;
+
+  SetUserBit(CameraUser_Hmd, true);
+
   return true;
 }
 
@@ -280,6 +288,29 @@ bool HmdDeviceCamera::GetCameraIntrinsics(uint32_t nCameraIndex, vr::EVRTrackedC
   }
 
   return true;
+}
+
+void HmdDeviceCamera::SetUserBit(CameraUser user, bool enable) {
+  std::lock_guard<std::mutex> lock(m_cameraUserMutex);
+
+  uint8_t oldBitmask = cameraUserBitmask;
+  if (enable) {
+    cameraUserBitmask |= static_cast<uint8_t>(user);
+  } else {
+    cameraUserBitmask &= ~static_cast<uint8_t>(user);
+  }
+
+  bool oldCameraShouldBeOn = (oldBitmask != 0);
+  bool newCameraShouldBeOn = (cameraUserBitmask != 0);
+
+  if (oldCameraShouldBeOn != newCameraShouldBeOn) {
+    Util::DriverLog("Camera state changed to: {}", newCameraShouldBeOn ? "ON" : "OFF");
+    char data[8] = {1, 0, 0, 0, (char)(newCameraShouldBeOn ? 0x10 : 0x05), 0, 0, 0};
+    auto singleton = CaesarManager::getSingleton();
+    if (singleton && singleton->imageThread) {
+      singleton->imageThread->ControlCommand(true, 0xb, data, 8, 0, 0, 1);
+    }
+  }
 }
 
 } // namespace psvr2_toolkit

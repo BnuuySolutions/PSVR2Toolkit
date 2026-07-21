@@ -20,10 +20,13 @@ const int32_t frameDataSize = pixelCount * 3 / 2; // NV12 is 1.5 bytes per pixel
 
 namespace psvr2_toolkit {
 
+enum CameraUser : uint8_t { CameraUser_Hmd = 1 << 0, CameraUser_Ipc = 1 << 1, CameraUser_PlayArea = 1 << 2 };
+
 class HmdDeviceCamera : public vr::IVRCameraComponent {
 public:
   static HmdDeviceCamera *Instance();
   void UploadBC4(uint64_t tickTime, uint8_t *data);
+  void SetUserBit(CameraUser user, bool enable);
 
   vr::IVRBlockQueue *pVRBlockQueue = nullptr;
   vr::PropertyContainerHandle_t blockQueueHandle;
@@ -55,6 +58,10 @@ public:
   bool GetCameraFrameBounds(vr::EVRTrackedCameraFrameType eFrameType, uint32_t *pLeft, uint32_t *pTop, uint32_t *pWidth, uint32_t *pHeight) override;
   bool GetCameraIntrinsics(uint32_t nCameraIndex, vr::EVRTrackedCameraFrameType eFrameType, vr::HmdVector2_t *pFocalLength, vr::HmdVector2_t *pCenter,
                            vr::EVRDistortionFunctionType *peDistortionType, double rCoefficients[vr::k_unMaxDistortionFunctionParameters]) override;
+
+private:
+  std::mutex m_cameraUserMutex;
+  uint8_t cameraUserBitmask = 0;
 };
 
 } // namespace psvr2_toolkit

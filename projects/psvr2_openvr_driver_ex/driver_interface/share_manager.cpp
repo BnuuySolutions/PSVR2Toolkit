@@ -2,6 +2,7 @@
 #include "../hmd_driver_loader.h"
 
 #include "cross_ipc.h"
+#include "hmd_device_camera.h"
 #include "hook_lib.h"
 #include "util.h"
 
@@ -524,6 +525,72 @@ void ShareManager::InstallHooks() {
   HookLib::InstallHook(reinterpret_cast<void *>(baseAddress + 0x15f760), reinterpret_cast<void *>(&ShareManager::WriteInitSetup_0xc73c));
 }
 
+unsigned __stdcall ShareManager::CameraMonitorThread(void *pContext) {
+  ShareManager *self = reinterpret_cast<ShareManager *>(pContext);
+  if (!self)
+    return 0;
+
+  // Seed the event as signaled so we don't get a false positive on the first check
+  if (self->m_ipcEvents[SR_Image]) {
+    IpcEvent_Set(self->m_ipcEvents[SR_Image]);
+  }
+
+  uint8_t lastPlayAreaVal = 0;
+  uint64_t lastPlayAreaChangeTime = 0;
+  uint64_t lastEventResetTime = 0;
+
+  if (self->m_pMem) {
+    lastPlayAreaVal = reinterpret_cast<uint8_t *>(self->m_pMem)[0x9DD1];
+    lastPlayAreaChangeTime = GetTickCount64();
+  }
+
+  bool lastCameraShouldBeOn = false;
+  bool hasLoggedInitialState = false;
+
+  while (!self->m_exitThreads) {
+    uint64_t currentTimeMs = GetTickCount64();
+
+    // Check if the event is being reset
+    bool eventActive = false;
+    if (self->m_ipcEvents[SR_Image]) {
+      bool isEventReset = !IpcEvent_Wait(self->m_ipcEvents[SR_Image], 0);
+      if (isEventReset) {
+        lastEventResetTime = currentTimeMs;
+      }
+      eventActive = (currentTimeMs - lastEventResetTime) < 3000;
+    }
+
+    // Check if play area app is active
+    bool playAreaActive = false;
+    if (self->m_pMem) {
+      uint8_t currentPlayAreaVal = reinterpret_cast<uint8_t *>(self->m_pMem)[0x9DD1];
+      if (currentPlayAreaVal != lastPlayAreaVal) {
+        lastPlayAreaVal = currentPlayAreaVal;
+        lastPlayAreaChangeTime = currentTimeMs;
+      }
+      playAreaActive = (currentTimeMs - lastPlayAreaChangeTime) < 3000;
+    }
+
+    bool hmdCameraActive = false;
+    if (g_pHmdDeviceCamera) {
+      hmdCameraActive = g_pHmdDeviceCamera->shouldSubmit;
+      g_pHmdDeviceCamera->SetUserBit(CameraUser_Ipc, eventActive);
+      g_pHmdDeviceCamera->SetUserBit(CameraUser_PlayArea, playAreaActive);
+    }
+
+    // If the camera is not actually submitting frames, we must keep setting the event
+    // so any client waiting on it can be detected.
+    bool cameraIsSubmitting = (g_pHmdDeviceCamera != nullptr && g_pHmdDeviceCamera->shouldSubmit);
+    if (!cameraIsSubmitting && self->m_ipcEvents[SR_Image]) {
+      IpcEvent_Set(self->m_ipcEvents[SR_Image]);
+    }
+
+    Sleep(500);
+  }
+
+  return 0;
+}
+
 void ShareManager::Initialize(this ShareManager &self, DWORD processInstanceId) {
   OutputDebugStringA("ShareManager::Initialize");
 
@@ -663,6 +730,10 @@ void ShareManager::Initialize(this ShareManager &self, DWORD processInstanceId) 
   self.m_pMem->watchdog.timestamps[self.m_instanceId] = timestamp;
   self.m_pMem->watchdog.pids[self.m_instanceId] = GetCurrentProcessId();
   self.m_pMem->watchdog.states[self.m_instanceId] = 0x29;
+
+  // Start the camera monitoring thread
+  unsigned int monitorThreadId;
+  _beginthreadex(nullptr, 0, &CameraMonitorThread, &self, 0, &monitorThreadId);
 }
 
 void ShareManager::RegisterEventCallback(this ShareManager &self, uint64_t mask, std::function<void()> *pCallback) {
