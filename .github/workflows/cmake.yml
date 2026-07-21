@@ -13,6 +13,7 @@ on:
   workflow_dispatch:
 
 env:
+  ARTIFACTS_DIR: ${{github.workspace}}/artifacts
   BUILD_TYPE: RelWithDebInfo
 
 jobs:
@@ -30,8 +31,24 @@ jobs:
     - name: Build
       run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
 
+    - name: Copy artifacts from bin
+      run: mkdir -p ${{env.ARTIFACTS_DIR}} && cp -r ${{github.workspace}}/build/bin/${{env.BUILD_TYPE}}/* ${{env.ARTIFACTS_DIR}}
+
     - name: Upload artifacts
+      id: upload-artifacts
       uses: actions/upload-artifact@v4
       with:
         name: psvr2-toolkit-build
-        path: ${{github.workspace}}/build
+        path: ${{env.ARTIFACTS_DIR}}
+
+    - name: Sign with SignPath
+      id: signpath-signing
+      uses: signpath/github-action-submit-signing-request@v2
+      with:
+        api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+        organization-id: e5b00777-6877-43dd-8f53-89ac106cb9be
+        project-slug: PSVR2Toolkit
+        signing-policy-slug: test-signing
+        github-artifact-id: ${{ steps.upload-artifacts.outputs.artifact-id }}
+        wait-for-completion: true
+        output-artifact-directory: ${{env.ARTIFACTS_DIR}}
