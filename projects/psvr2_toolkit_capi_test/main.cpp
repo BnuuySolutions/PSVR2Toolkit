@@ -284,7 +284,7 @@ int main(int argc, char *argv[]) {
         break;
       case SCE_PAD_TRIGGER_EFFECT_MODE_MULTIPLE_POSITION_VIBRATION:
         SliderUint8("Frequency", &payload.commandData.multiplePositionVibrationParam.frequency, 0, 255);
-        for (int i = 0; i < 10; i++) {
+        for (int i = 0; i < SCE_PAD_TRIGGER_EFFECT_CONTROL_POINT_NUM; i++) {
           SliderUint8(("Amplitude " + std::to_string(i)).c_str(), &payload.commandData.multiplePositionVibrationParam.amplitude[i], 0, 8);
         }
         break;
