@@ -106,8 +106,9 @@ vr::EVRInitError sie__psvr2__HmdDevice__ActivateHook(void *thisptr, uint32_t unO
     }
   });
 
-  // Room view is only supported for Windows. It does not work well on Linux.
-  if (!Util::IsRunningOnWine()) {
+  bool enableCamera = vr::VRSettings()->GetBool(vr::k_pch_Camera_Section, vr::k_pch_Camera_EnableCamera_Bool);
+
+  if (!Util::IsRunningOnWine() || enableCamera) {
     vr::VRProperties()->SetBoolProperty(ulPropertyContainer, vr::Prop_AllowCameraToggle_Bool, true);
     vr::VRProperties()->SetBoolProperty(ulPropertyContainer, vr::Prop_HasCamera_Bool, true);
     vr::VRProperties()->SetBoolProperty(ulPropertyContainer, vr::Prop_HasCameraComponent_Bool, true);
@@ -193,7 +194,9 @@ void sie__psvr2__HmdDevice__DeactivateHook(void *thisptr) { sie__psvr2__HmdDevic
 
 void *(*sie__psvr2__HmdDevice__GetComponent)(void *, char *) = nullptr;
 void *sie__psvr2__HmdDevice__GetComponentHook(void *thisptr, char *pchComponentNameAndVersion) {
-  if (!Util::IsRunningOnWine()) {
+  bool enableCamera = vr::VRSettings()->GetBool(vr::k_pch_Camera_Section, vr::k_pch_Camera_EnableCamera_Bool);
+
+  if (!Util::IsRunningOnWine() || enableCamera) {
     if (strcmp(pchComponentNameAndVersion, vr::IVRCameraComponent_Version) == 0) {
       HmdDeviceCamera *pHmdDeviceCamera = HmdDeviceCamera::Instance();
       return pHmdDeviceCamera;

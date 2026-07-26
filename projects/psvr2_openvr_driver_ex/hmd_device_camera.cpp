@@ -29,22 +29,30 @@ void HmdDeviceCamera::UploadBC4(uint64_t tickTime, uint8_t *data) {
       vr::EVRInitError eError;
       static vr::IVRPaths *pVRPaths = (vr::IVRPaths *)vr::VRDriverContext()->GetGenericInterface(vr::IVRPaths_Version, &eError);
 
-      // The Master Clock: server_time_ticks
-      WritePathProperty(pVRPaths, handle, "/server_time_ticks", tickTime);
+      if (!Util::IsRunningOnWine()) {
+        WritePathProperty(pVRPaths, handle, "/server_time_ticks", tickTime);
+      } else {
+        // This is a hacky workaround for ticks under Wine/Proton being different from POSIX time.
+        WritePathProperty(pVRPaths, handle, "/server_time_ticks", tickTime * 100);
+      }
 
-      // Sequence and Size
       WritePathProperty(pVRPaths, handle, "/frame_sequence", (uint64_t)frameSequence++);
       WritePathProperty(pVRPaths, handle, "/frame_size", (int32_t)frameDataSize);
 
-      // Timing and Rate
       double frameTime = frameSequence * (1.0 / 60.0);
       WritePathProperty(pVRPaths, handle, "/frame_time_monotonic", frameTime);
       WritePathProperty(pVRPaths, handle, "/delivery_rate", 60.0);
       WritePathProperty(pVRPaths, handle, "/elapsed_time", 1.0 / 60.0);
 
       // Convert and Release
-      static BC4_to_NV12_Converter conv(TEXTURE_WIDTH, IMAGE_WIDTH, IMAGE_HEIGHT);
-      conv.convert(data, data + BC4_DATA_SIZE, reinterpret_cast<uint8_t *>(blockImageBuffer));
+      if (!Util::IsRunningOnWine()) {
+        static BC4_to_NV12_Converter conv(TEXTURE_WIDTH, IMAGE_WIDTH, IMAGE_HEIGHT);
+        conv.convert(data, data + BC4_DATA_SIZE, reinterpret_cast<uint8_t *>(blockImageBuffer));
+      } else {
+        // GPU-based decoding isn't supported under Wine/Proton.
+        static BC4_to_NV12_Converter_CPU conv(TEXTURE_WIDTH, IMAGE_WIDTH, IMAGE_HEIGHT);
+        conv.convert(data, data + BC4_DATA_SIZE, reinterpret_cast<uint8_t *>(blockImageBuffer));
+      }
 
       pVRBlockQueue->ReleaseWriteOnlyBlock(blockQueueHandle, handle);
     }

@@ -171,6 +171,88 @@ private:
   ID3D11Texture2D *m_stagingTexY = nullptr;
 };
 
+class BC4_to_NV12_Converter_CPU {
+public:
+  // sourceWidth = 1024, targetWidth = 1016, height = 1016
+  BC4_to_NV12_Converter_CPU(uint32_t srcW, uint32_t dstW, uint32_t h) : m_srcWidth(srcW), m_dstWidth(dstW), m_height(h) { generateLut(); }
+
+  void convert(const void *leftData, const void *rightData, void *nv12Data) {
+    const uint32_t sbsWidth = m_dstWidth * 2;
+    uint8_t *outY = static_cast<uint8_t *>(nv12Data);
+
+    // 1. Process Left Eye (writes to x=0 to 1015)
+    processEye(static_cast<const uint8_t *>(leftData), outY, 0);
+
+    // 2. Process Right Eye (writes to x=1016 to 2031)
+    processEye(static_cast<const uint8_t *>(rightData), outY, m_dstWidth);
+
+    // 3. UV-plane (Neutral Grey)
+    const size_t sbsYSize = sbsWidth * m_height;
+    const size_t sbsUVSize = sbsYSize / 2;
+    std::memset(outY + sbsYSize, 128, sbsUVSize);
+  }
+
+private:
+  void processEye(const uint8_t *bc4Data, uint8_t *outY, uint32_t xOffset) {
+    const uint32_t sbsWidth = m_dstWidth * 2;
+    const uint32_t blocksX = m_srcWidth / 4; // 1024 / 4 = 256 blocks
+    const uint32_t blocksY = m_height / 4;   // 1016 / 4 = 254 blocks
+
+    for (uint32_t by = 0; by < blocksY; ++by) {
+      for (uint32_t bx = 0; bx < blocksX; ++bx) {
+        // Skip processing blocks that start beyond our 1016 target width
+        if (bx * 4 >= m_dstWidth)
+          continue;
+
+        const uint8_t *block = bc4Data + (by * blocksX + bx) * 8;
+        uint8_t endpoints[8];
+        endpoints[0] = block[0];
+        endpoints[1] = block[1];
+
+        // BC4 Interpolation
+        if (endpoints[0] > endpoints[1]) {
+          for (int i = 0; i < 6; ++i)
+            endpoints[i + 2] = (uint8_t)(((6 - i) * endpoints[0] + (1 + i) * endpoints[1]) / 7);
+        } else {
+          for (int i = 0; i < 4; ++i)
+            endpoints[i + 2] = (uint8_t)(((4 - i) * endpoints[0] + (1 + i) * endpoints[1]) / 5);
+          endpoints[6] = 0;
+          endpoints[7] = 255;
+        }
+
+        uint64_t indices = 0;
+        std::memcpy(&indices, block + 2, 6);
+
+        for (uint32_t ly = 0; ly < 4; ++ly) {
+          for (uint32_t lx = 0; lx < 4; ++lx) {
+            uint32_t outX = (bx * 4) + lx;
+            // Final crop check for pixels within a block that straddles the boundary
+            if (outX >= m_dstWidth)
+              continue;
+
+            uint32_t pixelIdx = ly * 4 + lx;
+            uint8_t index = (indices >> (pixelIdx * 3)) & 0x7;
+
+            // Use LUT for the math: (pow(luma, 0.75) * 2.0) - 0.135
+            outY[(by * 4 + ly) * sbsWidth + (xOffset + outX)] = m_lut[endpoints[index]];
+          }
+        }
+      }
+    }
+  }
+
+  void generateLut() {
+    for (int i = 0; i < 256; ++i) {
+      float luma = i / 255.0f;
+      float processed = (std::pow(luma, 0.75f) * 2.0f) - 0.135f;
+      m_lut[i] = (uint8_t)(std::max(0.0f, std::min(1.0f, processed)) * 255.0f);
+    }
+  }
+
+  uint32_t m_srcWidth, m_dstWidth, m_height;
+  uint8_t m_lut[256];
+};
+
 typedef struct {
   double params[20];
 } DistortionParameters;
