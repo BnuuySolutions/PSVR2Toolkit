@@ -170,6 +170,9 @@ public:
   void SetLatencyOffset(int32_t newOffsetLatency) {
     std::scoped_lock<std::mutex> lock(this->controllerMutex);
     this->offsetLatency = newOffsetLatency;
+
+    // Reset filtered offset value to ensure everything is fresh
+    this->filteredOffset = this->timeStampOffset;
   }
 
   double GetTimestampOffset() {
@@ -278,7 +281,7 @@ public:
   static std::atomic<uint8_t> g_ShouldResetLEDTrackingInTicks;
 
 private:
-  static constexpr double k_maxDecayRate = 5.0E-5;
+  static constexpr double k_maxDecayRate = 2.0E-4;
   static constexpr double k_initialDecayRate = 1.0E-5;
   static constexpr double k_targetFloorInterval = 10.0E6; // 10 seconds in microseconds
 
