@@ -208,7 +208,7 @@ int main(int argc, char *argv[]) {
     if (ImGui::CollapsingHeader("HMD Rumble", ImGuiTreeNodeFlags_DefaultOpen)) {
       ImGui::PushID("HMDRumbleSection");
       static int hmdRumbleHz = 0;
-      ImGui::SliderInt("Frequency (Hz)", &hmdRumbleHz, 0, 255);
+      ImGui::SliderInt("Frequency (Hz)", &hmdRumbleHz, 0, 25);
       if (ImGui::Button("Send HMD Rumble")) {
         psvr2_toolkit_set_hmd_rumble(static_cast<uint8_t>(hmdRumbleHz));
       }
@@ -243,34 +243,49 @@ int main(int argc, char *argv[]) {
       case SCE_PAD_TRIGGER_EFFECT_MODE_OFF:
         break;
       case SCE_PAD_TRIGGER_EFFECT_MODE_FEEDBACK:
-        SliderUint8("Position", &payload.commandData.feedbackParam.position, 0, 10);
-        SliderUint8("Strength", &payload.commandData.feedbackParam.strength, 0, 10);
+        SliderUint8("Position", &payload.commandData.feedbackParam.position, 0, 9);
+        SliderUint8("Strength", &payload.commandData.feedbackParam.strength, 0, 8);
         break;
       case SCE_PAD_TRIGGER_EFFECT_MODE_WEAPON:
-        SliderUint8("Start Position", &payload.commandData.weaponParam.startPosition, 0, 10);
-        SliderUint8("End Position", &payload.commandData.weaponParam.endPosition, 0, 10);
-        SliderUint8("Strength", &payload.commandData.weaponParam.strength, 0, 10);
+        SliderUint8("Start Position", &payload.commandData.weaponParam.startPosition, 2, 7);
+        SliderUint8("End Position", &payload.commandData.weaponParam.endPosition, payload.commandData.weaponParam.startPosition + 1, 8);
+        if (payload.commandData.weaponParam.startPosition < 2) {
+          payload.commandData.weaponParam.startPosition = 2;
+        }
+        if (payload.commandData.weaponParam.startPosition >= payload.commandData.weaponParam.endPosition) {
+          payload.commandData.weaponParam.endPosition = payload.commandData.weaponParam.startPosition + 1;
+        }
+        SliderUint8("Strength", &payload.commandData.weaponParam.strength, 0, 8);
         break;
       case SCE_PAD_TRIGGER_EFFECT_MODE_VIBRATION:
-        SliderUint8("Position", &payload.commandData.vibrationParam.position, 0, 10);
-        SliderUint8("Amplitude", &payload.commandData.vibrationParam.amplitude, 0, 10);
+        SliderUint8("Position", &payload.commandData.vibrationParam.position, 0, 9);
+        SliderUint8("Amplitude", &payload.commandData.vibrationParam.amplitude, 0, 8);
         SliderUint8("Frequency", &payload.commandData.vibrationParam.frequency, 0, 255);
         break;
       case SCE_PAD_TRIGGER_EFFECT_MODE_MULTIPLE_POSITION_FEEDBACK:
-        for (int i = 0; i < 10; i++) {
-          SliderUint8(("Strength " + std::to_string(i)).c_str(), &payload.commandData.multiplePositionFeedbackParam.strength[i], 0, 10);
+        for (int i = 0; i < SCE_PAD_TRIGGER_EFFECT_CONTROL_POINT_NUM; i++) {
+          SliderUint8(("Strength " + std::to_string(i)).c_str(), &payload.commandData.multiplePositionFeedbackParam.strength[i], 0, 8);
         }
         break;
       case SCE_PAD_TRIGGER_EFFECT_MODE_SLOPE_FEEDBACK:
-        SliderUint8("Start Position", &payload.commandData.slopeFeedbackParam.startPosition, 0, 10);
-        SliderUint8("End Position", &payload.commandData.slopeFeedbackParam.endPosition, 0, 10);
-        SliderUint8("Start Strength", &payload.commandData.slopeFeedbackParam.startStrength, 0, 10);
-        SliderUint8("End Strength", &payload.commandData.slopeFeedbackParam.endStrength, 0, 10);
+        SliderUint8("Start Position", &payload.commandData.slopeFeedbackParam.startPosition, 0, 8);
+        SliderUint8("End Position", &payload.commandData.slopeFeedbackParam.endPosition, payload.commandData.slopeFeedbackParam.startPosition + 1, 9);
+        if (payload.commandData.slopeFeedbackParam.startPosition >= payload.commandData.slopeFeedbackParam.endPosition) {
+          payload.commandData.slopeFeedbackParam.endPosition = payload.commandData.slopeFeedbackParam.startPosition + 1;
+        }
+        SliderUint8("Start Strength", &payload.commandData.slopeFeedbackParam.startStrength, 1, 8);
+        SliderUint8("End Strength", &payload.commandData.slopeFeedbackParam.endStrength, 1, 8);
+        if (payload.commandData.slopeFeedbackParam.startStrength < 1) {
+          payload.commandData.slopeFeedbackParam.startStrength = 1;
+        }
+        if (payload.commandData.slopeFeedbackParam.endStrength < 1) {
+          payload.commandData.slopeFeedbackParam.endStrength = 1;
+        }
         break;
       case SCE_PAD_TRIGGER_EFFECT_MODE_MULTIPLE_POSITION_VIBRATION:
         SliderUint8("Frequency", &payload.commandData.multiplePositionVibrationParam.frequency, 0, 255);
         for (int i = 0; i < 10; i++) {
-          SliderUint8(("Amplitude " + std::to_string(i)).c_str(), &payload.commandData.multiplePositionVibrationParam.amplitude[i], 0, 10);
+          SliderUint8(("Amplitude " + std::to_string(i)).c_str(), &payload.commandData.multiplePositionVibrationParam.amplitude[i], 0, 8);
         }
         break;
       }
