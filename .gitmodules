@@ -1,0 +1,6 @@
+[submodule "externals/PolyHook_2_0"]
+	path = externals/PolyHook_2_0
+	url = https://github.com/stevemk14ebr/PolyHook_2_0
+[submodule "externals/SDL"]
+	path = externals/SDL
+	url = https://github.com/libsdl-org/SDL.git

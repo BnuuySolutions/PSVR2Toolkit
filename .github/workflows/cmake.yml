@@ -1,0 +1,56 @@
+# This workflow uses actions that are not certified by GitHub.
+# They are provided by a third-party and are governed by
+# separate terms of service, privacy policy, and support
+# documentation.
+
+name: CMake Build
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+env:
+  ARTIFACTS_DIR: ${{github.workspace}}/artifacts
+  BUILD_TYPE: RelWithDebInfo
+  SIGNPATH_API_TOKEN_EXISTS: ${{ secrets.SIGNPATH_API_TOKEN != '' }}
+
+jobs:
+  build:
+    runs-on: windows-2025-vs2026
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Configure CMake
+      run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
+
+    - name: Build
+      run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
+
+    - name: Copy artifacts from bin
+      run: mkdir -p ${{env.ARTIFACTS_DIR}} && cp -r ${{github.workspace}}/build/bin/${{env.BUILD_TYPE}}/* ${{env.ARTIFACTS_DIR}}
+
+    - name: Upload artifacts
+      id: upload-artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: psvr2-toolkit-build
+        path: ${{env.ARTIFACTS_DIR}}
+
+    - name: Sign with SignPath
+      if: ${{ env.SIGNPATH_API_TOKEN_EXISTS == 'true' }}
+      id: signpath-signing
+      uses: signpath/github-action-submit-signing-request@v2
+      with:
+        api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+        organization-id: e5b00777-6877-43dd-8f53-89ac106cb9be
+        project-slug: PSVR2Toolkit
+        signing-policy-slug: test-signing
+        github-artifact-id: ${{ steps.upload-artifacts.outputs.artifact-id }}
+        wait-for-completion: true
+        output-artifact-directory: ${{env.ARTIFACTS_DIR}}

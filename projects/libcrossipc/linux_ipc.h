@@ -1,0 +1,72 @@
+#pragma once
+
+#ifdef __linux__
+
+#include <string>
+#include <pthread.h>
+#include <atomic>
+
+#include "cross_ipc.h"
+
+class LinuxIpcMutex : public IIpcMutex {
+private:
+  std::string m_name;
+  int m_fd;
+  pthread_mutex_t *m_mutex;
+
+public:
+  LinuxIpcMutex(const char *name);
+  ~LinuxIpcMutex() override;
+  void lock() override;
+  bool try_lock() override;
+  void unlock() override;
+  void *get_native_handle() override;
+};
+
+class LinuxIpcEvent : public IIpcEvent {
+private:
+  std::string m_name;
+  int m_fd;
+  struct EventData;
+  EventData *m_data;
+  bool m_manualReset;
+
+public:
+  LinuxIpcEvent(const char *name, bool manualReset = false);
+  ~LinuxIpcEvent() override;
+  void set() override;
+  bool wait(uint32_t timeoutMs = 0xFFFFFFFF) override;
+  void reset() override;
+  void *get_native_handle() override;
+};
+
+class LinuxIpcSharedMemory : public IIpcSharedMemory {
+private:
+  std::string m_name;
+  int m_fd;
+  size_t m_size;
+  void *m_ptr;
+
+public:
+  LinuxIpcSharedMemory(const char *name, size_t size);
+  ~LinuxIpcSharedMemory() override;
+  void *map() override;
+  void unmap() override;
+  void *get_native_handle() override;
+};
+
+class LinuxIpcBroadcast : public IIpcBroadcast {
+private:
+  std::string m_name;
+  int m_fd;
+  struct BroadcastData;
+  BroadcastData *m_data;
+
+public:
+  LinuxIpcBroadcast(const char *name);
+  ~LinuxIpcBroadcast() override;
+  bool wait(uint32_t timeoutMs = 0xFFFFFFFF) override;
+  void notify_all() override;
+};
+
+#endif // __linux__

@@ -4,23 +4,23 @@
 
 namespace psvr2_toolkit {
 
-  class DriverContextProxy : public vr::IVRDriverContext {
-  public:
-    DriverContextProxy();
+class DriverContextProxy : public vr::IVRDriverContext {
+public:
+  DriverContextProxy();
 
-    static DriverContextProxy *Instance();
+  static DriverContextProxy *Instance();
 
-    void SetDriverContext(vr::IVRDriverContext *pDriverContext);
+  void SetDriverContext(vr::IVRDriverContext *pDriverContext);
 
-    /** IVRDriverContext **/
+  /** IVRDriverContext **/
 
-    void *GetGenericInterface(const char *pchInterfaceVersion, vr::EVRInitError *peError = nullptr) override;
-    vr::DriverHandle_t GetDriverHandle() override;
+  void *GetGenericInterface(const char *pchInterfaceVersion, vr::EVRInitError *peError = nullptr) override;
+  vr::DriverHandle_t GetDriverHandle() override;
 
-  private:
-    static DriverContextProxy *m_pInstance;
+private:
+  static DriverContextProxy *m_pInstance;
 
-    vr::IVRDriverContext *m_pDriverContext;
-  };
+  vr::IVRDriverContext *m_pDriverContext;
+};
 
-} // psvr2_toolkit
+} // namespace psvr2_toolkit
