@@ -298,6 +298,14 @@ bool HmdDeviceCamera::GetCameraIntrinsics(uint32_t nCameraIndex, vr::EVRTrackedC
   return true;
 }
 
+bool HmdDeviceCamera::CameraStreamEnabled() {
+  std::lock_guard<std::mutex> lock(m_cameraUserMutex);
+
+  bool cameraShouldBeOn = (cameraUserBitmask != 0);
+
+  return cameraShouldBeOn;
+}
+
 void HmdDeviceCamera::SetUserBit(CameraUser user, bool enable) {
   std::lock_guard<std::mutex> lock(m_cameraUserMutex);
 

@@ -26,6 +26,7 @@ class HmdDeviceCamera : public vr::IVRCameraComponent {
 public:
   static HmdDeviceCamera *Instance();
   void UploadBC4(uint64_t tickTime, uint8_t *data);
+  bool CameraStreamEnabled();
   void SetUserBit(CameraUser user, bool enable);
 
   vr::IVRBlockQueue *pVRBlockQueue = nullptr;

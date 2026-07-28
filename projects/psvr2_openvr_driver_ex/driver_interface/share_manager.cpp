@@ -578,10 +578,10 @@ unsigned __stdcall ShareManager::CameraMonitorThread(void *pContext) {
       g_pHmdDeviceCamera->SetUserBit(CameraUser_PlayArea, playAreaActive);
     }
 
-    // If the camera is not actually submitting frames, we must keep setting the event
+    // If the camera is not actually streaming frames, we must keep setting the event
     // so any client waiting on it can be detected.
-    bool cameraIsSubmitting = (g_pHmdDeviceCamera != nullptr && g_pHmdDeviceCamera->shouldSubmit);
-    if (!cameraIsSubmitting && self->m_ipcEvents[SR_Image]) {
+    bool cameraIsStreaming = (g_pHmdDeviceCamera != nullptr && g_pHmdDeviceCamera->CameraStreamEnabled());
+    if (!cameraIsStreaming && self->m_ipcEvents[SR_Image]) {
       IpcEvent_Set(self->m_ipcEvents[SR_Image]);
     }
 
