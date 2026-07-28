@@ -101,6 +101,9 @@ void CustomShareManager::initialize() {
 
   m_sharedMemory = CreateIpcSharedMemory("CUSTOM_SHARE_VRT2_WIN", sizeof(BufferData));
   m_pBufferData = static_cast<BufferData *>(IpcSharedMemory_Map(m_sharedMemory));
+
+  m_driverActiveMutex = CreateIpcMutex("CUSTOM_SHARE_VRT2_DRIVER_ACTIVE_MTX");
+  m_driverActiveGuardMutex = CreateIpcMutex("CUSTOM_SHARE_VRT2_DRIVER_ACTIVE_GUARD_MTX");
 }
 
 #ifdef _WIN32
@@ -132,6 +135,43 @@ void CustomShareManager::setupCAPIPath() {
   }
 }
 #endif
+
+bool CustomShareManager::getDriverActive() {
+  IpcMutex_Lock(m_driverActiveGuardMutex);
+
+  bool active = true;
+  if (IpcMutex_TryLock(m_driverActiveMutex)) {
+    // If we can lock it, it means the driver doesn't hold the lock, so it's not active.
+    IpcMutex_Unlock(m_driverActiveMutex);
+    active = false;
+  }
+
+  IpcMutex_Unlock(m_driverActiveGuardMutex);
+
+  return active;
+}
+
+bool CustomShareManager::claimDriverMutex() {
+  IpcMutex_Lock(m_driverActiveGuardMutex);
+
+  auto now = std::chrono::steady_clock::now();
+
+  bool held = false;
+  while (!held && now < now + std::chrono::milliseconds(5000)) {
+    // Spin until we hold it or 5 second timeout
+    held = IpcMutex_TryLock(m_driverActiveMutex);
+  }
+
+  IpcMutex_Unlock(m_driverActiveGuardMutex);
+
+  return !held;
+}
+
+void CustomShareManager::releaseDriverMutex() {
+  // We don't need the guard mutex, as we should the only one that can unlock this mutex.
+  IpcMutex_Unlock(m_driverActiveMutex);
+}
+
 
 void CustomShareManager::setGazeStatus(const hmd2_gaze_status_t *pGazeStatus) {
   IpcMutex_Lock(m_gazeStatusMutex);
@@ -263,9 +303,13 @@ void CustomShareManager::writePcm(int slot, VRControllerType controllerType, con
   }
 }
 
-void CustomShareManager::waitForPcmUpdate() { IpcBroadcast_Wait(m_pcmBroadcast, 0xFFFFFFFF); }
+void CustomShareManager::waitForPcmUpdate() { IpcBroadcast_Wait(m_pcmBroadcast, 1000); }
 
 void CustomShareManager::submitCommand(DriverCommand &command) {
+  if (!this->getDriverActive()) {
+    return; // Without the driver, we will not get a response. Exit now.
+  }
+
   IpcMutex_Lock(m_commandMutex);
   DriverCommand *ptr = m_pBufferData->commandBuffer.push(command);
   IpcMutex_Unlock(m_commandMutex);
@@ -276,7 +320,8 @@ void CustomShareManager::submitCommand(DriverCommand &command) {
   IpcBroadcast_NotifyAll(m_commandBroadcast);
 
   while (!ptr->isFulfilled) {
-    IpcBroadcast_Wait(m_commandBroadcast, 0xFFFFFFFF);
+    // Allow up to 5 seconds for the command to be fulfilled
+    IpcBroadcast_Wait(m_commandBroadcast, 5000);
   }
 
   command = *ptr;

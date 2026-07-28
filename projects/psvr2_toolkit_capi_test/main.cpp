@@ -66,6 +66,20 @@ void HapticsThreadFunc() {
 }
 
 int main(int argc, char *argv[]) {
+  // Initialize our CAPI
+  SDL_SharedObject *handle = static_cast<SDL_SharedObject *>(psvr2_toolkit_loader_get_module_handle());
+  psvr2_toolkit_loader_init_functions(handle);
+  psvr2_toolkit_private_loader_init_functions(handle);
+
+  int result = psvr2_toolkit_init();
+  if (handle && result < 0) {
+    std::cerr << "Failed to initialize CAPI! Result: " << result << std::endl;
+
+    std::cout << "Press Enter to close" << std::endl;
+    std::cin.get();
+    return -1;
+  }
+
   // Initialize SDL
   if (!SDL_Init(SDL_INIT_VIDEO)) {
     std::cerr << "Failed to initialize SDL: " << SDL_GetError() << std::endl;
@@ -117,16 +131,6 @@ int main(int argc, char *argv[]) {
   init_info.SwapchainComposition = SDL_GPU_SWAPCHAINCOMPOSITION_SDR;
   init_info.PresentMode = SDL_GPU_PRESENTMODE_VSYNC;
   ImGui_ImplSDLGPU3_Init(&init_info);
-
-  // Initialize our CAPI
-  SDL_SharedObject *handle = static_cast<SDL_SharedObject *>(psvr2_toolkit_loader_get_module_handle());
-  psvr2_toolkit_loader_init_functions(handle);
-  psvr2_toolkit_private_loader_init_functions(handle);
-
-  if (handle && psvr2_toolkit_init() < 0) {
-    std::cerr << "Failed to initialize CAPI! Are 4 applications already running?" << std::endl;
-    // Continue anyway for the sake of the test app
-  }
 
   std::thread hapticsThread(HapticsThreadFunc);
   hapticsThread.detach(); // Detached so if PSVR2TK goes down, the test app can still exit cleanly
@@ -193,7 +197,9 @@ int main(int argc, char *argv[]) {
 
     ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_FirstUseEver);
     ImGui::SetNextWindowSize(ImVec2(1280, 720), ImGuiCond_FirstUseEver);
-    ImGui::Begin("Gaze Info");
+    ImGui::Begin("PSVR2TK Info");
+
+    ImGui::Text("PSVR2TK Active: %s", psvr2_toolkit_get_driver_active() ? "YES" : "NO");
 
     if (ImGui::CollapsingHeader("Controller Haptics", ImGuiTreeNodeFlags_DefaultOpen)) {
       ImGui::PushID("HapticsSection");

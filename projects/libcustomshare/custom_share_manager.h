@@ -49,6 +49,10 @@ public:
 #ifdef _WIN32
   void setupCAPIPath();
 #endif
+  
+  bool getDriverActive();
+  bool claimDriverMutex();
+  void releaseDriverMutex();
 
   void setGazeStatus(const hmd2_gaze_status_t *pGazeStatus);
   bool getGazeStatus(hmd2_gaze_status_t *pGazeStatus, int *lastCounter = nullptr, uint32_t timeoutMs = 0);
@@ -90,6 +94,9 @@ private:
 
   IIpcSharedMemory *m_sharedMemory;
   BufferData *m_pBufferData;
+
+  IIpcMutex *m_driverActiveMutex;
+  IIpcMutex *m_driverActiveGuardMutex;
 
   void initialize();
 };

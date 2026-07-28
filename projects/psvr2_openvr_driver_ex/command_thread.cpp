@@ -27,8 +27,12 @@ void CommandThread::Stop() {
 }
 
 void CommandThread::ThreadLoop() {
+  CustomShareManager* customShareManager = CustomShareManager::getSingleton();
+  
+  customShareManager->claimDriverMutex();
+
   while (m_running) {
-    DriverCommand *command = CustomShareManager::getSingleton()->popCommand(10);
+    DriverCommand *command = customShareManager->popCommand(10);
     CaesarManager *caesarManager = CaesarManager::getSingleton();
 
     // This should run about every 10ms since popCommand is set to timeout after 10ms.
@@ -67,8 +71,10 @@ void CommandThread::ThreadLoop() {
         }
       }
 
-      CustomShareManager::getSingleton()->fulfillCommand(command);
+      customShareManager->fulfillCommand(command);
     }
   }
+
+  customShareManager->releaseDriverMutex();
 }
 } // namespace psvr2_toolkit

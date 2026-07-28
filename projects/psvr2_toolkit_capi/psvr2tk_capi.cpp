@@ -10,10 +10,15 @@ static int g_lastGazeImageCounter = -1;
 
 int psvr2_toolkit_init() {
   CustomShareManager::createSingleton();
+
+  if (!CustomShareManager::getSingleton()->getDriverActive()) {
+    return PSVR2TK_RESULT_DRIVER_INACTIVE;
+  }
+  
   if (g_slot < 0) {
     g_slot = CustomShareManager::getSingleton()->claimSlot();
   }
-  return g_slot >= 0 ? 0 : -1;
+  return g_slot >= 0 ? PSVR2TK_RESULT_OK : PSVR2TK_RESULT_NO_SLOT;
 }
 
 void psvr2_toolkit_deinit() {
@@ -21,6 +26,10 @@ void psvr2_toolkit_deinit() {
     CustomShareManager::getSingleton()->releaseSlot(g_slot);
     g_slot = -1;
   }
+}
+
+bool psvr2_toolkit_get_driver_active() {
+  return CustomShareManager::getSingleton()->getDriverActive();
 }
 
 bool psvr2_toolkit_gaze_status(hmd2_gaze_status_t *pGazeStatus, uint32_t timeoutMs) {
