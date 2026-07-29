@@ -28,7 +28,7 @@ Unofficial modification for the official PlayStation VR2 driver/app, which aims 
 
 For developers, we also have our own API library, which allows you to take full advantage of these features.
 
-\* Certain features require jailbreaking your headset, which may have risks (such as bricking your headset, although we have never seen this happen yet), please read our wiki for more information!
+\* Certain features require [jailbreaking your headset](https://github.com/BnuuySolutions/PSVR2Toolkit/wiki/Jailbreaking-your-headset), which may have risks (such as bricking your headset, although we have never seen this happen yet).
 
 ## Installation Guide
 1.) Open Steam, go to the PS VR2 app, click on the cog wheel, and go to "Manage -> Browse local files". (If you are using a copy of the PS VR2 app not installed by Steam, go to that instead.)
