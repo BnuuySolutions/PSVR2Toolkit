@@ -30,18 +30,9 @@ For developers, we also have our own API library, which allows you to take full 
 
 \* Certain features require [jailbreaking your headset](https://github.com/BnuuySolutions/PSVR2Toolkit/wiki/Jailbreaking-your-headset), which may have risks (such as bricking/damaging your headset, although in our testing, we have never seen this happen, yet).
 
-## Installation Guide
-1.) Open Steam, go to the PS VR2 app, click on the cog wheel, and go to "Manage -> Browse local files". (If you are using a copy of the PS VR2 app not installed by Steam, go to that instead.)
+## [Installation Guide](https://github.com/BnuuySolutions/PSVR2Toolkit/wiki/Installation)
 
-2.) Inside the newly opened file explorer, go into "SteamVR_Plug-In", then "bin" and finally "win64".
-
-3.) Rename "driver_playstation_vr2.dll" to "driver_playstation_vr2_orig.dll" (**IT MUST BE CALLED "driver_playstation_vr2_orig.dll", DO NOT RENAME IT TO ANYTHING ELSE, IT MUST BE EXACTLY THAT**)
-
-4.) Download the "driver_playstation_vr2.dll" attached in a release, and copy/move it into the same folder where "driver_playstation_vr2_orig.dll" is at.
-
-5.) Your "win64" directory should now have 2 DLL files inside it, "driver_playstation_vr2.dll" and "driver_playstation_vr2_orig.dll". If you do not have both of those files, you fucked something up.
-
-6.) Enjoy your new features, please give us feedback in our [Discord](https://discord.gg/jym8CgJPF3).
+## [Jailbreak Guide](https://github.com/BnuuySolutions/PSVR2Toolkit/wiki/Jailbreaking-your-headset)
 
 # Code Signing Policy
 Free code signing provided by [SignPath.io](https://signpath.io), certificate by [SignPath Foundation](https://signpath.org/).
