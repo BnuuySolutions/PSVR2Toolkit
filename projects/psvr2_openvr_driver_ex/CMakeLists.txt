@@ -18,17 +18,39 @@ add_library(psvr2_openvr_driver_ex SHARED
   driver_interface/share_manager.h
   driver_interface/share_manager.cpp
 
+  caesar_usb_thread.h
   caesar_usb_thread.cpp
+  command_thread.h
   command_thread.cpp
+  device_provider_proxy.h
   device_provider_proxy.cpp
+  driver_context_proxy.h
   driver_context_proxy.cpp
+  driver_host_proxy.h
   driver_host_proxy.cpp
-  hmd_driver_factory.cpp
-  hmd_driver_loader.cpp
+  hmd_device_camera.h
   hmd_device_camera.cpp
+  hmd_driver_factory.cpp
+  hmd_driver_loader.h
+  hmd_driver_loader.cpp
+  hmd_math.h
+  hmd_types.h
+  hook_lib.h
+  img_utils.h
+  math_helpers.h
+  openvr_driver_internal.h
+  resources_patch.h
+  resources_patch.cpp
+  sense_controller.h
   sense_controller.cpp
+  sense_crc.h
+  trigger_effect_manager.h
   trigger_effect_manager.cpp
+  usb_thread_gaze.h
   usb_thread_gaze.cpp
+  util.h
+  vr_settings.h
+  write_file_async.h
 )
 target_include_directories(psvr2_openvr_driver_ex PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
