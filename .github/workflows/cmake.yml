@@ -19,12 +19,34 @@ env:
 
 jobs:
   build:
-    runs-on: windows-2025-vs2026
+    name: Build (${{ matrix.platform }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: Windows
+            os: windows-2025-vs2026
+            artifact-name: psvr2-toolkit-build-windows
+          - platform: Linux
+            os: ubuntu-24.04
+            artifact-name: psvr2-toolkit-build-linux
 
     steps:
     - uses: actions/checkout@v4
       with:
         submodules: recursive
+    
+    # Most of these are SDL3 dependencies https://wiki.libsdl.org/SDL3/README-linux#build-dependencies
+    - name: Install dependencies (Linux)
+      if: runner.os == 'Linux'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y wine64-tools libwine-dev pkg-config cmake ninja-build gnome-desktop-testing libasound2-dev libpulse-dev \
+        libaudio-dev libfribidi-dev libjack-dev libsndio-dev libx11-dev libxext-dev \
+        libxrandr-dev libxcursor-dev libxfixes-dev libxi-dev libxss-dev libxtst-dev \
+        libxkbcommon-dev libdrm-dev libgbm-dev libgl1-mesa-dev libgles2-mesa-dev \
+        libegl1-mesa-dev libdbus-1-dev libibus-1.0-dev libudev-dev libthai-dev libusb-1.0-0-dev
 
     - name: Configure CMake
       run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
@@ -32,18 +54,28 @@ jobs:
     - name: Build
       run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
 
-    - name: Copy artifacts from bin
+    - name: Copy artifacts from bin (Windows)
+      if: runner.os == 'Windows'
       run: mkdir -p ${{env.ARTIFACTS_DIR}} && cp -r ${{github.workspace}}/build/bin/${{env.BUILD_TYPE}}/* ${{env.ARTIFACTS_DIR}}
+
+    - name: Copy artifacts from bin (Linux)
+      if: runner.os == 'Linux'
+      run: |
+        mkdir -p ${{env.ARTIFACTS_DIR}}
+        cp -r ${{github.workspace}}/build/bin/* ${{env.ARTIFACTS_DIR}}/
+        if [ -d "${{github.workspace}}/build/winedll" ]; then
+          cp -r ${{github.workspace}}/build/winedll/* ${{env.ARTIFACTS_DIR}}/
+        fi
 
     - name: Upload artifacts
       id: upload-artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: psvr2-toolkit-build
+        name: ${{ matrix.artifact-name }}
         path: ${{env.ARTIFACTS_DIR}}
 
     - name: Sign with SignPath
-      if: ${{ env.SIGNPATH_API_TOKEN_EXISTS == 'true' }}
+      if: ${{ runner.os == 'Windows' && env.SIGNPATH_API_TOKEN_EXISTS == 'true' }}
       id: signpath-signing
       continue-on-error: true
       uses: signpath/github-action-submit-signing-request@v2
