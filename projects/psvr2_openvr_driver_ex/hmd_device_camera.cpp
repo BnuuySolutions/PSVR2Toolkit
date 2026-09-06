@@ -205,12 +205,7 @@ void HmdDeviceCamera::UploadBC4(uint64_t tickTime, uint8_t *data) {
       vr::EVRInitError eError;
       static vr::IVRPaths *pVRPaths = (vr::IVRPaths *)vr::VRDriverContext()->GetGenericInterface(vr::IVRPaths_Version, &eError);
 
-      if (!Util::IsRunningOnWine()) {
-        WritePathProperty(pVRPaths, handle, "/server_time_ticks", tickTime);
-      } else {
-        // This is a hacky workaround for ticks under Wine/Proton being different from POSIX time.
-        WritePathProperty(pVRPaths, handle, "/server_time_ticks", tickTime * 100);
-      }
+      WritePathProperty(pVRPaths, handle, "/server_time_ticks", tickTime);
 
       WritePathProperty(pVRPaths, handle, "/frame_sequence", (uint64_t)frameSequence++);
       WritePathProperty(pVRPaths, handle, "/frame_size", (int32_t)frameDataSize);
