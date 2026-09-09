@@ -8,6 +8,7 @@
 #include "driver_hooks/caesar_manager_hooks.h"
 #include "driver_hooks/hmd_device_hooks.h"
 #include "driver_hooks/libpad_hooks.h"
+#include "driver_hooks/relocalizer_thread_hooks.h"
 #include "driver_hooks/sense_device_hooks.h"
 #include "driver_hooks/usb_thread_hooks.h"
 #include "driver_hooks/vr_dialog_manager_hooks.h"
@@ -125,6 +126,7 @@ void DeviceProviderProxy::InitPatches() {
   CaesarUsbThread::InstallHooks();
   HmdDeviceHooks::InstallHooks();
   LibpadHooks::InstallHooks();
+  RelocalizerThreadHooks::InstallHooks();
   SenseDeviceHooks::InstallHooks();
   ShareManager::InstallHooks();
   UsbThreadHooks::InstallHooks();
