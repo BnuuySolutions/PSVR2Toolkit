@@ -8,53 +8,66 @@
 
 namespace psvr2_toolkit {
 
-struct CachedChaperoneSettings {
-  float fadeDistance = 0.7f;
-  bool playSpaceOn = false;
-  bool groundPerimeterOn = false;
-  bool centerMarkerOn = false;
-};
+static constexpr const char *kBackupSection = "playstation_vr2_ex_collisionBounds_Backup";
 
-static CachedChaperoneSettings s_cachedSettings;
-static bool s_bChaperoneHidden = false;
+static bool HasBackupSettings() {
+  vr::IVRSettings *pSettings = vr::VRSettings();
+  if (!pSettings) {
+    return false;
+  }
+
+  vr::EVRSettingsError error;
+  pSettings->GetFloat(kBackupSection, vr::k_pch_CollisionBounds_FadeDistance_Float, &error);
+  return error == vr::EVRSettingsError::VRSettingsError_None;
+}
 
 static void sie__psvr2__VrDialogManager__hideChaperone_Hook(void *thisptr) {
-  if (!s_bChaperoneHidden) {
-    vr::IVRSettings *pSettings = vr::VRSettings();
-    if (pSettings) {
-      s_cachedSettings.fadeDistance = pSettings->GetFloat(vr::k_pch_CollisionBounds_Section, vr::k_pch_CollisionBounds_FadeDistance_Float);
-      s_cachedSettings.playSpaceOn = pSettings->GetBool(vr::k_pch_CollisionBounds_Section, vr::k_pch_CollisionBounds_PlaySpaceOn_Bool);
-      s_cachedSettings.groundPerimeterOn = pSettings->GetBool(vr::k_pch_CollisionBounds_Section, vr::k_pch_CollisionBounds_GroundPerimeterOn_Bool);
-      s_cachedSettings.centerMarkerOn = pSettings->GetBool(vr::k_pch_CollisionBounds_Section, vr::k_pch_CollisionBounds_CenterMarkerOn_Bool);
+  if (HasBackupSettings()) {
+    return;
+  }
 
-      pSettings->SetFloat(vr::k_pch_CollisionBounds_Section, vr::k_pch_CollisionBounds_FadeDistance_Float, 0.0f);
-      pSettings->SetBool(vr::k_pch_CollisionBounds_Section, vr::k_pch_CollisionBounds_PlaySpaceOn_Bool, false);
-      pSettings->SetBool(vr::k_pch_CollisionBounds_Section, vr::k_pch_CollisionBounds_GroundPerimeterOn_Bool, false);
-      pSettings->SetBool(vr::k_pch_CollisionBounds_Section, vr::k_pch_CollisionBounds_CenterMarkerOn_Bool, false);
+  vr::IVRSettings *pSettings = vr::VRSettings();
+  if (pSettings) {
+    float fadeDistance = pSettings->GetFloat(vr::k_pch_CollisionBounds_Section, vr::k_pch_CollisionBounds_FadeDistance_Float);
+    bool playSpaceOn = pSettings->GetBool(vr::k_pch_CollisionBounds_Section, vr::k_pch_CollisionBounds_PlaySpaceOn_Bool);
+    bool groundPerimeterOn = pSettings->GetBool(vr::k_pch_CollisionBounds_Section, vr::k_pch_CollisionBounds_GroundPerimeterOn_Bool);
+    bool centerMarkerOn = pSettings->GetBool(vr::k_pch_CollisionBounds_Section, vr::k_pch_CollisionBounds_CenterMarkerOn_Bool);
 
-      Util::DriverLog("[VrTracker2] hide Chaperone (cached FadeDistance: {})\n", s_cachedSettings.fadeDistance);
-    }
-    s_bChaperoneHidden = true;
+    pSettings->SetFloat(kBackupSection, vr::k_pch_CollisionBounds_FadeDistance_Float, fadeDistance);
+    pSettings->SetBool(kBackupSection, vr::k_pch_CollisionBounds_PlaySpaceOn_Bool, playSpaceOn);
+    pSettings->SetBool(kBackupSection, vr::k_pch_CollisionBounds_GroundPerimeterOn_Bool, groundPerimeterOn);
+    pSettings->SetBool(kBackupSection, vr::k_pch_CollisionBounds_CenterMarkerOn_Bool, centerMarkerOn);
+
+    pSettings->SetFloat(vr::k_pch_CollisionBounds_Section, vr::k_pch_CollisionBounds_FadeDistance_Float, 0.0f);
+    pSettings->SetBool(vr::k_pch_CollisionBounds_Section, vr::k_pch_CollisionBounds_PlaySpaceOn_Bool, false);
+    pSettings->SetBool(vr::k_pch_CollisionBounds_Section, vr::k_pch_CollisionBounds_GroundPerimeterOn_Bool, false);
+    pSettings->SetBool(vr::k_pch_CollisionBounds_Section, vr::k_pch_CollisionBounds_CenterMarkerOn_Bool, false);
+
+    Util::DriverLog("[VrTracker2] hide Chaperone (backed up FadeDistance: {})\n", fadeDistance);
   }
 }
 
 static void sie__psvr2__VrDialogManager__showChaperone_Hook(void *thisptr) {
-  // If the chaperone was never hidden, do not restore/write anything.
-  // This prevents clobbering user settings with driver defaults when no HMD is connected or on driver cleanup.
-  if (!s_bChaperoneHidden) {
+  if (!HasBackupSettings()) {
     return;
   }
-  s_bChaperoneHidden = false;
 
   vr::IVRSettings *pSettings = vr::VRSettings();
   if (pSettings) {
-    pSettings->SetFloat(vr::k_pch_CollisionBounds_Section, vr::k_pch_CollisionBounds_FadeDistance_Float, s_cachedSettings.fadeDistance);
-    pSettings->SetBool(vr::k_pch_CollisionBounds_Section, vr::k_pch_CollisionBounds_PlaySpaceOn_Bool, s_cachedSettings.playSpaceOn);
-    pSettings->SetBool(vr::k_pch_CollisionBounds_Section, vr::k_pch_CollisionBounds_GroundPerimeterOn_Bool, s_cachedSettings.groundPerimeterOn);
-    pSettings->SetBool(vr::k_pch_CollisionBounds_Section, vr::k_pch_CollisionBounds_CenterMarkerOn_Bool, s_cachedSettings.centerMarkerOn);
-  }
+    float fadeDistance = pSettings->GetFloat(kBackupSection, vr::k_pch_CollisionBounds_FadeDistance_Float);
+    bool playSpaceOn = pSettings->GetBool(kBackupSection, vr::k_pch_CollisionBounds_PlaySpaceOn_Bool);
+    bool groundPerimeterOn = pSettings->GetBool(kBackupSection, vr::k_pch_CollisionBounds_GroundPerimeterOn_Bool);
+    bool centerMarkerOn = pSettings->GetBool(kBackupSection, vr::k_pch_CollisionBounds_CenterMarkerOn_Bool);
 
-  Util::DriverLog("[VrTracker2] show Chaperone({})\n", s_cachedSettings.fadeDistance);
+    pSettings->SetFloat(vr::k_pch_CollisionBounds_Section, vr::k_pch_CollisionBounds_FadeDistance_Float, fadeDistance);
+    pSettings->SetBool(vr::k_pch_CollisionBounds_Section, vr::k_pch_CollisionBounds_PlaySpaceOn_Bool, playSpaceOn);
+    pSettings->SetBool(vr::k_pch_CollisionBounds_Section, vr::k_pch_CollisionBounds_GroundPerimeterOn_Bool, groundPerimeterOn);
+    pSettings->SetBool(vr::k_pch_CollisionBounds_Section, vr::k_pch_CollisionBounds_CenterMarkerOn_Bool, centerMarkerOn);
+
+    pSettings->RemoveSection(kBackupSection);
+
+    Util::DriverLog("[VrTracker2] show Chaperone (restored FadeDistance: {})\n", fadeDistance);
+  }
 }
 
 void VrDialogManagerHooks::InstallHooks() {
