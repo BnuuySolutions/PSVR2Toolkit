@@ -4,7 +4,7 @@
 #include "hook_lib.h"
 #include "sense_controller.h"
 #include "util.h"
-#include "vr_settings.h"
+#include "driver_settings.h"
 
 #include <cstdint>
 #include <hidsdi.h>
@@ -869,7 +869,7 @@ void LibpadHooks::InstallHooks() {
   static HmdDriverLoader *pHmdDriverLoader = HmdDriverLoader::Instance();
   uintptr_t baseAddress = pHmdDriverLoader->GetBaseAddress();
 
-  if (VRSettings::GetBool(STEAMVR_SETTINGS_USE_TOOLKIT_SYNC, SETTING_USE_TOOLKIT_SYNC_DEFAULT_VALUE)) {
+  if (DriverSettings::GetBool(STEAMVR_SETTINGS_USE_TOOLKIT_SYNC, SETTING_USE_TOOLKIT_SYNC_DEFAULT_VALUE)) {
     Util::DriverLog("Using custom controller/LED sync...");
 
     ResolveLibpadSymbols(baseAddress);
@@ -903,7 +903,7 @@ void LibpadHooks::InstallHooks() {
                          reinterpret_cast<void **>(&logDeviceTrackingState));
   }
 
-  if (VRSettings::GetBool(STEAMVR_SETTINGS_USE_ENHANCED_HAPTICS, SETTING_USE_TOOLKIT_SYNC_DEFAULT_VALUE)) {
+  if (DriverSettings::GetBool(STEAMVR_SETTINGS_USE_ENHANCED_HAPTICS, SETTING_USE_TOOLKIT_SYNC_DEFAULT_VALUE)) {
     // libpad function for int32_t libpad_SendOutputReport(int32_t handle, uchar * buffer, uint16_t size) @ 0x1CBA20
     HookLib::InstallHook(reinterpret_cast<void *>(pHmdDriverLoader->GetBaseAddress() + 0x1CBA20), reinterpret_cast<void *>(libpad_SendOutputReportHook),
                          reinterpret_cast<void **>(&libpad_SendOutputReport));

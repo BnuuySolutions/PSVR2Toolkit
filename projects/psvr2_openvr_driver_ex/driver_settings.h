@@ -20,7 +20,7 @@
 
 namespace psvr2_toolkit {
 
-class VRSettings {
+class DriverSettings {
 public:
   static bool GetBool(const char *pchSettingsKey, bool defaultValue) {
     vr::EVRSettingsError error;

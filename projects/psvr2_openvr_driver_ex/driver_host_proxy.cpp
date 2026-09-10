@@ -3,7 +3,7 @@
 #include "hmd_math.h"
 #include "hmd_types.h"
 #include "util.h"
-#include "vr_settings.h"
+#include "driver_settings.h"
 
 #include <cstdint>
 
@@ -27,7 +27,7 @@ void DriverHostProxy::AddEventHandler(void (*pfnEventHandler)(vr::VREvent_t *)) 
 
 bool DriverHostProxy::TrackedDeviceAdded(const char *pchDeviceSerialNumber, vr::ETrackedDeviceClass eDeviceClass, vr::ITrackedDeviceServerDriver *pDriver) {
   if (Util::StartsWith(pchDeviceSerialNumber, "playstation_vr2_sense_controller_") &&
-      VRSettings::GetBool(STEAMVR_SETTINGS_DISABLE_SENSE, SETTING_DISABLE_SENSE_DEFAULT_VALUE)) {
+      DriverSettings::GetBool(STEAMVR_SETTINGS_DISABLE_SENSE, SETTING_DISABLE_SENSE_DEFAULT_VALUE)) {
     return false;
   }
 

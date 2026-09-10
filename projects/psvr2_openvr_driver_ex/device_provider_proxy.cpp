@@ -17,7 +17,7 @@
 #include "hook_lib.h"
 #include "trigger_effect_manager.h"
 #include "util.h"
-#include "vr_settings.h"
+#include "driver_settings.h"
 
 #include <windows.h>
 #include "sense_controller.h"
@@ -71,7 +71,7 @@ vr::EVRInitError DeviceProviderProxy::Init(vr::IVRDriverContext *pDriverContext)
 }
 
 void DeviceProviderProxy::Cleanup() {
-  if (VRSettings::GetBool(STEAMVR_SETTINGS_USE_ENHANCED_HAPTICS, SETTING_USE_TOOLKIT_SYNC_DEFAULT_VALUE)) {
+  if (DriverSettings::GetBool(STEAMVR_SETTINGS_USE_ENHANCED_HAPTICS, SETTING_USE_TOOLKIT_SYNC_DEFAULT_VALUE)) {
     SenseController::Destroy();
   }
 
@@ -135,7 +135,7 @@ void DeviceProviderProxy::InitPatches() {
 
 void DeviceProviderProxy::InitSystems() {
   TriggerEffectManager::Instance()->Initialize();
-  if (VRSettings::GetBool(STEAMVR_SETTINGS_USE_ENHANCED_HAPTICS, SETTING_USE_TOOLKIT_SYNC_DEFAULT_VALUE)) {
+  if (DriverSettings::GetBool(STEAMVR_SETTINGS_USE_ENHANCED_HAPTICS, SETTING_USE_TOOLKIT_SYNC_DEFAULT_VALUE)) {
     SenseController::Initialize();
   }
 }

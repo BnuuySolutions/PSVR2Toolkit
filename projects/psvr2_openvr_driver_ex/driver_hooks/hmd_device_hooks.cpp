@@ -7,7 +7,7 @@
 #include "hmd_driver_loader.h"
 #include "hook_lib.h"
 #include "openvr_driver.h"
-#include "vr_settings.h"
+#include "driver_settings.h"
 #include "hmd_math.h"
 #include "util.h"
 
@@ -39,7 +39,7 @@ vr::EVRInitError sie__psvr2__HmdDevice__ActivateHook(void *thisptr, uint32_t unO
       vr::EVREye eye = static_cast<vr::EVREye>(e);
       vr::ETrackedPropertyError err;
 
-      if (VRSettings::GetBool(STEAMVR_SETTINGS_DISABLE_HIDDEN_AREA_MESH, SETTING_DISABLE_HIDDEN_AREA_MESH_DEFAULT_VALUE)) {
+      if (DriverSettings::GetBool(STEAMVR_SETTINGS_DISABLE_HIDDEN_AREA_MESH, SETTING_DISABLE_HIDDEN_AREA_MESH_DEFAULT_VALUE)) {
         hamHelpers.SetHiddenArea(eye, vr::k_eHiddenAreaMesh_Standard, nullptr, 0);
         hamHelpers.SetHiddenArea(eye, vr::k_eHiddenAreaMesh_Inverse, nullptr, 0);
         hamHelpers.SetHiddenArea(eye, vr::k_eHiddenAreaMesh_LineLoop, nullptr, 0);
@@ -82,7 +82,7 @@ vr::EVRInitError sie__psvr2__HmdDevice__ActivateHook(void *thisptr, uint32_t unO
   }
 
   // Tell SteamVR we want the chaperone visibility disabled if we're actually disabling the chaperone.
-  if (VRSettings::GetBool(STEAMVR_SETTINGS_DISABLE_CHAPERONE, SETTING_DISABLE_CHAPERONE_DEFAULT_VALUE)) {
+  if (DriverSettings::GetBool(STEAMVR_SETTINGS_DISABLE_CHAPERONE, SETTING_DISABLE_CHAPERONE_DEFAULT_VALUE)) {
     vr::VRProperties()->SetBoolProperty(ulPropertyContainer, vr::Prop_DriverProvidedChaperoneVisibility_Bool, false);
   }
 

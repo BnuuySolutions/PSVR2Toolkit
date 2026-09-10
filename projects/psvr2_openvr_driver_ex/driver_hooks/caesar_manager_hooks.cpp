@@ -4,7 +4,7 @@
 #include "hmd_driver_loader.h"
 #include "hook_lib.h"
 #include "usb_thread_gaze.h"
-#include "vr_settings.h"
+#include "driver_settings.h"
 #include "util.h"
 
 namespace psvr2_toolkit {
@@ -42,7 +42,7 @@ void CaesarManagerHooks::InstallHooks() {
 
   Framework__Thread__start = decltype(Framework__Thread__start)(pHmdDriverLoader->GetBaseAddress() + 0x16B660);
 
-  if (!VRSettings::GetBool(STEAMVR_SETTINGS_DISABLE_GAZE, SETTING_DISABLE_GAZE_DEFAULT_VALUE)) {
+  if (!DriverSettings::GetBool(STEAMVR_SETTINGS_DISABLE_GAZE, SETTING_DISABLE_GAZE_DEFAULT_VALUE)) {
     Util::DriverLog("Enabling PSVR2 gaze tracking...");
     // CaesarManager::initialize
     HookLib::InstallHook(reinterpret_cast<void *>(pHmdDriverLoader->GetBaseAddress() + 0x123130), reinterpret_cast<void *>(CaesarManager__initializeHook),
