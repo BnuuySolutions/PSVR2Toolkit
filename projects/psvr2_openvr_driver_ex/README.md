@@ -1,5 +1,5 @@
 # DriverEx
-The driver extension for the official PS VR2 driver from Sony.
+PlayStation VR2 Toolkit's "driver extension" for the official PS VR2 driver from Sony.
 
 # Project Structure
 - `/*_proxy(.h/.cpp)`: Proxy classes for the OpenVR interfaces, allowing DriverEx to intercept things like pose data before its actually sent to SteamVR.
