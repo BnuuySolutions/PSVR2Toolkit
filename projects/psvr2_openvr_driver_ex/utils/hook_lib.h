@@ -26,6 +26,16 @@ public:
   static void InstallStub(void *pTarget, void **ppOriginal = nullptr) { InstallHook(pTarget, reinterpret_cast<void *>(Stub), ppOriginal); }
 
   static void InstallStubRet0(void *pTarget, void **ppOriginal = nullptr) { InstallHook(pTarget, reinterpret_cast<void *>(StubRet0), ppOriginal); }
+
+  static bool SetInstructionNOPAtAddress(void *pTarget, size_t length) {
+    DWORD oldProtect;
+    if (!VirtualProtect(pTarget, length, PAGE_EXECUTE_READWRITE, &oldProtect)) {
+      return false;
+    }
+    memset(pTarget, 0x90, length);
+    VirtualProtect(pTarget, length, oldProtect, &oldProtect);
+    return true;
+  }
 };
 
 } // namespace psvr2_toolkit

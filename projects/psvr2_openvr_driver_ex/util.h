@@ -51,16 +51,6 @@ public:
     return false;
   }
 
-  static bool SetInstructionNOPAtAddress(void *address, size_t length) {
-    DWORD oldProtect;
-    if (!VirtualProtect(address, length, PAGE_EXECUTE_READWRITE, &oldProtect)) {
-      return false;
-    }
-    memset(address, 0x90, length);
-    VirtualProtect(address, length, oldProtect, &oldProtect);
-    return true;
-  }
-
   template <typename... Args> static void DriverLog(const char *format, const Args &...args) {
     std::string message = std::vformat(std::string_view(format), std::make_format_args(args...));
     vr::VRDriverLog()->Log(message.c_str());

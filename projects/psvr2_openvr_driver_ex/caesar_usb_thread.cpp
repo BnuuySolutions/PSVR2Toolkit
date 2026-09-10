@@ -576,31 +576,31 @@ void CaesarUsbThread::InstallHooks() {
                        reinterpret_cast<void **>(&orig_getDescriptor));
 
   // NOP some WinUSB calls for changing alternate settings for interface 7
-  Util::SetInstructionNOPAtAddress(reinterpret_cast<void *>(baseAddr + 0x125926), 5);
-  Util::SetInstructionNOPAtAddress(reinterpret_cast<void *>(baseAddr + 0x125952), 5);
+  HookLib::SetInstructionNOPAtAddress(reinterpret_cast<void *>(baseAddr + 0x125926), 5);
+  HookLib::SetInstructionNOPAtAddress(reinterpret_cast<void *>(baseAddr + 0x125952), 5);
 
   // NOP AbortPipe calls
-  Util::SetInstructionNOPAtAddress(reinterpret_cast<void *>(baseAddr + 0x122158), 5);
-  Util::SetInstructionNOPAtAddress(reinterpret_cast<void *>(baseAddr + 0x1221d8), 5);
-  Util::SetInstructionNOPAtAddress(reinterpret_cast<void *>(baseAddr + 0x122258), 5);
-  Util::SetInstructionNOPAtAddress(reinterpret_cast<void *>(baseAddr + 0x1222d8), 5);
-  Util::SetInstructionNOPAtAddress(reinterpret_cast<void *>(baseAddr + 0x122368), 5);
-  Util::SetInstructionNOPAtAddress(reinterpret_cast<void *>(baseAddr + 0x1223e8), 5);
-  Util::SetInstructionNOPAtAddress(reinterpret_cast<void *>(baseAddr + 0x122478), 5);
-  Util::SetInstructionNOPAtAddress(reinterpret_cast<void *>(baseAddr + 0x12262f), 5);
-  Util::SetInstructionNOPAtAddress(reinterpret_cast<void *>(baseAddr + 0x1226cf), 5);
-  Util::SetInstructionNOPAtAddress(reinterpret_cast<void *>(baseAddr + 0x12276f), 5);
-  Util::SetInstructionNOPAtAddress(reinterpret_cast<void *>(baseAddr + 0x12280f), 5);
-  Util::SetInstructionNOPAtAddress(reinterpret_cast<void *>(baseAddr + 0x1228bf), 5);
-  Util::SetInstructionNOPAtAddress(reinterpret_cast<void *>(baseAddr + 0x12295f), 5);
-  Util::SetInstructionNOPAtAddress(reinterpret_cast<void *>(baseAddr + 0x122a0f), 5);
-  Util::SetInstructionNOPAtAddress(reinterpret_cast<void *>(baseAddr + 0x12395e), 5);
-  Util::SetInstructionNOPAtAddress(reinterpret_cast<void *>(baseAddr + 0x1239ae), 5);
-  Util::SetInstructionNOPAtAddress(reinterpret_cast<void *>(baseAddr + 0x1239fe), 5);
-  Util::SetInstructionNOPAtAddress(reinterpret_cast<void *>(baseAddr + 0x123a4e), 5);
-  Util::SetInstructionNOPAtAddress(reinterpret_cast<void *>(baseAddr + 0x123a9e), 5);
-  Util::SetInstructionNOPAtAddress(reinterpret_cast<void *>(baseAddr + 0x123aee), 5);
-  Util::SetInstructionNOPAtAddress(reinterpret_cast<void *>(baseAddr + 0x123b3e), 5);
+  HookLib::SetInstructionNOPAtAddress(reinterpret_cast<void *>(baseAddr + 0x122158), 5);
+  HookLib::SetInstructionNOPAtAddress(reinterpret_cast<void *>(baseAddr + 0x1221d8), 5);
+  HookLib::SetInstructionNOPAtAddress(reinterpret_cast<void *>(baseAddr + 0x122258), 5);
+  HookLib::SetInstructionNOPAtAddress(reinterpret_cast<void *>(baseAddr + 0x1222d8), 5);
+  HookLib::SetInstructionNOPAtAddress(reinterpret_cast<void *>(baseAddr + 0x122368), 5);
+  HookLib::SetInstructionNOPAtAddress(reinterpret_cast<void *>(baseAddr + 0x1223e8), 5);
+  HookLib::SetInstructionNOPAtAddress(reinterpret_cast<void *>(baseAddr + 0x122478), 5);
+  HookLib::SetInstructionNOPAtAddress(reinterpret_cast<void *>(baseAddr + 0x12262f), 5);
+  HookLib::SetInstructionNOPAtAddress(reinterpret_cast<void *>(baseAddr + 0x1226cf), 5);
+  HookLib::SetInstructionNOPAtAddress(reinterpret_cast<void *>(baseAddr + 0x12276f), 5);
+  HookLib::SetInstructionNOPAtAddress(reinterpret_cast<void *>(baseAddr + 0x12280f), 5);
+  HookLib::SetInstructionNOPAtAddress(reinterpret_cast<void *>(baseAddr + 0x1228bf), 5);
+  HookLib::SetInstructionNOPAtAddress(reinterpret_cast<void *>(baseAddr + 0x12295f), 5);
+  HookLib::SetInstructionNOPAtAddress(reinterpret_cast<void *>(baseAddr + 0x122a0f), 5);
+  HookLib::SetInstructionNOPAtAddress(reinterpret_cast<void *>(baseAddr + 0x12395e), 5);
+  HookLib::SetInstructionNOPAtAddress(reinterpret_cast<void *>(baseAddr + 0x1239ae), 5);
+  HookLib::SetInstructionNOPAtAddress(reinterpret_cast<void *>(baseAddr + 0x1239fe), 5);
+  HookLib::SetInstructionNOPAtAddress(reinterpret_cast<void *>(baseAddr + 0x123a4e), 5);
+  HookLib::SetInstructionNOPAtAddress(reinterpret_cast<void *>(baseAddr + 0x123a9e), 5);
+  HookLib::SetInstructionNOPAtAddress(reinterpret_cast<void *>(baseAddr + 0x123aee), 5);
+  HookLib::SetInstructionNOPAtAddress(reinterpret_cast<void *>(baseAddr + 0x123b3e), 5);
 }
 
 void CaesarUsbThread::Stop() {
