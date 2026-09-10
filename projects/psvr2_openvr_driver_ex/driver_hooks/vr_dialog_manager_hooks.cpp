@@ -1,7 +1,7 @@
 #include "vr_dialog_manager_hooks.h"
 
 #include "hmd_driver_loader.h"
-#include "hook_lib.h"
+#include "utils/hook_lib.h"
 #include "util.h"
 
 #include <openvr_driver.h>

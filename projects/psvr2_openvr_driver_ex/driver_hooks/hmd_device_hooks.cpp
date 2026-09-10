@@ -5,7 +5,7 @@
 #include "hmd_device_camera.h"
 #include "hmd_device_hooks.h"
 #include "hmd_driver_loader.h"
-#include "hook_lib.h"
+#include "utils/hook_lib.h"
 #include "openvr_driver.h"
 #include "utils/driver_settings.h"
 #include "hmd_math.h"

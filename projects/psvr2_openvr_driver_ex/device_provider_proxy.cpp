@@ -14,7 +14,7 @@
 #include "driver_hooks/vr_dialog_manager_hooks.h"
 #include "driver_interface/share_manager.h"
 #include "hmd_driver_loader.h"
-#include "hook_lib.h"
+#include "utils/hook_lib.h"
 #include "trigger_effect_manager.h"
 #include "util.h"
 #include "utils/driver_settings.h"

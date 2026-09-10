@@ -1,6 +1,6 @@
 #include "caesar_usb_thread.h"
 #include "hmd_driver_loader.h"
-#include "hook_lib.h"
+#include "utils/hook_lib.h"
 #include "libusb-1.0/libusb.h"
 #include "util.h"
 

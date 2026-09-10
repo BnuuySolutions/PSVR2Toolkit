@@ -3,7 +3,7 @@
 
 #include "cross_ipc.h"
 #include "hmd_device_camera.h"
-#include "hook_lib.h"
+#include "utils/hook_lib.h"
 #include "util.h"
 
 using namespace psvr2_toolkit;

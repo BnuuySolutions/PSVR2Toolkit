@@ -2,7 +2,7 @@
 #include "caesar_manager_hooks.h"
 
 #include "hmd_driver_loader.h"
-#include "hook_lib.h"
+#include "utils/hook_lib.h"
 #include "usb_thread_gaze.h"
 #include "utils/driver_settings.h"
 #include "util.h"

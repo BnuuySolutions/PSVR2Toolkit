@@ -3,7 +3,7 @@
 #include "driver_host_proxy.h"
 #include "hmd_driver_loader.h"
 #include "hmd_types.h"
-#include "hook_lib.h"
+#include "utils/hook_lib.h"
 
 namespace psvr2_toolkit {
 

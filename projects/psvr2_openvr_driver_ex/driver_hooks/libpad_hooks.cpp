@@ -1,7 +1,7 @@
 #include "libpad_hooks.h"
 
 #include "hmd_driver_loader.h"
-#include "hook_lib.h"
+#include "utils/hook_lib.h"
 #include "sense_controller.h"
 #include "util.h"
 #include "utils/driver_settings.h"
