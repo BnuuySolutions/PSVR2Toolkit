@@ -7,7 +7,7 @@
 #include "hmd_driver_loader.h"
 #include "hook_lib.h"
 #include "openvr_driver.h"
-#include "driver_settings.h"
+#include "utils/driver_settings.h"
 #include "hmd_math.h"
 #include "util.h"
 

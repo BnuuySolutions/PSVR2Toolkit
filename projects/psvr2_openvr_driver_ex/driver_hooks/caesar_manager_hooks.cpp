@@ -4,7 +4,7 @@
 #include "hmd_driver_loader.h"
 #include "hook_lib.h"
 #include "usb_thread_gaze.h"
-#include "driver_settings.h"
+#include "utils/driver_settings.h"
 #include "util.h"
 
 namespace psvr2_toolkit {

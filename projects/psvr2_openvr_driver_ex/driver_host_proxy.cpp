@@ -3,7 +3,7 @@
 #include "hmd_math.h"
 #include "hmd_types.h"
 #include "util.h"
-#include "driver_settings.h"
+#include "utils/driver_settings.h"
 
 #include <cstdint>
 

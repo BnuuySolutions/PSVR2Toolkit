@@ -17,7 +17,7 @@
 #include "hook_lib.h"
 #include "trigger_effect_manager.h"
 #include "util.h"
-#include "driver_settings.h"
+#include "utils/driver_settings.h"
 
 #include <windows.h>
 #include "sense_controller.h"
