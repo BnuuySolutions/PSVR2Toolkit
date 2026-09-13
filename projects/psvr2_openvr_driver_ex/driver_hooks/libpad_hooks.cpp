@@ -598,7 +598,7 @@ int32_t libpad_SendOutputReportHook(int32_t device, const uint8_t *buffer, uint1
 }
 
 static int (*g_fn_libpadIsInitialized)() = nullptr;
-static void (*g_fn_libpadResendDeviceSettings)(int32_t padHandle) = nullptr;
+static uint64_t (*g_fn_libpadResendDeviceSettings)(int32_t padHandle, uint64_t hostTimestamp) = nullptr;
 static void (*g_fn_libpadAppendReceiveDataSense)(int32_t padHandle, ProcessedControllerState *pState, uint8_t isBt) = nullptr;
 static int32_t (*g_fn_libpadCreateDeviceSense)(int32_t padHandle, uint16_t devType, uint16_t subId1, uint32_t devInterface, void *param_132, void *param_1b4,
                                                uint32_t isBt, const void *calibInfo, uint8_t flag) = nullptr;
@@ -840,7 +840,7 @@ void libpad_deviceThreadHook(PadContext *padContext) {
           }
 
           if (*g_p_StopThread == '\0') {
-            g_fn_libpadResendDeviceSettings(padHandle);
+            g_fn_libpadResendDeviceSettings(padHandle, nowMicroseconds);
           }
         }
       }
