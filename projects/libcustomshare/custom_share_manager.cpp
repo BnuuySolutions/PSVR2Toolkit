@@ -151,21 +151,16 @@ bool CustomShareManager::getDriverActive() {
   return active;
 }
 
-bool CustomShareManager::claimDriverMutex() {
+void CustomShareManager::claimDriverMutex() {
   IpcMutex_Lock(m_driverActiveGuardMutex);
 
-  auto now = std::chrono::steady_clock::now();
-
   bool held = false;
-  while (!held && now < now + std::chrono::milliseconds(5000)) {
-    // Spin until we hold it or 5 second timeout
+  while (!held) {
+    // Spin until we hold it
     held = IpcMutex_TryLock(m_driverActiveMutex);
-    now = std::chrono::steady_clock::now();
   }
 
   IpcMutex_Unlock(m_driverActiveGuardMutex);
-
-  return !held;
 }
 
 void CustomShareManager::releaseDriverMutex() {

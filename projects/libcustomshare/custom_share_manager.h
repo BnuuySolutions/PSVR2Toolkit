@@ -51,7 +51,7 @@ public:
 #endif
 
   bool getDriverActive();
-  bool claimDriverMutex();
+  void claimDriverMutex();
   void releaseDriverMutex();
 
   void setGazeStatus(const hmd2_gaze_status_t *pGazeStatus);
