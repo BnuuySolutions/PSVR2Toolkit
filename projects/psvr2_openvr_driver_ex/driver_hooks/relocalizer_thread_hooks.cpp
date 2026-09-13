@@ -9,16 +9,8 @@
 namespace psvr2_toolkit {
 
 int (*RelocalizerThread__RunLocalizer)(void *, void *, void *, void *, void *) = nullptr;
-int RelocalizerThread__RunLocalizerHook(
-    void *pTrackerContext,
-    void *pRPPacket,
-    void *pLocalizerResult,
-    void *pRelocPreOutput,
-    void *pOutStatus
-) {
-  int result = RelocalizerThread__RunLocalizer(
-      pTrackerContext, pRPPacket, pLocalizerResult, pRelocPreOutput, pOutStatus
-  );
+int RelocalizerThread__RunLocalizerHook(void *pTrackerContext, void *pRPPacket, void *pLocalizerResult, void *pRelocPreOutput, void *pOutStatus) {
+  int result = RelocalizerThread__RunLocalizer(pTrackerContext, pRPPacket, pLocalizerResult, pRelocPreOutput, pOutStatus);
 
   if (result == 0 && pRelocPreOutput != nullptr) {
     uint8_t *pOutputBytes = reinterpret_cast<uint8_t *>(pRelocPreOutput);
@@ -46,8 +38,7 @@ void RelocalizerThreadHooks::InstallHooks() {
   static HmdDriverLoader *pHmdDriverLoader = HmdDriverLoader::Instance();
 
   // RelocalizerThread::RunLocalizer
-  HookLib::InstallHook(reinterpret_cast<void *>(pHmdDriverLoader->GetBaseAddress() + 0x1DF010),
-                       reinterpret_cast<void *>(RelocalizerThread__RunLocalizerHook),
+  HookLib::InstallHook(reinterpret_cast<void *>(pHmdDriverLoader->GetBaseAddress() + 0x1DF010), reinterpret_cast<void *>(RelocalizerThread__RunLocalizerHook),
                        reinterpret_cast<void **>(&RelocalizerThread__RunLocalizer));
 }
 

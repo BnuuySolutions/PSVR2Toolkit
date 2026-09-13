@@ -18,7 +18,7 @@ void *CaesarManager__initializeHook(CaesarManager *thisptr, void *arg1, void *ar
 
   thisptr->firmwareLoaded = false;
   thisptr->firmwareVersion = 0;
-  
+
   caesarUsbThreadGaze.Start(0);
   Framework__Thread__start(&caesarUsbThreadGaze);
 

@@ -8,4 +8,3 @@ public:
 };
 
 } // namespace psvr2_toolkit
-
