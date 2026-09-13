@@ -17,7 +17,11 @@
 #define CROSS_IPC_API __declspec(dllimport)
 #endif
 #else
+#ifdef __WINE__
 #define CROSS_IPC_API __attribute__((visibility("default"))) __cdecl
+#else
+#define CROSS_IPC_API __attribute__((visibility("default")))
+#endif
 #endif
 
 class IIpcMutex {
