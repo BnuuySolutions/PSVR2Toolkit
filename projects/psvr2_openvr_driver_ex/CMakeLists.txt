@@ -19,6 +19,7 @@ add_library(psvr2_openvr_driver_ex SHARED
   driver_interface/aston_context.h
   driver_interface/aston_manager.h
   driver_interface/caesar_manager.h
+  driver_interface/config_manager.h
   driver_interface/share_manager.h
   driver_interface/share_manager.cpp
 
