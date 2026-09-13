@@ -160,6 +160,7 @@ bool CustomShareManager::claimDriverMutex() {
   while (!held && now < now + std::chrono::milliseconds(5000)) {
     // Spin until we hold it or 5 second timeout
     held = IpcMutex_TryLock(m_driverActiveMutex);
+    now = std::chrono::steady_clock::now();
   }
 
   IpcMutex_Unlock(m_driverActiveGuardMutex);
