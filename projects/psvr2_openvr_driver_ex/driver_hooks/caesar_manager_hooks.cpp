@@ -15,8 +15,13 @@ void *(*Framework__Thread__start)(void *thisptr) = nullptr;
 void *(*CaesarManager__initialize)(CaesarManager *, void *, void *) = nullptr;
 void *CaesarManager__initializeHook(CaesarManager *thisptr, void *arg1, void *arg2) {
   void *result = CaesarManager__initialize(thisptr, arg1, arg2);
+
+  thisptr->firmwareLoaded = false;
+  thisptr->firmwareVersion = 0;
+  
   caesarUsbThreadGaze.Start(0);
   Framework__Thread__start(&caesarUsbThreadGaze);
+
   return result;
 }
 
@@ -25,16 +30,6 @@ void CaesarManager__shutdownHook(CaesarManager *thisptr) {
   caesarUsbThreadGaze.JoinThread();
 
   CaesarManager__shutdown(thisptr);
-}
-
-void *(*CaesarManager__setupManager)(CaesarManager *, void *, void *) = nullptr;
-void *CaesarManager__setupManagerHook(CaesarManager *thisptr, void *arg1, void *arg2) {
-  void *result = CaesarManager__setupManager(thisptr, arg1, arg2);
-
-  thisptr->firmwareLoaded = false;
-  thisptr->firmwareVersion = 0;
-
-  return result;
 }
 
 void CaesarManagerHooks::InstallHooks() {
@@ -51,10 +46,6 @@ void CaesarManagerHooks::InstallHooks() {
     // CaesarManager::shutdown
     HookLib::InstallHook(reinterpret_cast<void *>(pHmdDriverLoader->GetBaseAddress() + 0x128320), reinterpret_cast<void *>(CaesarManager__shutdownHook),
                          reinterpret_cast<void **>(&CaesarManager__shutdown));
-
-    // CaesarManager::setupManager
-    HookLib::InstallHook(reinterpret_cast<void *>(pHmdDriverLoader->GetBaseAddress() + 0x123130), reinterpret_cast<void *>(CaesarManager__setupManagerHook),
-                         reinterpret_cast<void **>(&CaesarManager__setupManager));
   }
 }
 
