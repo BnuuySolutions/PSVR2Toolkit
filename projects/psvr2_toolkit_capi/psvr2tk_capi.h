@@ -14,10 +14,17 @@
   X(bool, psvr2_toolkit_get_driver_active, (), ())                                                                                                             \
   X(bool, psvr2_toolkit_gaze_status, (hmd2_gaze_status_t * pGazeStatus, uint32_t timeoutMs), (pGazeStatus, timeoutMs))                                         \
   X(bool, psvr2_toolkit_gaze_image, (unsigned char **pGazeImage, uint32_t timeoutMs), (pGazeImage, timeoutMs))                                                 \
+  X(bool, psvr2_toolkit_gaze_image_copy, (unsigned char *pDest, uint32_t destSize, uint32_t *pOutSize, uint32_t timeoutMs),                                    \
+    (pDest, destSize, pOutSize, timeoutMs))                                                                                                                    \
   X(int, psvr2_toolkit_write_pcm, (VRControllerType controllerType, const unsigned char *pcm), (controllerType, pcm))                                          \
   X(int, psvr2_toolkit_wait_for_pcm, (), ())                                                                                                                   \
   X(int, psvr2_toolkit_set_trigger_effect, (VRControllerType controllerType, const ScePadTriggerEffectCommand &command), (controllerType, command))            \
-  X(int, psvr2_toolkit_set_hmd_rumble, (uint8_t rumbleHz), (rumbleHz))
+  X(int, psvr2_toolkit_set_hmd_rumble, (uint8_t rumbleHz), (rumbleHz))                                                                                         \
+  X(int, psvr2_toolkit_pupillometry, (Psvr2tkPupillometry * pOut, uint32_t timeoutMs), (pOut, timeoutMs))                                                      \
+  X(int, psvr2_toolkit_pupillometry_set_camera_axes, (float leftAzimuthDeg, float leftElevationDeg, float rightAzimuthDeg, float rightElevationDeg),           \
+    (leftAzimuthDeg, leftElevationDeg, rightAzimuthDeg, rightElevationDeg))                                                                                    \
+  X(int, psvr2_toolkit_pupillometry_get_camera_axes, (float *pLeftAzimuthDeg, float *pLeftElevationDeg, float *pRightAzimuthDeg, float *pRightElevationDeg),   \
+    (pLeftAzimuthDeg, pLeftElevationDeg, pRightAzimuthDeg, pRightElevationDeg))
 
 #ifdef __cplusplus
 extern "C" {

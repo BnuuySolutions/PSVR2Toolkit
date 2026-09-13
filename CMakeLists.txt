@@ -25,6 +25,8 @@ if (UNIX)
   set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 endif()
 
+enable_testing()
+
 find_program(CLANG_FORMAT_EXECUTABLE NAMES clang-format)
 
 if (CLANG_FORMAT_EXECUTABLE)

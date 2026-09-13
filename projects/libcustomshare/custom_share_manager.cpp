@@ -1,9 +1,11 @@
 #include "custom_share_manager.h"
 
+#include <atomic>
 #include <chrono>
 #include <cstdio>
 #include <cstring>
 #include <mutex>
+#include <thread>
 #include <filesystem>
 #include <fstream>
 #include "util.h"
@@ -15,10 +17,12 @@ void GazeStatus::set(const hmd2_gaze_status_t *pGazeStatus) { std::memcpy(&data,
 
 void GazeStatus::get(hmd2_gaze_status_t *pGazeStatus) const { std::memcpy(pGazeStatus, &data, sizeof(data)); }
 
-void GazeImage::pushToCircularBuffer(const unsigned char *pGazeImage) {
-  int index = counter % 8;
-  // TODO: size shouldn't be 0x200100?
-  std::memcpy(&images[0x200100 * index], pGazeImage, 0x200100);
+void GazeImage::pushToCircularBuffer(const unsigned char *pGazeImage, uint32_t size) {
+  const uint32_t copySize = (size == 0 || size > k_gazeImageSlotSize) ? k_gazeImageSlotSize : size;
+  const int index = counter % k_gazeImageSlots;
+
+  std::memcpy(&images[k_gazeImageSlotSize * index], pGazeImage, copySize);
+  sizes[index] = copySize;
   counter++;
 }
 
@@ -27,10 +31,30 @@ int GazeImage::getFromCircularBuffer(unsigned char **gazeImageBuffer) {
     *gazeImageBuffer = nullptr;
     return -1;
   }
-  int index = (counter - 1) % 8;
-  // TODO: size shouldn't be 0x200100?
-  *gazeImageBuffer = &images[0x200100 * index];
+  int index = (counter - 1) % k_gazeImageSlots;
+  *gazeImageBuffer = &images[k_gazeImageSlotSize * index];
   return index;
+}
+
+bool GazeImage::copyLatest(unsigned char *pDest, uint32_t destSize, uint32_t *pOutSize) const {
+  if (counter == 0) {
+    if (pOutSize) {
+      *pOutSize = 0;
+    }
+    return false;
+  }
+
+  const int index = (counter - 1) % k_gazeImageSlots;
+  const uint32_t available = (sizes[index] == 0 || sizes[index] > k_gazeImageSlotSize) ? k_gazeImageSlotSize : sizes[index];
+  const uint32_t copySize = available < destSize ? available : destSize;
+
+  std::memcpy(pDest, &images[k_gazeImageSlotSize * index], copySize);
+  if (pOutSize) {
+    *pOutSize = copySize;
+  }
+
+  // Report a short read rather than pretending the caller got a whole frame.
+  return copySize == available;
 }
 
 DriverCommand *CommandBuffer::push(const DriverCommand &command) {
@@ -39,7 +63,8 @@ DriverCommand *CommandBuffer::push(const DriverCommand &command) {
     return nullptr;
   DriverCommand *ptr = &commands[head];
   *ptr = command;
-  ptr->isFulfilled = false;
+  // Release: the payload copied above must be visible before a consumer can observe this slot.
+  std::atomic_ref<bool>(ptr->isFulfilled).store(false, std::memory_order_release);
   head = next_head;
   return ptr;
 }
@@ -82,28 +107,28 @@ CustomShareManager *CustomShareManager::getSingleton() {
 }
 
 void CustomShareManager::initialize() {
-  m_gazeStatusBroadcast = CreateIpcBroadcast("CUSTOM_SHARE_VRT2_WIN_GAZE_STATUS_BCAST");
-  m_gazeStatusMutex = CreateIpcMutex("CUSTOM_SHARE_VRT2_WIN_GAZE_STATUS_MTX");
+  m_gazeStatusBroadcast = CreateIpcBroadcast(CUSTOM_SHARE_NAME("CUSTOM_SHARE_VRT2_WIN_GAZE_STATUS_BCAST"));
+  m_gazeStatusMutex = CreateIpcMutex(CUSTOM_SHARE_NAME("CUSTOM_SHARE_VRT2_WIN_GAZE_STATUS_MTX"));
 
-  m_gazeImageBroadcast = CreateIpcBroadcast("CUSTOM_SHARE_VRT2_WIN_GAZE_IMAGE_BCAST");
-  m_gazeImageMutex = CreateIpcMutex("CUSTOM_SHARE_VRT2_WIN_GAZE_IMAGE_MTX");
+  m_gazeImageBroadcast = CreateIpcBroadcast(CUSTOM_SHARE_NAME("CUSTOM_SHARE_VRT2_WIN_GAZE_IMAGE_BCAST"));
+  m_gazeImageMutex = CreateIpcMutex(CUSTOM_SHARE_NAME("CUSTOM_SHARE_VRT2_WIN_GAZE_IMAGE_MTX"));
 
   for (int i = 0; i < k_maxSlots; i++) {
     char name[128];
-    snprintf(name, sizeof(name), "CUSTOM_SHARE_VRT2_WIN_SLOT_OWNER_MTX_%d", i);
+    snprintf(name, sizeof(name), CUSTOM_SHARE_NAME("CUSTOM_SHARE_VRT2_WIN_SLOT_OWNER_MTX") "_%d", i);
     m_slotOwnerMutex[i] = CreateIpcMutex(name);
   }
 
-  m_pcmBroadcast = CreateIpcBroadcast("CUSTOM_SHARE_VRT2_WIN_PCM_BCAST");
-  m_commandBroadcast = CreateIpcBroadcast("CUSTOM_SHARE_VRT2_WIN_CMD_BCAST");
+  m_pcmBroadcast = CreateIpcBroadcast(CUSTOM_SHARE_NAME("CUSTOM_SHARE_VRT2_WIN_PCM_BCAST"));
+  m_commandBroadcast = CreateIpcBroadcast(CUSTOM_SHARE_NAME("CUSTOM_SHARE_VRT2_WIN_CMD_BCAST"));
 
-  m_commandMutex = CreateIpcMutex("CUSTOM_SHARE_VRT2_WIN_COMMAND_MTX");
+  m_commandMutex = CreateIpcMutex(CUSTOM_SHARE_NAME("CUSTOM_SHARE_VRT2_WIN_COMMAND_MTX"));
 
-  m_sharedMemory = CreateIpcSharedMemory("CUSTOM_SHARE_VRT2_WIN", sizeof(BufferData));
+  m_sharedMemory = CreateIpcSharedMemory(CUSTOM_SHARE_NAME("CUSTOM_SHARE_VRT2_WIN"), sizeof(BufferData));
   m_pBufferData = static_cast<BufferData *>(IpcSharedMemory_Map(m_sharedMemory));
 
-  m_driverActiveMutex = CreateIpcMutex("CUSTOM_SHARE_VRT2_DRIVER_ACTIVE_MTX");
-  m_driverActiveGuardMutex = CreateIpcMutex("CUSTOM_SHARE_VRT2_DRIVER_ACTIVE_GUARD_MTX");
+  m_driverActiveMutex = CreateIpcMutex(CUSTOM_SHARE_NAME("CUSTOM_SHARE_VRT2_DRIVER_ACTIVE_MTX"));
+  m_driverActiveGuardMutex = CreateIpcMutex(CUSTOM_SHARE_NAME("CUSTOM_SHARE_VRT2_DRIVER_ACTIVE_GUARD_MTX"));
 }
 
 #ifdef _WIN32
@@ -151,20 +176,26 @@ bool CustomShareManager::getDriverActive() {
   return active;
 }
 
+// Returns true once this process owns the driver-active mutex, false if it could not be taken within the timeout (which means another driver instance is holding it
 bool CustomShareManager::claimDriverMutex() {
   IpcMutex_Lock(m_driverActiveGuardMutex);
 
-  auto now = std::chrono::steady_clock::now();
+  // Compare against a fixed deadline. Re-reading the clock into the same variable it is compared
+  // against made the old condition unconditionally true, so there was no timeout and no backoff.
+  const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(5000);
 
   bool held = false;
-  while (!held && now < now + std::chrono::milliseconds(5000)) {
-    // Spin until we hold it or 5 second timeout
+  while (!held && std::chrono::steady_clock::now() < deadline) {
     held = IpcMutex_TryLock(m_driverActiveMutex);
+    if (!held) {
+      // Back off rather than spinning a core flat for the whole timeout.
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
   }
 
   IpcMutex_Unlock(m_driverActiveGuardMutex);
 
-  return !held;
+  return held;
 }
 
 void CustomShareManager::releaseDriverMutex() {
@@ -213,11 +244,47 @@ bool CustomShareManager::getGazeStatus(hmd2_gaze_status_t *pGazeStatus, int *las
   }
 }
 
-void CustomShareManager::setGazeImage(const unsigned char *pGazeImage) {
+void CustomShareManager::setGazeImage(const unsigned char *pGazeImage, uint32_t size) {
   IpcMutex_Lock(m_gazeImageMutex);
-  m_pBufferData->gazeImage.pushToCircularBuffer(pGazeImage);
+  m_pBufferData->gazeImage.pushToCircularBuffer(pGazeImage, size);
   IpcMutex_Unlock(m_gazeImageMutex);
   IpcBroadcast_NotifyAll(m_gazeImageBroadcast);
+}
+
+bool CustomShareManager::getGazeImageCopy(unsigned char *pDest, uint32_t destSize, uint32_t *pOutSize, int *lastCounter, uint32_t timeoutMs) {
+  auto start = std::chrono::steady_clock::now();
+  while (true) {
+    IpcMutex_Lock(m_gazeImageMutex);
+    int currentCounter = m_pBufferData->gazeImage.counter;
+    if (!lastCounter || *lastCounter != currentCounter) {
+      // Copy while still holding the lock: that is the whole point of this entry point over
+      // getGazeImageBuffer, which hands out a pointer the producer can recycle underneath the caller.
+      const bool complete = m_pBufferData->gazeImage.copyLatest(pDest, destSize, pOutSize);
+      if (lastCounter) {
+        *lastCounter = currentCounter;
+      }
+      IpcMutex_Unlock(m_gazeImageMutex);
+      return complete;
+    }
+    IpcMutex_Unlock(m_gazeImageMutex);
+
+    if (timeoutMs == 0) {
+      if (pOutSize) {
+        *pOutSize = 0;
+      }
+      return false;
+    }
+
+    auto now = std::chrono::steady_clock::now();
+    uint32_t elapsed = static_cast<uint32_t>(std::chrono::duration_cast<std::chrono::milliseconds>(now - start).count());
+    if (elapsed >= timeoutMs) {
+      if (pOutSize) {
+        *pOutSize = 0;
+      }
+      return false;
+    }
+    IpcBroadcast_Wait(m_gazeImageBroadcast, timeoutMs - elapsed);
+  }
 }
 
 bool CustomShareManager::getGazeImageBuffer(unsigned char **gazeImageBuffer, int *lastCounter, uint32_t timeoutMs) {
@@ -320,7 +387,11 @@ bool CustomShareManager::submitCommand(DriverCommand &command) {
 
   auto start = std::chrono::steady_clock::now();
 
-  while (!ptr->isFulfilled) {
+  // Acquire, so that whatever the driver wrote into the payload is visible once the flag is observed.
+  // This is read without holding m_commandMutex, which is why it needs ordering at all.
+  std::atomic_ref<bool> fulfilledFlag(ptr->isFulfilled);
+
+  while (!fulfilledFlag.load(std::memory_order_acquire)) {
     // Allow up to 5 seconds for the command to be fulfilled
     IpcBroadcast_Wait(m_commandBroadcast, 5000);
 
@@ -330,9 +401,10 @@ bool CustomShareManager::submitCommand(DriverCommand &command) {
     }
   }
 
+  const bool fulfilled = fulfilledFlag.load(std::memory_order_acquire);
   command = *ptr;
 
-  return command.isFulfilled;
+  return fulfilled;
 }
 
 DriverCommand *CustomShareManager::popCommand(uint32_t timeoutMs) {
@@ -354,6 +426,7 @@ DriverCommand *CustomShareManager::popCommand(uint32_t timeoutMs) {
 }
 
 void CustomShareManager::fulfillCommand(DriverCommand *command) {
-  command->isFulfilled = true;
+  // Release: pair with the acquire in submitCommand so the caller sees the payload we just wrote.
+  std::atomic_ref<bool>(command->isFulfilled).store(true, std::memory_order_release);
   IpcBroadcast_NotifyAll(m_commandBroadcast);
 }

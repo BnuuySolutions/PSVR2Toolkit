@@ -2,6 +2,8 @@
 
 #include "polyhook2/Detour/NatDetour.hpp"
 
+#include "util.h"
+
 #define INSTALL_STUB(pTarget) psvr2_toolkit::HookLib::InstallStub(pTarget)
 #define INSTALL_STUB_ORIGINAL(pTarget, ppOriginal) psvr2_toolkit::HookLib::InstallStub(pTarget, ppOriginal)
 
@@ -17,15 +19,30 @@ private:
   static __int64 StubRet0() { return 0; }
 
 public:
-  static void InstallHook(void *pTarget, void *pDetour, void **ppOriginal = nullptr) {
-    uint64_t original = 0; // Only used if ppOriginal is null.
-    PLH::NatDetour *detour = new PLH::NatDetour((uint64_t)pTarget, (uint64_t)pDetour, ppOriginal ? (uint64_t *)ppOriginal : &original);
-    detour->hook();
+  // Returns false if the detour could not be installed. A failed hook is otherwise indistinguishable
+  // from a hook whose target simply never runs, so the log line here is the only signal callers get.
+  static bool InstallHook(void *pTarget, void *pDetour, void **ppOriginal = nullptr) {
+    // The detour outlives this call and writes the trampoline through this pointer, so it must not
+    // be a local. Only used if ppOriginal is null.
+    static uint64_t s_discardedOriginal = 0;
+
+    const uint64_t targetAddress = reinterpret_cast<uint64_t>(pTarget);
+    PLH::NatDetour *detour = new PLH::NatDetour(targetAddress, (uint64_t)pDetour, ppOriginal ? (uint64_t *)ppOriginal : &s_discardedOriginal);
+
+    if (!detour->hook()) {
+      Util::DriverLog("[HookLib] Failed to install hook at {:#x}", targetAddress);
+      // Deliberately not deleted. A failed hook may have already patched bytes, and letting the
+      // destructor decide what to unwind is riskier than leaking one small object during startup --
+      // which is what this code did for every detour, successful or not, before logging was added.
+      return false;
+    }
+
+    return true;
   }
 
-  static void InstallStub(void *pTarget, void **ppOriginal = nullptr) { InstallHook(pTarget, reinterpret_cast<void *>(Stub), ppOriginal); }
+  static bool InstallStub(void *pTarget, void **ppOriginal = nullptr) { return InstallHook(pTarget, reinterpret_cast<void *>(Stub), ppOriginal); }
 
-  static void InstallStubRet0(void *pTarget, void **ppOriginal = nullptr) { InstallHook(pTarget, reinterpret_cast<void *>(StubRet0), ppOriginal); }
+  static bool InstallStubRet0(void *pTarget, void **ppOriginal = nullptr) { return InstallHook(pTarget, reinterpret_cast<void *>(StubRet0), ppOriginal); }
 
   static bool SetInstructionNOPAtAddress(void *pTarget, size_t length) {
     DWORD oldProtect;

@@ -1,0 +1,5 @@
+add_executable(psvr2_gen_data_parser_test main.cpp)
+
+target_link_libraries(psvr2_gen_data_parser_test PRIVATE common)
+
+add_test(NAME gen_data_parser COMMAND psvr2_gen_data_parser_test)

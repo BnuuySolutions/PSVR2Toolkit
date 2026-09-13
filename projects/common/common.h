@@ -1,6 +1,8 @@
 #pragma once
 
+#include <atomic>
 #include <cstdint>
+#include <type_traits>
 
 #include "hmd2_gaze.h"
 #include "pad_trigger_effect.h"
@@ -69,6 +71,29 @@ struct GazeCalibrationCommand {
   GazeCalibrationPacket payload;
 };
 
+// Processed pupillometry.
+//
+// Plain data with fixed-width fields so non-C++ consumers can marshal it: the Baballonia module and the
+// Unity calibration app both P/Invoke this API from managed code.
+//
+// Prefer activityIndex over deltaMm. There is no display-luminance signal anywhere in the headset
+// telemetry, so absolute diameter cannot be separated from the scene simply getting brighter and activityIndex counts abrupt dilations instead and rides out slow light changes. read pupillometry.h!!!!!!
+struct Psvr2tkPupillometry {
+  int64_t timestamp;
+
+  uint32_t isValid;
+  uint32_t isBaselineReady;
+  uint32_t isActivityReady;
+  uint32_t contributingEyes; // 0, 1 or 2
+
+  float correctedMm; // foreshortening-corrected, binocular where both eyes were usable
+  float smoothedMm;
+  float baselineMm;
+  float deltaMm;       // smoothedMm - baselineMm
+  float relative;      // deltaMm / baselineMm
+  float activityIndex; // abrupt dilations per second
+};
+
 struct HeadsetRumbleCommand {
   uint8_t rumbleHz;
 };
@@ -92,7 +117,16 @@ enum class DriverCommandType : uint32_t {
 
 struct DriverCommand {
   DriverCommandType type;
-  volatile bool isFulfilled;
+
+  // Cross-process completion handshake, written by the driver and polled by the submitting process
+  // without holding the command mutex.
+  //
+  // Declared as a plain bool and accessed through std::atomic_ref at every site (see
+  // custom_share_manager.cpp) rather than as std::atomic<bool>: std::atomic is not copyable, and this
+  // struct is assigned by value into and out of the shared-memory ring. `volatile`, which this used to
+  // be, is not a synchronisation primitive and carried no ordering guarantees at all.
+  bool isFulfilled;
+
   union {
     GazeCalibrationCommand gazeCalibration;
     HeadsetRumbleCommand headsetRumble;
@@ -101,3 +135,11 @@ struct DriverCommand {
   };
 };
 #pragma pack(pop)
+
+static_assert(std::is_trivially_copyable_v<DriverCommand>, "DriverCommand is copied by value through shared memory and must stay trivially copyable!");
+// std::atomic_ref is C++20. This header ships in the public CAPI dist include folder, where consumers
+// may still be C++17, so the check is conditional -- the driver and libcustomshare build as C++23 and
+// will evaluate it.
+#if defined(__cpp_lib_atomic_ref)
+static_assert(std::atomic_ref<bool>::is_always_lock_free, "std::atomic_ref<bool> must be lock-free to be usable across processes!");
+#endif

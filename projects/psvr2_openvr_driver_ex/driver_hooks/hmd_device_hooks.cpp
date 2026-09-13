@@ -1,6 +1,7 @@
 #include "driver_interface/caesar_manager.h"
 #include "driver_interface/share_manager.h"
 #include "driver_host_proxy.h"
+#include "gaze_filter.h"
 #include "hmd2_gaze.h"
 #include "hmd_device_camera.h"
 #include "hmd_device_hooks.h"
@@ -210,15 +211,24 @@ vr::EVRInitError sie__psvr2__HmdDevice__ActivateHook(void *thisptr, uint32_t unO
   // Tell SteamVR our dashboard scale.
   vr::VRProperties()->SetFloatProperty(ulPropertyContainer, vr::Prop_DashboardScale_Float, .9f);
 
-  vr::VRProperties()->SetBoolProperty(ulPropertyContainer, vr::Prop_SupportsXrEyeGazeInteraction_Bool, true);
+  // Only advertise eye gaze when the pipeline feeding it is actually running. With disableGaze set,
+  // CaesarManagerHooks never installs the gaze hooks, so the component would exist and never update --
+  // applications would light up gaze-driven UI that then never moves, which is worse for them than
+  // being told there is no eye tracking at all.
+  if (DriverSettings::IsGazeEnabled()) {
+    vr::VRProperties()->SetBoolProperty(ulPropertyContainer, vr::Prop_SupportsXrEyeGazeInteraction_Bool, true);
 
-  if (vr::VRDriverInput()) {
-    vr::EVRInputError result = (vr::VRDriverInput())->CreateEyeTrackingComponent(ulPropertyContainer, "/eyetracking", &eyeTrackingComponent);
-    if (result != vr::VRInputError_None) {
-      vr::VRDriverLog()->Log("Failed to create eye tracking component.");
+    if (vr::VRDriverInput()) {
+      // Deliberately not named 'result': that would shadow the EVRInitError this function returns.
+      vr::EVRInputError eyeTrackingError = (vr::VRDriverInput())->CreateEyeTrackingComponent(ulPropertyContainer, "/eyetracking", &eyeTrackingComponent);
+      if (eyeTrackingError != vr::VRInputError_None) {
+        vr::VRDriverLog()->Log("Failed to create eye tracking component.");
+      }
+    } else {
+      vr::VRDriverLog()->Log("Failed to get driver input interface. Are you on the latest version of SteamVR?");
     }
   } else {
-    vr::VRDriverLog()->Log("Failed to get driver input interface. Are you on the latest version of SteamVR?");
+    Util::DriverLog("[Gaze] disableGaze is set; eye tracking will not be advertised.");
   }
 
   return result;
@@ -253,6 +263,63 @@ inline const int64_t GetHostTimestamp() {
   return static_cast<int64_t>((static_cast<double>(now.QuadPart) / static_cast<double>(frequency.QuadPart)) * 1e6);
 }
 
+// Smoothing for the SteamVR gaze path only. The C API and the legacy IPC server keep delivering raw
+// samples: clients doing their own processing need the unfiltered stream, and silently filtering it
+// would be a breaking behavioural change for them.
+//
+// UpdateGaze is only ever called from the single gaze USB thread, so this needs no locking.
+static GazeFilter s_gazeFilter;
+
+static bool IsGazeFilterEnabled() {
+  static const bool enabled = DriverSettings::GetBool(STEAMVR_SETTINGS_GAZE_FILTER_ENABLED, SETTING_GAZE_FILTER_ENABLED_DEFAULT_VALUE);
+  return enabled;
+}
+
+// Reads the filter tuning once, on the first gaze frame. Settings are not re-read afterwards, matching
+// how the rest of the driver treats them.
+static GazeFilter &ConfiguredGazeFilter() {
+  static const bool configured = [] {
+    GazeFilterConfig config;
+    config.minCutoffHz = DriverSettings::GetFloat(STEAMVR_SETTINGS_GAZE_FILTER_MIN_CUTOFF, SETTING_GAZE_FILTER_MIN_CUTOFF_DEFAULT_VALUE);
+    config.beta = DriverSettings::GetFloat(STEAMVR_SETTINGS_GAZE_FILTER_BETA, SETTING_GAZE_FILTER_BETA_DEFAULT_VALUE);
+    config.saccadeVelocityDegPerSec =
+        DriverSettings::GetFloat(STEAMVR_SETTINGS_GAZE_FILTER_SACCADE_DEG_PER_SEC, SETTING_GAZE_FILTER_SACCADE_DEG_PER_SEC_DEFAULT_VALUE);
+    config.blinkHoldUs = static_cast<int64_t>(DriverSettings::GetInt32(STEAMVR_SETTINGS_GAZE_BLINK_HOLD_MS, SETTING_GAZE_BLINK_HOLD_MS_DEFAULT_VALUE)) * 1000;
+
+    s_gazeFilter.Configure(config);
+
+    Util::DriverLog("[Gaze] Filter enabled: minCutoff={} Hz, beta={} Hz per deg/s, saccade={} deg/s, blinkHold={} us.", config.minCutoffHz, config.beta,
+                    config.saccadeVelocityDegPerSec, config.blinkHoldUs);
+    return true;
+  }();
+  (void)configured;
+  return s_gazeFilter;
+}
+
+// Distance at which to place the fixation point, in metres.
+//
+// The headset reports convergence distance in the foveated block, while the validity flag for it lives
+// in the wearable block. Falls back to a configured default when it is unusable, and clamps so that a
+// bad reading cannot put the fixation point behind the viewer or at infinity.
+static float GetFixationDistanceMeters(const hmd2_gaze_status_t &gazeState) {
+  static const float s_defaultDistanceM =
+      DriverSettings::GetFloat(STEAMVR_SETTINGS_GAZE_DEFAULT_FIXATION_DISTANCE_M, SETTING_GAZE_DEFAULT_FIXATION_DISTANCE_M_DEFAULT_VALUE);
+
+  constexpr float k_minFixationDistanceM = 0.1f;
+  constexpr float k_maxFixationDistanceM = 20.0f;
+
+  if (gazeState.wearable.is_convergence_distance_valid != HMD2_GAZE_BOOL_TRUE) {
+    return s_defaultDistanceM;
+  }
+
+  const float distanceM = gazeState.foveated.convergence_distance_mm / 1000.0f;
+  if (!std::isfinite(distanceM) || distanceM < k_minFixationDistanceM || distanceM > k_maxFixationDistanceM) {
+    return s_defaultDistanceM;
+  }
+
+  return distanceM;
+}
+
 void HmdDeviceHooks::UpdateGaze(void *pData, size_t dwSize) {
   if (eyeTrackingComponent == vr::k_ulInvalidInputComponentHandle) {
     return;
@@ -261,17 +328,55 @@ void HmdDeviceHooks::UpdateGaze(void *pData, size_t dwSize) {
   hmd2_gaze_status_t *pGazeState = reinterpret_cast<hmd2_gaze_status_t *>(pData);
   vr::VREyeTrackingData_t eyeTrackingData{};
 
-  bool valid = pGazeState->wearable.is_gaze_dir_combined_valid;
-
-  eyeTrackingData.bActive = valid;
-  eyeTrackingData.bTracked = valid;
-  eyeTrackingData.bValid = valid;
+  const bool dirValid = pGazeState->wearable.is_gaze_dir_combined_valid == HMD2_GAZE_BOOL_TRUE;
+  const bool originValid = pGazeState->wearable.is_gaze_origin_combined_valid == HMD2_GAZE_BOOL_TRUE;
 
   auto &origin = pGazeState->wearable.gaze_origin_combined_mm;
   auto &direction = pGazeState->wearable.gaze_dir_combined_norm;
 
-  eyeTrackingData.vGazeOrigin = vr::HmdVector3_t{-origin.x / 1000.0f, origin.y / 1000.0f, -origin.z / 1000.0f};
-  eyeTrackingData.vGazeTarget = vr::HmdVector3_t{-direction.x, direction.y, -direction.z};
+  // Smooth in headset space, before the axis flip, so the filter sees the same frame the hardware
+  // reports in. The blink hold can keep this valid for a short while after dirValid has gone false.
+  GazeFilterVec3 filteredDirection{direction.x, direction.y, direction.z};
+  bool sampleValid = dirValid;
+
+  if (IsGazeFilterEnabled()) {
+    const GazeFilterOutput filtered = ConfiguredGazeFilter().Update(filteredDirection, dirValid, static_cast<int64_t>(pGazeState->wearable.timestamp));
+    filteredDirection = filtered.direction;
+    sampleValid = filtered.valid;
+  }
+
+  // The eyeball centre barely moves, so holding the last good origin across a blink is what makes the
+  // direction hold above usable: without it the ray would be valid but originless.
+  static vr::HmdVector3_t s_lastValidOriginMeters{};
+  static bool s_haveValidOrigin = false;
+
+  vr::HmdVector3_t originMeters{-origin.x / 1000.0f, origin.y / 1000.0f, -origin.z / 1000.0f};
+  if (originValid) {
+    s_lastValidOriginMeters = originMeters;
+    s_haveValidOrigin = true;
+  } else if (s_haveValidOrigin) {
+    originMeters = s_lastValidOriginMeters;
+  }
+
+  // bActive means "the tracker is running", which stays true across a momentary dropout. bTracked and
+  // bValid describe this particular sample, and a sample is only usable if both halves of the ray are:
+  // the origin feeds the target below, so a bad origin would corrupt both fields.
+  eyeTrackingData.bActive = dirValid;
+  eyeTrackingData.bTracked = sampleValid && s_haveValidOrigin;
+  eyeTrackingData.bValid = sampleValid && s_haveValidOrigin;
+
+  // SteamVR's x and z run opposite to the headset's.
+  const vr::HmdVector3_t directionMeters{-filteredDirection.x, filteredDirection.y, -filteredDirection.z};
+
+  // vGazeTarget is a fixation POINT in the same space as vGazeOrigin, not a direction. Writing the
+  // unit direction vector here left every consumer computing normalize(target - origin) with a ray
+  // skewed by the ~30 mm eye offset against a 1 m vector -- on the order of two degrees of error.
+  const float fixationDistanceM = GetFixationDistanceMeters(*pGazeState);
+
+  eyeTrackingData.vGazeOrigin = originMeters;
+  eyeTrackingData.vGazeTarget =
+      vr::HmdVector3_t{originMeters.v[0] + directionMeters.v[0] * fixationDistanceM, originMeters.v[1] + directionMeters.v[1] * fixationDistanceM,
+                       originMeters.v[2] + directionMeters.v[2] * fixationDistanceM};
 
   int64_t hmdToHostOffset;
 

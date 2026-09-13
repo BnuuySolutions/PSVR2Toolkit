@@ -2,15 +2,20 @@
 
 #include "../driver_interface/caesar_manager.h"
 #include "hmd2_gaze.h"
+#include "hmd2_gen_data.h"
 #include "hmd_device_camera.h"
 #include "hmd_driver_loader.h"
 #include "utils/hook_lib.h"
+#include "utils/driver_settings.h"
 #include "util.h"
 
 #include "custom_share_manager.h"
 #include <openvr_driver.h>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <system_error>
+#include <vector>
 
 namespace psvr2_toolkit {
 struct image_data {
@@ -33,107 +38,99 @@ struct CaesarUsbThreadImage {
   image_data image_data;
 };
 
-#pragma pack(push, 1)
-struct Hmd2GenDataHeader {
-  char magic[2];
-  uint16_t minSize;
-  uint32_t size;
-  uint16_t numItems;
-  uint8_t padding[22];
-};
+// Resolves the SteamVR user config directory and appends the calibration blob filename.
+static bool GetGazeCalibBlobPath(std::filesystem::path &outPath) {
+  vr::ETrackedPropertyError err;
+  vr::PropertyContainerHandle_t container = vr::VRDriverHandle();
+  uint32_t propSize = vr::VRProperties()->GetStringProperty(container, vr::Prop_UserConfigPath_String, nullptr, 0, &err);
 
-struct Hmd2GenDataItem {
-  uint16_t id;
-  uint16_t unk1;
-  uint32_t size;
-  uint32_t offset;
-};
-
-struct Hmd2GazeCalibHeader {
-  char magic[2];
-  uint16_t struct_version;
-  uint16_t data_version;
-  uint16_t data_id;
-  uint32_t payload_size;
-  uint32_t calib_id;
-  hmd2_gaze_enabled_eye_t calib_eye;
-  uint8_t padding[12];
-};
-#pragma pack(pop)
-
-int customHandleData(char *buffer, uint32_t bufferSize) {
-  uint32_t actualBufferSize = bufferSize;
-
-  if (!bufferSize) {
-    return 0;
+  if (propSize == 0) {
+    return false;
   }
 
-  while (actualBufferSize > 0) {
-    if (actualBufferSize < 0x200) {
-      return -1;
+  std::string configPath(propSize - 1, '\0');
+  vr::VRProperties()->GetStringProperty(container, vr::Prop_UserConfigPath_String, configPath.data(), propSize, &err);
+
+  if (err != vr::TrackedProp_Success) {
+    return false;
+  }
+
+  outPath = std::filesystem::path(configPath) / std::string(HMD2_GAZE_CALIB_BLOB_FILENAME);
+  return true;
+}
+
+// True when the file already holds exactly these bytes.
+static bool GazeCalibBlobMatchesDisk(const std::filesystem::path &filePath, const char *data, uint32_t size) {
+  std::error_code ec;
+  const auto existingSize = std::filesystem::file_size(filePath, ec);
+  if (ec || existingSize != size) {
+    return false;
+  }
+
+  std::ifstream inFile(filePath, std::ios::binary);
+  if (!inFile.is_open()) {
+    return false;
+  }
+
+  std::vector<char> existing(size);
+  if (!inFile.read(existing.data(), size)) {
+    return false;
+  }
+
+  return std::memcmp(existing.data(), data, size) == 0;
+}
+
+// Persists the gaze calibration blob the headset hands us so it can be replayed on the next connect.
+// The block walking and bounds checking live in Hmd2ParseGenData (common/hmd2_gen_data.h) so that they
+// can be tested without a headset; everything specific to this driver stays here.
+int customHandleData(char *buffer, uint32_t bufferSize) {
+  return Hmd2ParseGenData(buffer, bufferSize, [](char *data, uint32_t size) {
+    // Avoid saving any blank or invalid calibration data.
+    if (!Hmd2IsGazeCalibBlobValid(data, size)) {
+      return;
     }
 
-    Hmd2GenDataHeader *header = reinterpret_cast<Hmd2GenDataHeader *>(buffer);
-
-    if (header->magic[0] != 'V' || header->magic[1] != 'D' || header->size > actualBufferSize || header->minSize != 0x200) {
-      return -1;
+    std::filesystem::path filePath;
+    if (!GetGazeCalibBlobPath(filePath)) {
+      return;
     }
 
-    if (header->numItems != 0) {
-      Hmd2GenDataItem *items = reinterpret_cast<Hmd2GenDataItem *>(buffer + sizeof(Hmd2GenDataHeader));
+    // The headset re-sends this blob on every connect, so skip the write unless it actually changed.
+    // That removes essentially all of the I/O this hook would otherwise do on the USB data thread.
+    if (GazeCalibBlobMatchesDisk(filePath, data, size)) {
+      return;
+    }
 
-      for (uint16_t i = 0; i < header->numItems; ++i) {
-        Hmd2GenDataItem *item = &items[i];
+    // Write to a temporary and rename over the target. Truncating the real file in place means a crash
+    // or power loss between truncate and write leaves the user with no usable calibration.
+    std::filesystem::path tempPath = filePath;
+    tempPath += ".tmp";
 
-        if (item->offset + item->size > bufferSize) {
-          return -1;
-        }
+    {
+      std::ofstream outFile(tempPath, std::ios::binary | std::ios::trunc);
+      if (!outFile.is_open()) {
+        Util::DriverLog("[Gaze] Could not open {} for writing.", tempPath.string());
+        return;
+      }
 
-        if (item->id == 0x3)
-          do {
-            char *data = buffer + item->offset;
-            Hmd2GazeCalibHeader *calibHeader = reinterpret_cast<Hmd2GazeCalibHeader *>(data);
-
-            // Avoid saving any blank or invalid calibration data
-            if (calibHeader->calib_eye != hmd2_gaze_enabled_eye_t::HMD2_GAZE_ENABLED_EYE_BOTH || calibHeader->calib_id == 0) {
-              break;
-            }
-
-            vr::ETrackedPropertyError err;
-            vr::PropertyContainerHandle_t container = vr::VRDriverHandle();
-            uint32_t propSize = vr::VRProperties()->GetStringProperty(container, vr::Prop_UserConfigPath_String, nullptr, 0, &err);
-
-            if (propSize == 0) {
-              break;
-            }
-
-            std::string configPath(propSize - 1, '\0');
-            vr::VRProperties()->GetStringProperty(container, vr::Prop_UserConfigPath_String, configPath.data(), propSize, &err);
-
-            if (err != vr::TrackedProp_Success) {
-              break;
-            }
-
-            std::filesystem::path dir(configPath);
-            std::filesystem::path filePath = dir / std::string("gaze_calibration_blob.bin");
-
-            std::ofstream outFile(filePath, std::ios::binary);
-            if (!outFile.is_open()) {
-              break;
-            }
-
-            outFile.write(data, item->size);
-            outFile.close();
-          } while (false);
+      outFile.write(data, size);
+      outFile.flush();
+      if (!outFile.good()) {
+        Util::DriverLog("[Gaze] Failed writing calibration blob to {}.", tempPath.string());
+        return;
       }
     }
 
-    uint32_t size = header->size;
-    buffer += size;
-    actualBufferSize -= size;
-  }
+    std::error_code ec;
+    std::filesystem::rename(tempPath, filePath, ec);
+    if (ec) {
+      Util::DriverLog("[Gaze] Could not replace {}: {}", filePath.string(), ec.message());
+      std::filesystem::remove(tempPath, ec);
+      return;
+    }
 
-  return 0;
+    Util::DriverLog("[Gaze] Saved calibration blob ({} bytes).", size);
+  });
 }
 
 int (*CaesarUsbThreadGenData__handleData)(void *, char *, uint32_t) = nullptr;
@@ -141,6 +138,39 @@ int CaesarUsbThreadGenData__handleDataHook(void *thisptr, char *buffer, uint32_t
   int result = CaesarUsbThreadGenData__handleData(thisptr, buffer, bufferSize);
   customHandleData(buffer, bufferSize);
   return result;
+}
+
+static bool IsGazeImageStreamEnabled() {
+  // Function-local so the lookup happens on the first frame rather than at static init, by which point
+  // VRSettings is guaranteed to be up.
+  static const bool enabled = DriverSettings::GetBool(STEAMVR_SETTINGS_GAZE_IMAGE_STREAM_ENABLED, SETTING_GAZE_IMAGE_STREAM_ENABLED_DEFAULT_VALUE);
+  return enabled;
+}
+
+// How much of the fixed-size image slot is actually worth copying. This runs on the USB thread while
+// holding the share mutex, so copying 2 MB when the frame is smaller is not free.
+//
+// The precise meaning of total_size has NOT been confirmed against hardware yet, so anything outside a
+// sane range falls back to copying the whole slot -- a wasted copy is recoverable, a truncated IR frame
+// silently corrupts the eyelid work in phase 4.1. The first value observed is logged so that the
+// assumption can be checked on-device.
+static uint32_t GetGazeImageCopySize(const image_data &img) {
+  constexpr uint32_t k_headerSize = 0x100;
+
+  static bool s_logged = false;
+  if (!s_logged) {
+    s_logged = true;
+    const uint32_t observedTotalSize = img.total_size;
+    const uint32_t observedCustomDataSize = img.custom_data_size;
+    Util::DriverLog("[Gaze] First gaze image: total_size={}, custom_data_size={}, slot={} bytes.", observedTotalSize, observedCustomDataSize,
+                    k_gazeImageSlotSize);
+  }
+
+  if (img.total_size <= k_headerSize || img.total_size > k_gazeImageSlotSize) {
+    return k_gazeImageSlotSize;
+  }
+
+  return img.total_size;
 }
 
 int (*CaesarUsbThreadImage__poll)(void *thisptr) = nullptr;
@@ -151,7 +181,9 @@ int CaesarUsbThreadImage__pollHook(void *thisptr) {
     CaesarUsbThreadImage *a1 = (CaesarUsbThreadImage *)thisptr;
     if (a1->image_data.magic[0] == 'V' && a1->image_data.magic[1] == 'I') {
       if (a1->image_data.image_type == 6) {
-        CustomShareManager::getSingleton()->setGazeImage((unsigned char *)&a1->image_data);
+        if (IsGazeImageStreamEnabled()) {
+          CustomShareManager::getSingleton()->setGazeImage((unsigned char *)&a1->image_data, GetGazeImageCopySize(a1->image_data));
+        }
       } else if (a1->image_data.image_type == 11) {
         static HmdDeviceCamera *pHmdDeviceCamera = HmdDeviceCamera::Instance();
 

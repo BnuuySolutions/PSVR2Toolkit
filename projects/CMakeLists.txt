@@ -1,4 +1,7 @@
 add_subdirectory(common)
+add_subdirectory(psvr2_gen_data_parser_test)
+add_subdirectory(psvr2_gaze_filter_test)
+add_subdirectory(psvr2_pupillometry_test)
 add_subdirectory(libcrossipc)
 add_subdirectory(libcustomshare)
 if (WIN32)

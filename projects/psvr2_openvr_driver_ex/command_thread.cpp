@@ -5,6 +5,7 @@
 #include "trigger_effect_manager.h"
 
 #include "command_thread.h"
+#include "util.h"
 
 namespace psvr2_toolkit {
 std::atomic<bool> CommandThread::m_running{false};
@@ -29,7 +30,15 @@ void CommandThread::Stop() {
 void CommandThread::ThreadLoop() {
   CustomShareManager *customShareManager = CustomShareManager::getSingleton();
 
-  customShareManager->claimDriverMutex();
+  // Losing this race must not take the thread down with it. The mutex only backs the "driver active"
+  // flag that clients poll, whereas TriggerEffectManager::Update below drives controller trigger
+  // effects every ~10 ms and has to keep running either way. The original code span here until it won
+  // and never reported failure, so bailing out on a 5 second timeout would have been a regression.
+  const bool holdsDriverMutex = customShareManager->claimDriverMutex();
+  if (!holdsDriverMutex) {
+    Util::DriverLog("[CommandThread] Could not claim the driver-active mutex within the timeout. Clients will not "
+                    "see the driver as active, but trigger effects will still run.");
+  }
 
   while (m_running) {
     DriverCommand *command = customShareManager->popCommand(10);
@@ -75,6 +84,10 @@ void CommandThread::ThreadLoop() {
     }
   }
 
-  customShareManager->releaseDriverMutex();
+  // Only release what we actually took: unlocking a mutex this thread never owned would hand it away
+  // from whichever process does own it.
+  if (holdsDriverMutex) {
+    customShareManager->releaseDriverMutex();
+  }
 }
 } // namespace psvr2_toolkit
