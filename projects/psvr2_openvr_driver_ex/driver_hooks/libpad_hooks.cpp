@@ -822,18 +822,16 @@ void libpad_deviceThreadHook(PadContext *padContext) {
 
               g_fn_parseSenseInputReport(padContext, pSingleReport, static_cast<uint32_t>(reportStride), isBt, &controllerState);
 
-              uint64_t currentHostTime = GetHostTimestamp();
-
               SenseController &senseController = SenseController::GetControllerByIsLeft(isLeft);
               uint32_t devTimeMicros = controllerState.deviceTimestamp / k_unSenseUnitsPerMicrosecond;
-              int32_t clockOffset = GetWraparoundDifference(devTimeMicros, static_cast<uint32_t>(currentHostTime));
-              senseController.AddTimestampOffsetSample(static_cast<double>(clockOffset));
+              int32_t clockOffset = GetWraparoundDifference(devTimeMicros, static_cast<uint32_t>(nowMicroseconds));
+              senseController.AddTimestampOffsetSample(static_cast<double>(clockOffset), nowMicroseconds);
 
               uint32_t hostTime =
                   (static_cast<uint32_t>(devTimeMicros) - static_cast<uint32_t>(senseController.GetTimestampOffset()) + k_unDeviceTimestampModulus) %
                   k_unDeviceTimestampModulus;
-              int32_t difference = GetWraparoundDifference(hostTime, static_cast<uint32_t>(currentHostTime));
-              controllerState.hostReceiveTime = currentHostTime + difference;
+              int32_t difference = GetWraparoundDifference(hostTime, static_cast<uint32_t>(nowMicroseconds));
+              controllerState.hostReceiveTime = nowMicroseconds + difference;
 
               g_fn_libpadAppendReceiveDataSense(padHandle, &controllerState, isBt);
             }

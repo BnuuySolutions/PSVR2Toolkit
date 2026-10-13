@@ -185,14 +185,12 @@ public:
     return this->hasTimestampOffset;
   }
 
-  void AddTimestampOffsetSample(double sample) {
+  void AddTimestampOffsetSample(double sample, uint64_t now) {
     std::scoped_lock<std::mutex> lock(this->controllerMutex);
 
     // Average in the new sample with exponential decay.
     // We'll use this as a sanity check to make sure we're not off by a lot.
     this->averageSample = this->averageSample * 0.999 + sample * 0.001;
-
-    uint64_t now = GetHostTimestamp();
 
     // Reset if the average sample is more than 10000 microseconds off or we don't have a timestamp offset
     if (!this->hasTimestampOffset || std::abs(this->filteredOffset - this->averageSample) > 10000.0) {
@@ -200,48 +198,22 @@ public:
       this->filteredOffset = sample;
       this->averageSample = sample;
       this->hasTimestampOffset = true;
-      this->currentDecayRate = k_initialDecayRate;
-      this->lastFloorHitTimestamp = now;
 
       Util::DriverLog("[{}] Reset timestamp offset", this->isLeft ? "L" : "R");
     } else {
-      uint64_t dt = now - this->lastSampleTimestamp;
-      double elapsed = static_cast<double>(now - this->lastFloorHitTimestamp);
-
-      // If we haven't hit the floor in 10 seconds, start increasing the decay rate
-      if (elapsed > k_targetFloorInterval) {
-        // Increase decay rate slowly (ramp to k_maxDecayRate over ramp up interval of no hits)
-        this->currentDecayRate += static_cast<double>(dt) * (k_maxDecayRate / k_rampUpInterval);
-        if (this->currentDecayRate > k_maxDecayRate) {
-          this->currentDecayRate = k_maxDecayRate;
-        }
-      }
+      double dt = std::min(static_cast<double>(now - this->lastSampleTimestamp) / 1.0E6, 0.1);
+      double a = 0.025 * dt;
 
       // Counter any potential drift to ensure accuracy.
-      this->timeStampOffset -= static_cast<double>(dt) * (this->currentDecayRate - (k_maxDecayRate / 2.0));
+      this->timeStampOffset = this->timeStampOffset * (1.0 - a) + this->averageSample * a;
 
       if (this->timeStampOffset < sample) {
         this->timeStampOffset = sample;
-
-        // Feedback loop on decay rate:
-        // If we hit too early (elapsed < k_targetFloorInterval), decrease decay rate. Debounce interval of 0.5 seconds.
-        if (elapsed < k_targetFloorInterval && elapsed > k_debounceInterval) {
-          double lastDecayRate = this->currentDecayRate;
-
-          // Proportional reduction: 0.95 for immediate hit, 1.0 for target interval hit
-          double factor = elapsed / k_targetFloorInterval;
-          this->currentDecayRate *= (0.95 + 0.05 * factor);
-
-          Util::DriverLog("[{}] Decay Rate {} -> {}", this->isLeft ? "L" : "R", lastDecayRate - (k_maxDecayRate / 2.0),
-                          this->currentDecayRate - (k_maxDecayRate / 2.0));
-        }
-
-        this->lastFloorHitTimestamp = now;
       }
 
       // Update filtered offset with maximum delta
       double delta = this->timeStampOffset - this->filteredOffset;
-      double maxDelta = Clamp(delta, -2.5, 2.5); // Increase or decrease by at most 2.5 microseconds per sample
+      double maxDelta = Clamp(delta, -30.0 * dt, 30.0 * dt);
       this->filteredOffset += maxDelta;
     }
 
@@ -286,12 +258,6 @@ public:
   static std::atomic<uint8_t> g_ShouldResetLEDTrackingInTicks;
 
 private:
-  static constexpr double k_maxDecayRate = 2.0E-4;
-  static constexpr double k_initialDecayRate = 1.5E-4;
-  static constexpr double k_debounceInterval = 0.5E6;     // 0.5 seconds in microseconds
-  static constexpr double k_targetFloorInterval = 10.0E6; // 10 seconds in microseconds
-  static constexpr double k_rampUpInterval = 50.0E6;      // 50 seconds in microseconds
-
   void *handle = NULL;
   int padHandle = -1;
   std::mutex controllerMutex;
@@ -301,9 +267,6 @@ private:
   double averageSample = 0.0;
   bool hasTimestampOffset = false;
   uint64_t lastSampleTimestamp = 0;
-
-  double currentDecayRate = k_maxDecayRate;
-  uint64_t lastFloorHitTimestamp = 0;
 
   bool isTracking = false;
   uint64_t lastTrackedTimestamp = 0;
@@ -320,9 +283,6 @@ private:
 
   static SenseController leftController;
   static SenseController rightController;
-
-  uint32_t lastDeviceTimestamp = 0;
-  uint32_t lastLoopbackTimestamp = 0;
 
   uint8_t hapticPacketIncrement = 0;
 
