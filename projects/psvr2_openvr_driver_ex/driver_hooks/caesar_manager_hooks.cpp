@@ -19,8 +19,12 @@ void *CaesarManager__initializeHook(CaesarManager *thisptr, void *arg1, void *ar
   thisptr->firmwareLoaded = false;
   thisptr->firmwareVersion = 0;
 
-  caesarUsbThreadGaze.Start(0);
-  Framework__Thread__start(&caesarUsbThreadGaze);
+  if (!DriverSettings::GetBool(STEAMVR_SETTINGS_DISABLE_GAZE, SETTING_DISABLE_GAZE_DEFAULT_VALUE)) {
+    Util::DriverLog("Enabling PSVR2 gaze tracking...");
+
+    caesarUsbThreadGaze.Start(0);
+    Framework__Thread__start(&caesarUsbThreadGaze);
+  }
 
   return result;
 }
@@ -37,16 +41,13 @@ void CaesarManagerHooks::InstallHooks() {
 
   Framework__Thread__start = decltype(Framework__Thread__start)(pHmdDriverLoader->GetBaseAddress() + 0x16B660);
 
-  if (!DriverSettings::GetBool(STEAMVR_SETTINGS_DISABLE_GAZE, SETTING_DISABLE_GAZE_DEFAULT_VALUE)) {
-    Util::DriverLog("Enabling PSVR2 gaze tracking...");
-    // CaesarManager::initialize
-    HookLib::InstallHook(reinterpret_cast<void *>(pHmdDriverLoader->GetBaseAddress() + 0x123130), reinterpret_cast<void *>(CaesarManager__initializeHook),
-                         reinterpret_cast<void **>(&CaesarManager__initialize));
+  // CaesarManager::initialize
+  HookLib::InstallHook(reinterpret_cast<void *>(pHmdDriverLoader->GetBaseAddress() + 0x123130), reinterpret_cast<void *>(CaesarManager__initializeHook),
+                       reinterpret_cast<void **>(&CaesarManager__initialize));
 
-    // CaesarManager::shutdown
-    HookLib::InstallHook(reinterpret_cast<void *>(pHmdDriverLoader->GetBaseAddress() + 0x128320), reinterpret_cast<void *>(CaesarManager__shutdownHook),
-                         reinterpret_cast<void **>(&CaesarManager__shutdown));
-  }
+  // CaesarManager::shutdown
+  HookLib::InstallHook(reinterpret_cast<void *>(pHmdDriverLoader->GetBaseAddress() + 0x128320), reinterpret_cast<void *>(CaesarManager__shutdownHook),
+                       reinterpret_cast<void **>(&CaesarManager__shutdown));
 }
 
 } // namespace psvr2_toolkit
