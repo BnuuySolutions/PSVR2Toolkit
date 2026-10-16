@@ -7,6 +7,7 @@
 #include "driver_hooks/aston_manager_hooks.h"
 #include "driver_hooks/caesar_manager_hooks.h"
 #include "driver_hooks/hmd_device_hooks.h"
+#include "driver_hooks/ir_tracker_hooks.h"
 #include "driver_hooks/libpad_hooks.h"
 #include "driver_hooks/relocalizer_thread_hooks.h"
 #include "driver_hooks/sense_device_hooks.h"
@@ -125,6 +126,7 @@ void DeviceProviderProxy::InitPatches() {
   CaesarManagerHooks::InstallHooks();
   CaesarUsbThread::InstallHooks();
   HmdDeviceHooks::InstallHooks();
+  IrTrackerHooks::InstallHooks();
   LibpadHooks::InstallHooks();
   RelocalizerThreadHooks::InstallHooks();
   SenseDeviceHooks::InstallHooks();

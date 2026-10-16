@@ -1,4 +1,5 @@
 #include "libpad_hooks.h"
+#include "ir_tracker_hooks.h"
 
 #include "hmd_driver_loader.h"
 #include "utils/hook_lib.h"
@@ -155,35 +156,6 @@ struct ControllerContext {
   int32_t tunedCycle = 16683350; // 59.94hz. When we hit STABLE, we'll replace this.
 };
 static ControllerContext controllerCtx[2];
-std::atomic<int32_t> g_controllerLedCount[2] = {0, 0};
-std::atomic<uint64_t> g_opticalFrameIndex[2] = {0, 0};
-
-void (*OpticalProcessor__process)(void *pContext, void *pOpticalData) = nullptr;
-void OpticalProcessor__processHook(void *pContext, void *pOpticalData) {
-  uint32_t controllerIdx = *reinterpret_cast<uint32_t *>(reinterpret_cast<uint8_t *>(pContext) + 8);
-
-  if (controllerIdx < 2) {
-    uint8_t *pControllerData = reinterpret_cast<uint8_t *>(pOpticalData) + (controllerIdx * 0x5A44);
-    int32_t currentLedCount = 0;
-
-    for (int cam = 0; cam < 4; cam++) {
-      uint8_t *pCamData = pControllerData + (cam * 0x1688);
-      for (int ledId = 0; ledId < 17; ledId++) {
-        int16_t blobIndex = *reinterpret_cast<int16_t *>(pCamData + 0x1438 + (ledId * 2));
-        if (blobIndex != -1) {
-          uint8_t *pBlobData = pCamData + 0x40 + (blobIndex * 0x14);
-          int16_t isMatched = *reinterpret_cast<int16_t *>(pBlobData + 8);
-          if (isMatched == 1) {
-            currentLedCount++;
-          }
-        }
-      }
-    }
-    g_controllerLedCount[controllerIdx] = currentLedCount;
-    g_opticalFrameIndex[controllerIdx]++;
-  }
-  OpticalProcessor__process(pContext, pOpticalData);
-}
 
 uint32_t libpad_hostToDeviceHook(LibpadTimeSync *timeSync, uint32_t host, uint32_t *outDevice) {
   SenseController &senseController = SenseController::GetControllerByIsLeft(timeSync->isLeft);
@@ -315,13 +287,13 @@ void libpad_SetSyncLedBaseTimeHook(LibpadTimeSync *timeSync, LibpadLedSync *ledS
     senseController.SetLatencyOffset(-1);
     ctx.state = CalibrationState::Start;
     ctx.syncStartTime = GetHostTimestamp();
-    ctx.lastSyncFrame = g_opticalFrameIndex[controller];
+    ctx.lastSyncFrame = IrTrackerHooks::g_opticalFrameIndex[controller];
     ctx.searchLowerBound = 0;
     ctx.searchUpperBound = 16666;
     Util::DriverLog("[{}] Latency calibration has been reset.", controllerChar);
   };
 
-  int32_t currentLedCount = g_controllerLedCount[controller];
+  int32_t currentLedCount = IrTrackerHooks::g_controllerLedCount[controller];
 
   // TODO: calibration should be triggered via IPC
   static bool f9Pressed = false;
@@ -349,7 +321,7 @@ void libpad_SetSyncLedBaseTimeHook(LibpadTimeSync *timeSync, LibpadLedSync *ledS
     ctx.state = CalibrationState::Start;
     senseController.SetLatencyOffset(0);
     ctx.syncStartTime = GetHostTimestamp();
-    ctx.lastSyncFrame = g_opticalFrameIndex[controller];
+    ctx.lastSyncFrame = IrTrackerHooks::g_opticalFrameIndex[controller];
   }
 
   if (ctx.state != CalibrationState::Idle && GetHostTimestamp() - ctx.syncStartTime > 300000) {
@@ -359,7 +331,7 @@ void libpad_SetSyncLedBaseTimeHook(LibpadTimeSync *timeSync, LibpadLedSync *ledS
 
     int32_t fullWindow = (ledSync->oneSubGridTime * static_cast<int32_t>(ledSync->period)) + ledSync->camExposure;
 
-    if (g_opticalFrameIndex[controller] - ctx.lastSyncFrame >= 4) {
+    if (IrTrackerHooks::g_opticalFrameIndex[controller] - ctx.lastSyncFrame >= 4) {
       int32_t newLatencyOffset = 0;
 
       switch (ctx.state) {
@@ -527,7 +499,7 @@ void libpad_SetSyncLedBaseTimeHook(LibpadTimeSync *timeSync, LibpadLedSync *ledS
                         senseController.GetLatencyOffset(), currentLedCount, ctx.thresholdLedCount, (int)ctx.state);
 
         ctx.lastSync = GetHostTimestamp();
-        ctx.lastSyncFrame = g_opticalFrameIndex[controller];
+        ctx.lastSyncFrame = IrTrackerHooks::g_opticalFrameIndex[controller];
       }
     }
   } else if (ctx.state != CalibrationState::Idle) {
@@ -889,10 +861,6 @@ void LibpadHooks::InstallHooks() {
     // libpad function for void libpad_SetSyncLedBaseTime(LibpadTimeSync* timeSync, LibpadLedSync* ledSync) @ 0x1C27D0
     HookLib::InstallHook(reinterpret_cast<void *>(pHmdDriverLoader->GetBaseAddress() + 0x1C27D0), reinterpret_cast<void *>(libpad_SetSyncLedBaseTimeHook),
                          reinterpret_cast<void **>(&libpad_SetSyncLedBaseTime));
-
-    // OpticalProcessor::process @ 0x1999F0
-    HookLib::InstallHook(reinterpret_cast<void *>(pHmdDriverLoader->GetBaseAddress() + 0x1999F0), reinterpret_cast<void *>(OpticalProcessor__processHook),
-                         reinterpret_cast<void **>(&OpticalProcessor__process));
 
     // TODO: this should be moved out
     // driver function for void logDeviceTrackingState(void* session, int32_t deviceType, uint64_t timestamp, void* previousPose, void* previousMeta, void*
