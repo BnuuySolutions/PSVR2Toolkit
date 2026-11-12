@@ -1,7 +1,6 @@
 #pragma once
 
 #include "common.h"
-#include "math_helpers.h"
 #include "driver_hooks/libpad_hooks.h"
 #include "write_file_async.h"
 
@@ -145,6 +144,11 @@ public:
     return this->isTracking;
   }
 
+  void SetCalibrating(bool calibrating) {
+    std::scoped_lock<std::mutex> lock(this->controllerMutex);
+    this->calibrating = calibrating;
+  }
+
   void SetLibpadSyncs(LibpadTimeSync *timeSync, LibpadLedSync *ledSync) {
     std::scoped_lock<std::mutex> lock(this->controllerMutex);
     this->timeSync = timeSync;
@@ -170,14 +174,11 @@ public:
   void SetLatencyOffset(int32_t newOffsetLatency) {
     std::scoped_lock<std::mutex> lock(this->controllerMutex);
     this->offsetLatency = newOffsetLatency;
-
-    // Reset filtered offset value to ensure everything is fresh
-    this->filteredOffset = this->timeStampOffset;
   }
 
   double GetTimestampOffset() {
     std::scoped_lock<std::mutex> lock(this->controllerMutex);
-    return this->filteredOffset + this->offsetLatency;
+    return this->timeStampOffset + this->offsetLatency;
   }
 
   bool GetHasTimestampOffset() {
@@ -193,28 +194,22 @@ public:
     this->averageSample = this->averageSample * 0.999 + sample * 0.001;
 
     // Reset if the average sample is more than 10000 microseconds off or we don't have a timestamp offset
-    if (!this->hasTimestampOffset || std::abs(this->filteredOffset - this->averageSample) > 10000.0) {
+    if (!this->hasTimestampOffset || std::abs(this->timeStampOffset - this->averageSample) > 10000.0) {
       this->timeStampOffset = sample;
-      this->filteredOffset = sample;
       this->averageSample = sample;
       this->hasTimestampOffset = true;
 
       Util::DriverLog("[{}] Reset timestamp offset", this->isLeft ? "L" : "R");
     } else {
       double dt = std::min(static_cast<double>(now - this->lastSampleTimestamp) / 1.0E6, 0.1);
-      double a = 0.025 * dt;
 
       // Counter any potential drift to ensure accuracy.
-      this->timeStampOffset = this->timeStampOffset * (1.0 - a) + this->averageSample * a;
+      this->timeStampOffset = std::lerp(this->timeStampOffset, this->averageSample, 0.025 * dt);
 
       if (this->timeStampOffset < sample) {
-        this->timeStampOffset = sample;
+        double a = (this->calibrating || this->offsetLatency == -1) ? 1.0 : 0.05;
+        this->timeStampOffset = std::lerp(this->timeStampOffset, sample, a);
       }
-
-      // Update filtered offset with maximum delta
-      double delta = this->timeStampOffset - this->filteredOffset;
-      double maxDelta = Clamp(delta, -30.0 * dt, 30.0 * dt);
-      this->filteredOffset += maxDelta;
     }
 
     this->lastSampleTimestamp = now;
@@ -263,13 +258,14 @@ private:
   std::mutex controllerMutex;
 
   double timeStampOffset = 0.0;
-  double filteredOffset = 0.0;
   double averageSample = 0.0;
   bool hasTimestampOffset = false;
   uint64_t lastSampleTimestamp = 0;
 
   bool isTracking = false;
   uint64_t lastTrackedTimestamp = 0;
+
+  bool calibrating = false;
 
   int32_t offsetLatency = -1;
 

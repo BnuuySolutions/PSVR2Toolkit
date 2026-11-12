@@ -2,10 +2,12 @@
 #include "ir_tracker_hooks.h"
 
 #include "hmd_driver_loader.h"
-#include "utils/hook_lib.h"
+#include "math_helpers.h"
 #include "sense_controller.h"
 #include "util.h"
+
 #include "utils/driver_settings.h"
+#include "utils/hook_lib.h"
 
 #include <cstdint>
 #include <hidsdi.h>
@@ -520,6 +522,8 @@ void libpad_SetSyncLedBaseTimeHook(LibpadTimeSync *timeSync, LibpadLedSync *ledS
       resetCalibration();
     }
   }
+
+  senseController.SetCalibrating(ctx.state != CalibrationState::Idle);
 
   // This call uses libpad_hostToDevice, which will factor in the updated latencyOffset.
   libpad_SetSyncLedBaseTime(timeSync, ledSync);
