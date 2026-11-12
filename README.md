@@ -34,5 +34,8 @@ For developers, we also have our own API library, which allows you to take full 
 
 ## [Jailbreak Guide](https://github.com/BnuuySolutions/PSVR2Toolkit/wiki/Jailbreaking-your-headset)
 
+# Agents
+For coding agents, we have an in-depth guide on how to handle this project in [AGENTS.md](AGENTS.md).
+
 # Code Signing Policy
 Free code signing provided by [SignPath.io](https://signpath.io), certificate by [SignPath Foundation](https://signpath.org/).
