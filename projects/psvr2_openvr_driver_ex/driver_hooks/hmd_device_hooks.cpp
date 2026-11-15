@@ -242,6 +242,28 @@ void *sie__psvr2__HmdDevice__GetComponentHook(void *thisptr, char *pchComponentN
   return sie__psvr2__HmdDevice__GetComponent(thisptr, pchComponentNameAndVersion);
 }
 
+// This is intended for developers or those looking to do lens modifications.
+#ifdef USE_CUSTOM_DISTORTION_HOOKS
+
+void sie__psvr2__HmdDevice__GetProjectionRawHook(void *thisptr, vr::EVREye eEye, float *pfLeft, float *pfRight, float *pfTop, float *pfBottom) {
+  *pfLeft = -1.0;
+  *pfRight = 1.0;
+  *pfTop = -1.0;
+  *pfBottom = 1.0;
+}
+
+vr::DistortionCoordinates_t *sie__psvr2__HmdDevice__ComputeDistortionHook(void *thisptr, vr::DistortionCoordinates_t *coordinates, vr::EVREye eEye, float fU, float fV) {
+  coordinates->rfBlue[0] = fU;
+  coordinates->rfBlue[1] = fV;
+  coordinates->rfGreen[0] = fU;
+  coordinates->rfGreen[1] = fV;
+  coordinates->rfRed[0] = fU;
+  coordinates->rfRed[1] = fV;
+  return coordinates;
+}
+
+#endif
+
 inline const int64_t GetHostTimestamp() {
   static LARGE_INTEGER frequency{};
   if (frequency.QuadPart == 0) {
@@ -297,6 +319,14 @@ void HmdDeviceHooks::InstallHooks() {
   // sie::psvr2::HmdDevice::GetComponent
   HookLib::InstallHook(reinterpret_cast<void *>(pHmdDriverLoader->GetBaseAddress() + 0x19EC60),
                        reinterpret_cast<void *>(sie__psvr2__HmdDevice__GetComponentHook), reinterpret_cast<void **>(&sie__psvr2__HmdDevice__GetComponent));
+
+#ifdef USE_CUSTOM_DISTORTION_HOOKS
+  // sie::psvr2::HmdDevice::GetProjectionRaw
+  HookLib::InstallHook(reinterpret_cast<void *>(pHmdDriverLoader->GetBaseAddress() + 0x19ED60), reinterpret_cast<void *>(sie__psvr2__HmdDevice__GetProjectionRawHook));
+
+  // sie::psvr2::HmdDevice::ComputeDistortion
+  HookLib::InstallHook(reinterpret_cast<void *>(pHmdDriverLoader->GetBaseAddress() + 0x19E860), reinterpret_cast<void *>(sie__psvr2__HmdDevice__ComputeDistortionHook));
+#endif
 }
 
 } // namespace psvr2_toolkit
