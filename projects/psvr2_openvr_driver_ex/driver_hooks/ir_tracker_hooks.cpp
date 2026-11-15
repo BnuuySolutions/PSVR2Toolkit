@@ -4,7 +4,50 @@
 #include "utils/hook_lib.h"
 #include "util.h"
 
+#include <array>
+
 namespace psvr2_toolkit {
+
+constexpr size_t kLedPayloadSize = 0x139C;
+constexpr uint32_t kSenseLedCount = 17;
+constexpr uintptr_t kLedPayloadRVA = 0x25EA80; // Model IDs 0, 7, 8, or > 8
+
+/* clang-format off */
+// Original LED model positions for right controller but with +1-2mm adjustments along the normals
+// to compensate for the plastic shell refracting the light.
+// Computed by Beyley via a bundle adjustment of a large controller tracking dataset with CV1.
+constexpr float kPssenseRightLeds[kSenseLedCount][3] = {
+    {-32.431f,  13.721f, -60.240f},
+    { 12.316f, -56.911f,  38.955f},
+    { 33.687f, -56.532f,  19.709f},
+    { 55.245f, -32.096f,  28.953f},
+    { 68.574f, -10.962f,   8.633f},
+    { 65.003f,  25.089f,   4.160f},
+    { 49.041f,  45.854f,  18.774f},
+    {-46.455f, -27.963f,  44.322f},
+    {-60.704f, -14.648f,  28.511f},
+    {-62.375f,  14.518f,  24.704f},
+    {-52.240f,  28.111f,  37.039f},
+    {-49.546f,  43.439f,  18.371f},
+    {-31.106f,  54.608f,  29.894f},
+    {-18.870f,  64.631f,  10.628f},
+    {  3.147f,  65.517f,  23.007f},
+    { 29.409f,  13.468f, -61.765f},
+    { -1.192f,  13.552f, -68.389f},
+};
+/* clang-format on */
+
+struct IrTrackerModelDesc {
+  uint64_t pathOrNull;
+  uint8_t flags[8];
+  const void *pHeader;
+  uint32_t headerSize;
+  uint32_t headerPad;
+  const void *pPayload;
+  uint32_t payloadSize;
+  int32_t useInMemory;
+};
+static_assert(sizeof(IrTrackerModelDesc) == 0x30, "IrTrackerModelDesc size mismatch");
 
 std::atomic<int32_t> IrTrackerHooks::g_controllerLedCount[2] = {0, 0};
 std::atomic<uint64_t> IrTrackerHooks::g_opticalFrameIndex[2] = {0, 0};
@@ -36,6 +79,33 @@ static void IrTracker__AssociateLEDsHook(void *pContext, void *pOpticalData) {
   IrTracker__AssociateLEDs(pContext, pOpticalData);
 }
 
+static void (*IrTracker__GetModelOrDefault)(int32_t controllerIdx, IrTrackerModelDesc *pModelDesc) = nullptr;
+static void IrTracker__GetModelOrDefaultHook(int32_t controllerIdx, IrTrackerModelDesc *pModelDesc) {
+  const uint8_t *origPayload = reinterpret_cast<const uint8_t *>(pModelDesc->pPayload);
+  uintptr_t baseAddress = HmdDriverLoader::Instance()->GetBaseAddress();
+  uintptr_t rva = reinterpret_cast<uintptr_t>(origPayload) - baseAddress;
+  if (origPayload && rva == kLedPayloadRVA) {
+    std::array<uint8_t, kLedPayloadSize> modifiedPayload;
+    std::memcpy(modifiedPayload.data(), origPayload, kLedPayloadSize);
+
+    float *positions = reinterpret_cast<float *>(modifiedPayload.data() + 0x18);
+
+    for (uint32_t i = 0; i < kSenseLedCount; ++i) {
+      positions[i * 3 + 0] = kPssenseRightLeds[i][0];
+      positions[i * 3 + 1] = kPssenseRightLeds[i][1];
+      positions[i * 3 + 2] = kPssenseRightLeds[i][2];
+    }
+
+    pModelDesc->pPayload = modifiedPayload.data();
+    IrTracker__GetModelOrDefault(controllerIdx, pModelDesc);
+    pModelDesc->pPayload = origPayload;
+    return;
+  }
+
+  Util::DriverLog("[IrTracker__GetModelOrDefaultHook] Ctrl {} was registered to read unknown RVA {}", controllerIdx, rva);
+  IrTracker__GetModelOrDefault(controllerIdx, pModelDesc);
+}
+
 static int32_t (*IrTracker__ParseConfig)(const void *pConfigStruct, int32_t size, uint8_t *pOutTrackerConfig) = nullptr;
 static int32_t IrTracker__ParseConfigHook(const void *pConfigStruct, int32_t size, uint8_t *pOutTrackerConfig) {
   int32_t ret = IrTracker__ParseConfig(pConfigStruct, size, pOutTrackerConfig);
@@ -65,11 +135,14 @@ void IrTrackerHooks::InstallHooks() {
   static HmdDriverLoader *pHmdDriverLoader = HmdDriverLoader::Instance();
   uintptr_t baseAddress = pHmdDriverLoader->GetBaseAddress();
 
-  HookLib::InstallHook(reinterpret_cast<void *>(baseAddress + 0x182E80), reinterpret_cast<void *>(IrTracker__ParseConfigHook),
-                       reinterpret_cast<void **>(&IrTracker__ParseConfig));
-
   HookLib::InstallHook(reinterpret_cast<void *>(baseAddress + 0x1999F0), reinterpret_cast<void *>(IrTracker__AssociateLEDsHook),
                        reinterpret_cast<void **>(&IrTracker__AssociateLEDs));
+
+  HookLib::InstallHook(reinterpret_cast<void *>(baseAddress + 0x4A340), reinterpret_cast<void *>(IrTracker__GetModelOrDefaultHook),
+                       reinterpret_cast<void **>(&IrTracker__GetModelOrDefault));
+
+  HookLib::InstallHook(reinterpret_cast<void *>(baseAddress + 0x182E80), reinterpret_cast<void *>(IrTracker__ParseConfigHook),
+                       reinterpret_cast<void **>(&IrTracker__ParseConfig));
 }
 
 } // namespace psvr2_toolkit
