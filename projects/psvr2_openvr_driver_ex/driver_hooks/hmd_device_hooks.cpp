@@ -252,7 +252,8 @@ void sie__psvr2__HmdDevice__GetProjectionRawHook(void *thisptr, vr::EVREye eEye,
   *pfBottom = 1.0;
 }
 
-vr::DistortionCoordinates_t *sie__psvr2__HmdDevice__ComputeDistortionHook(void *thisptr, vr::DistortionCoordinates_t *coordinates, vr::EVREye eEye, float fU, float fV) {
+vr::DistortionCoordinates_t *sie__psvr2__HmdDevice__ComputeDistortionHook(void *thisptr, vr::DistortionCoordinates_t *coordinates, vr::EVREye eEye, float fU,
+                                                                          float fV) {
   coordinates->rfBlue[0] = fU;
   coordinates->rfBlue[1] = fV;
   coordinates->rfGreen[0] = fU;
@@ -322,10 +323,12 @@ void HmdDeviceHooks::InstallHooks() {
 
 #ifdef USE_CUSTOM_DISTORTION_HOOKS
   // sie::psvr2::HmdDevice::GetProjectionRaw
-  HookLib::InstallHook(reinterpret_cast<void *>(pHmdDriverLoader->GetBaseAddress() + 0x19ED60), reinterpret_cast<void *>(sie__psvr2__HmdDevice__GetProjectionRawHook));
+  HookLib::InstallHook(reinterpret_cast<void *>(pHmdDriverLoader->GetBaseAddress() + 0x19ED60),
+                       reinterpret_cast<void *>(sie__psvr2__HmdDevice__GetProjectionRawHook));
 
   // sie::psvr2::HmdDevice::ComputeDistortion
-  HookLib::InstallHook(reinterpret_cast<void *>(pHmdDriverLoader->GetBaseAddress() + 0x19E860), reinterpret_cast<void *>(sie__psvr2__HmdDevice__ComputeDistortionHook));
+  HookLib::InstallHook(reinterpret_cast<void *>(pHmdDriverLoader->GetBaseAddress() + 0x19E860),
+                       reinterpret_cast<void *>(sie__psvr2__HmdDevice__ComputeDistortionHook));
 #endif
 }
 
