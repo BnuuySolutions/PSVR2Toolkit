@@ -839,9 +839,23 @@ void libpad_deviceThreadHook(PadContext *padContext) {
   _endthread();
 }
 
+static void (*g_fn_libpadProcessImu)(uintptr_t padDevice, uintptr_t dstState, uintptr_t srcRaw) = nullptr;
+static void libpad_ProcessImuHook(uintptr_t padDevice, uintptr_t dstState, uintptr_t srcRaw) {
+  if (padDevice != 0) {
+    // Disable libpad's pre-rotation on accel (bit 0) and gyro (bit 1).
+    // We do the rotation in UkfManager__setImuPoseHook (see the comments there).
+    *reinterpret_cast<uint32_t *>(padDevice + 0xA8) &= ~3u;
+  }
+  g_fn_libpadProcessImu(padDevice, dstState, srcRaw);
+}
+
 void LibpadHooks::InstallHooks() {
   static HmdDriverLoader *pHmdDriverLoader = HmdDriverLoader::Instance();
   uintptr_t baseAddress = pHmdDriverLoader->GetBaseAddress();
+
+  // libpad function for void libpad_ProcessImu(uintptr_t padDevice, uintptr_t dstState, uintptr_t srcRaw) @ 0x1D4A90
+  HookLib::InstallHook(reinterpret_cast<void *>(baseAddress + 0x1D4A90), reinterpret_cast<void *>(libpad_ProcessImuHook),
+                       reinterpret_cast<void **>(&g_fn_libpadProcessImu));
 
   if (DriverSettings::GetBool(STEAMVR_SETTINGS_USE_TOOLKIT_SYNC, SETTING_USE_TOOLKIT_SYNC_DEFAULT_VALUE)) {
     Util::DriverLog("Using custom controller/LED sync...");

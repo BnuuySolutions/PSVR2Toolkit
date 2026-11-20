@@ -131,9 +131,45 @@ static int32_t IrTracker__ParseConfigHook(const void *pConfigStruct, int32_t siz
   return ret;
 }
 
+static void (*UkfManager__setImuPose)(uintptr_t ukf, int32_t ctrlIdx, uint32_t poseIdx, const float *offsetMm) = nullptr;
+static void UkfManager__setImuPoseHook(uintptr_t ukf, int32_t ctrlIdx, uint32_t poseIdx, const float *offsetMm) {
+  UkfManager__setImuPose(ukf, ctrlIdx, poseIdx, offsetMm);
+
+  // The driver uses the libpad library, and the IMU data is rotated along the X axis by default.
+  // However, this causes issues in the UKF where there's stuff to help compensate for the IMU clipping at 8G
+  // per axis. With the rotation performed outside, the UKF no longer knows when the IMU is actually clipping or not.
+  // Two cases can happen, one where the Y and Z axes are close to the 8G max and the rotation makes the
+  // acceleration more than 8G in one axis, and another where one axis is maxed out to 8G and is "split" to another axis.
+  // The solution is to let the UKF do the rotation instead, as it takes in a pose matrix, not just a position vector.
+  if (ukf && ctrlIdx >= 0 && ctrlIdx < 2 && offsetMm) {
+    // 50.27 degrees
+    constexpr float kCos = 0.63916653f;
+    constexpr float kSin = 0.76906836f;
+
+    // Convert to meters, since that's what the UKF works in.
+    float ox = offsetMm[0] * 0.001f;
+    float oy = offsetMm[1] * 0.001f;
+    float oz = offsetMm[2] * 0.001f;
+
+    // Set the IMU pose matrix
+    float *M = reinterpret_cast<float *>(ukf + 0x808 + static_cast<size_t>(ctrlIdx) * 0x2218);
+    // clang-format off
+    M[0]  = 1.0f; M[1]  = 0.0f; M[2]  = 0.0f;  M[3]  = 0.0f;
+    M[4]  = 0.0f; M[5]  = kCos; M[6]  = -kSin; M[7]  = 0.0f;
+    M[8]  = 0.0f; M[9]  = kSin; M[10] = kCos;  M[11] = 0.0f;
+    M[12] = ox;   M[13] = oy;   M[14] = oz;    M[15] = 1.0f;
+    // clang-format on
+
+    Util::DriverLog("[UkfManager__setImuPoseHook] Applied rotation to ctrlIdx {}, poseIdx 0x{:X}", ctrlIdx, poseIdx);
+  }
+}
+
 void IrTrackerHooks::InstallHooks() {
   static HmdDriverLoader *pHmdDriverLoader = HmdDriverLoader::Instance();
   uintptr_t baseAddress = pHmdDriverLoader->GetBaseAddress();
+
+  HookLib::InstallHook(reinterpret_cast<void *>(baseAddress + 0x5F1B0), reinterpret_cast<void *>(UkfManager__setImuPoseHook),
+                       reinterpret_cast<void **>(&UkfManager__setImuPose));
 
   HookLib::InstallHook(reinterpret_cast<void *>(baseAddress + 0x1999F0), reinterpret_cast<void *>(IrTracker__AssociateLEDsHook),
                        reinterpret_cast<void **>(&IrTracker__AssociateLEDs));
