@@ -106,7 +106,7 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
 }
 
 static bool show_demo_window = true;
-static ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+static ImVec4 clear_color = ImVec4(0.0f, 0.0f, 0.0f, 1.00f);
 
 SDL_AppResult SDL_AppIterate(void *appstate) {
   AppState *app_state = (AppState *)appstate;
