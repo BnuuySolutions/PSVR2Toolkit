@@ -168,8 +168,8 @@ void IrTrackerHooks::InstallHooks() {
   static HmdDriverLoader *pHmdDriverLoader = HmdDriverLoader::Instance();
   uintptr_t baseAddress = pHmdDriverLoader->GetBaseAddress();
 
-  HookLib::InstallHook(reinterpret_cast<void *>(baseAddress + 0x5F1B0), reinterpret_cast<void *>(UkfManager__setImuPoseHook),
-                       reinterpret_cast<void **>(&UkfManager__setImuPose));
+  // Stub lerp for when we reacquire full tracking
+  HookLib::InstallStubRet0(reinterpret_cast<void *>(baseAddress + 0x1B11E0));
 
   HookLib::InstallHook(reinterpret_cast<void *>(baseAddress + 0x1999F0), reinterpret_cast<void *>(IrTracker__AssociateLEDsHook),
                        reinterpret_cast<void **>(&IrTracker__AssociateLEDs));
@@ -179,6 +179,9 @@ void IrTrackerHooks::InstallHooks() {
 
   HookLib::InstallHook(reinterpret_cast<void *>(baseAddress + 0x182E80), reinterpret_cast<void *>(IrTracker__ParseConfigHook),
                        reinterpret_cast<void **>(&IrTracker__ParseConfig));
+
+  HookLib::InstallHook(reinterpret_cast<void *>(baseAddress + 0x5F1B0), reinterpret_cast<void *>(UkfManager__setImuPoseHook),
+                       reinterpret_cast<void **>(&UkfManager__setImuPose));
 }
 
 } // namespace psvr2_toolkit
