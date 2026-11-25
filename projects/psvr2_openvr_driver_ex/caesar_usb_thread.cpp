@@ -441,6 +441,12 @@ void CaesarUsbThread::ThreadLoopHook(CaesarUsbThread *thisptr) {
     } else if (thisptr->m_state == 2) { // Connected State
       int result = thisptr->PollAndProcess();
 
+      if (thisptr->m_lastError != 0) {
+        Util::DriverLog("Last error was set for interface {}. Error: {}", thisptr->GetInterface(), thisptr->m_lastError);
+        result = -1;
+        thisptr->m_lastError = 0;
+      }
+
       if (result != 0) {
         Util::DriverLog("PollAndProcess failed for interface {}. Disconnecting. Result: {}", thisptr->GetInterface(), result);
 
