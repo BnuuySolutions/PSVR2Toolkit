@@ -147,7 +147,7 @@ vr::EVRInitError sie__psvr2__HmdDevice__ActivateHook(void *thisptr, uint32_t unO
         const CameraConfig *cam0Cfg = pConfigManager->getCameraConfig(0);
         const CameraConfig *cam1Cfg = pConfigManager->getCameraConfig(1);
 
-        const float radX = -15.0f * std::numbers::pi / 180.0f;
+        const float radX = -14.5f * std::numbers::pi / 180.0f;
         const float cosX = std::cos(radX);
         const float sinX = std::sin(radX);
         const float rx15[9] = {1.0f, 0.0f, 0.0f, 0.0f, cosX, -sinX, 0.0f, sinX, cosX};

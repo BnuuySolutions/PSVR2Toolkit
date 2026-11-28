@@ -106,31 +106,6 @@ static void IrTracker__GetModelOrDefaultHook(int32_t controllerIdx, IrTrackerMod
   IrTracker__GetModelOrDefault(controllerIdx, pModelDesc);
 }
 
-static int32_t (*IrTracker__ParseConfig)(const void *pConfigStruct, int32_t size, uint8_t *pOutTrackerConfig) = nullptr;
-static int32_t IrTracker__ParseConfigHook(const void *pConfigStruct, int32_t size, uint8_t *pOutTrackerConfig) {
-  int32_t ret = IrTracker__ParseConfig(pConfigStruct, size, pOutTrackerConfig);
-
-  if (ret == 0 && pOutTrackerConfig && pOutTrackerConfig[0x24] != 0) {
-    for (int cam = 0; cam < 4; ++cam) {
-      float *pCamIntrinsics = reinterpret_cast<float *>(pOutTrackerConfig + 0x28 + (cam * 0x6C));
-      float calibW = pCamIntrinsics[0];
-      float &cx = pCamIntrinsics[4];
-
-      if (calibW > 0.0f) {
-        float oldCx = cx;
-        // So, it seems the LD payload is off by -4px on the x axis on every camera.
-        // We will compensate for this by shifting the calibrated focal center the same amount.
-        // The LD payload is actually using a binned resolution of 508x508. However, the calibration is still in 1016x1016.
-        // Hence why we shift by -8px here instead of -4px because we're dealing with the 1016x1016 calibration.
-        cx -= 8.0f;
-        Util::DriverLog("[IrTracker__ParseConfigHook] Cam {}: patched cx {:.2f} -> {:.2f} (W={:.0f})", cam, oldCx, cx, calibW);
-      }
-    }
-  }
-
-  return ret;
-}
-
 static void (*UkfManager__setImuPose)(uintptr_t ukf, int32_t ctrlIdx, uint32_t poseIdx, const float *offsetMm) = nullptr;
 static void UkfManager__setImuPoseHook(uintptr_t ukf, int32_t ctrlIdx, uint32_t poseIdx, const float *offsetMm) {
   UkfManager__setImuPose(ukf, ctrlIdx, poseIdx, offsetMm);
@@ -176,9 +151,6 @@ void IrTrackerHooks::InstallHooks() {
 
   HookLib::InstallHook(reinterpret_cast<void *>(baseAddress + 0x4A340), reinterpret_cast<void *>(IrTracker__GetModelOrDefaultHook),
                        reinterpret_cast<void **>(&IrTracker__GetModelOrDefault));
-
-  HookLib::InstallHook(reinterpret_cast<void *>(baseAddress + 0x182E80), reinterpret_cast<void *>(IrTracker__ParseConfigHook),
-                       reinterpret_cast<void **>(&IrTracker__ParseConfig));
 
   HookLib::InstallHook(reinterpret_cast<void *>(baseAddress + 0x5F1B0), reinterpret_cast<void *>(UkfManager__setImuPoseHook),
                        reinterpret_cast<void **>(&UkfManager__setImuPose));

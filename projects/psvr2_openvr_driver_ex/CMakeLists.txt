@@ -4,6 +4,8 @@ add_library(psvr2_openvr_driver_ex SHARED
   driver_hooks/aston_manager_hooks.cpp
   driver_hooks/caesar_manager_hooks.h
   driver_hooks/caesar_manager_hooks.cpp
+  driver_hooks/config_manager_hooks.h
+  driver_hooks/config_manager_hooks.cpp
   driver_hooks/hmd_device_hooks.h
   driver_hooks/hmd_device_hooks.cpp
   driver_hooks/ir_tracker_hooks.h
